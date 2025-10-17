@@ -1,16 +1,15 @@
 // src/App.jsx
 import { BrowserRouter } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
 import AppRoutes from "./routing/AppRoutes";
-import Header from "./components/Header";
+import { RootProvider } from "./contexts/RootProvider";
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Header />
+      <RootProvider>
         <AppRoutes />
-      </AuthProvider>
+      </RootProvider>
     </BrowserRouter>
   );
 }

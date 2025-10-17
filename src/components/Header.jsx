@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
-
+import { colors } from "../constants/colors";
 export default function Header() {
   return (
     <header
-      style={{ padding: "12px 20px", background: "#1e4ea8", color: "#fff" }}
+      style={{ padding: "12px 20px", background: colors.brand , color: "#fff" }}
     >
       <strong>SAMI</strong>
       <nav style={{ display: "inline-flex", gap: 16, marginLeft: 24 }}>

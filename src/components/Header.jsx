@@ -34,7 +34,7 @@ export default function Header() {
         }}
       >
         {/* Tên người dùng */}
-        <span style={{ fontSize: "14px" }}>{loggedInUser.full_name}</span>
+        <span style={{ fontSize: "14px" }}>Xin chào {loggedInUser.full_name}!</span>
         {/* Icon chuông + badge đỏ */}
         <div style={{ position: "relative", cursor: "pointer" }}>
           <Bell size={20} color="#fff" />

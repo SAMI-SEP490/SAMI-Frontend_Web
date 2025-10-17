@@ -2,6 +2,7 @@ import React, { useState, useContext } from "react";
 import { UserContext } from "../../contexts/UserContext";
 import { colors } from "../../constants/colors";
 import "./LoginPage.css";
+import { useNavigate } from "react-router-dom";
 
 function LoginPage() {
   const { userData, setUserIdLogin } = useContext(UserContext);
@@ -9,6 +10,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  const navigate = useNavigate();
   const handleLogin = (e) => {
     e.preventDefault();
 
@@ -42,17 +44,19 @@ function LoginPage() {
     // Đăng nhập thành công
     setError("");
     setUserIdLogin(foundUser.id);
+    localStorage.setItem("accessToken", "dummy-token");
     console.log("Đăng nhập thành công:", foundUser);
+    alert("Đăng nhập thành công!");
 
     // Chuyển trang (nếu có dùng React Router)
-    // navigate("/dashboard");
+    navigate("/contracts");
   };
 
   return (
     <div className="login-container" style={{ backgroundColor: colors.brand }}>
       <div className="login-box">
         <h2>Đăng Nhập</h2>
-        <form onSubmit={handleLogin}>
+        <form onClick={handleLogin}>
           <div className="form-group">
             <label>Email</label>
             <input

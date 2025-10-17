@@ -13,7 +13,8 @@ const SideBar = () => {
       display: "flex",
       flexDirection: "column",
       padding: "20px",
-      color: "#fff"
+      color: "#fff",
+      borderRadius: "8px",
     }}>
       <button onClick={() => (navigate("/contracts"))}
        style={{ margin: "10px 0", background: "none", border: "none", color: "#fff", cursor: "pointer", textAlign: "left" }}>Danh sách hợp đồng</button>

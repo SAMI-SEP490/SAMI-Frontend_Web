@@ -44,7 +44,7 @@ function ContractListPage() {
 return (
   <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
     {/* Header cố định ở trên */}
-    <div style={{ flexShrink: 0, position: "sticky", top: 0, zIndex: 1000 }}>
+    <div style={{ marginBottom: 10, borderRadius: "10px", flexShrink: 0, position: "sticky", top: 0, zIndex: 1000 }}>
       <Headers />
     </div>
 
@@ -59,6 +59,7 @@ return (
           height: "100%",
           position: "sticky",
           top: 0,
+          borderRadius:"10px",
         }}
       >
         <Sidebar />

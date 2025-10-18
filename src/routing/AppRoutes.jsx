@@ -10,6 +10,7 @@ import VerifyCodePage from "../pages/auth/VerifyCodePage";
 import NewPasswordPage from "../pages/auth/NewPasswordPage";
 import ChangePasswordPage from "../pages/profile/ChangePasswordPage";
 import EditProfilePage from "../pages/profile/EditProfilePage";
+import BillListPage from "../pages/bill/BillListPage";
 
 export default function AppRoutes() {
   return (
@@ -53,31 +54,40 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path={ROUTES.tenants}
+          element={
+            <ProtectedRoute>
+              <TenantListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.tenantDetail}
+          element={
+            <ProtectedRoute>
+              <TenantDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.tenantEdit}
+          element={
+            <ProtectedRoute>
+              <TenantEditPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.bills}
+          element={
+            <ProtectedRoute>
+              <BillListPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
-      <Route
-        path={ROUTES.tenants}
-        element={
-          <ProtectedRoute>
-            <TenantListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.tenantDetail}
-        element={
-          <ProtectedRoute>
-            <TenantDetailPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.tenantEdit}
-        element={
-          <ProtectedRoute>
-            <TenantEditPage />
-          </ProtectedRoute>
-        }
-      />
     </div>
   );
 }

@@ -10,4 +10,6 @@ export const ROUTES = {
   tenantDetail: "/tenants/:id",
   tenants: "/tenants",
   tenantEdit: "/tenants/:id/edit",
+  bills: "/bills",
+  billDetail: "/bills/:id",
 };

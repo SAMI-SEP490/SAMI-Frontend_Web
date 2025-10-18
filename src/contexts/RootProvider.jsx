@@ -1,11 +1,14 @@
-import { ContractProvider } from "./ContractProvider";
+import React from "react";
 import { UserProvider } from "./UserContext";
+import { ContractProvider } from "./ContractProvider";
 import { BillProvider } from "./BillContext";
-export const RootProvider = ({ children }) => (
-  <UserProvider>
-    <ContractProvider>
-      {children}
-      <BillProvider>{children}</BillProvider>
-    </ContractProvider>
-  </UserProvider>
-);
+
+export default function RootProvider({ children }) {
+  return (
+    <UserProvider>
+      <ContractProvider>
+        <BillProvider>{children}</BillProvider>
+      </ContractProvider>
+    </UserProvider>
+  );
+}

@@ -2,7 +2,7 @@ import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../../contexts/UserContext";
 import Headers from "../../components/Header";
-import Sidebar from "../../components/Sidebar";
+import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { Button, Form, Alert } from "react-bootstrap";
 

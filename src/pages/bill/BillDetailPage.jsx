@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/Header";
-import SideBar from "../../components/Sidebar";
+import SideBar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { useBillContext } from "../../contexts/BillContext";
 import { ROUTES } from "../../constants/routes";

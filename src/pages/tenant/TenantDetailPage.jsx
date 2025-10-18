@@ -3,7 +3,7 @@ import React from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
 import Headers from "../../components/Header";
-import Sidebar from "../../components/Sidebar"; // đúng tên file của bạn
+import Sidebar from "../../components/SideBar"; // đúng tên file của bạn
 import { colors } from "../../constants/colors"; // đã có trong dự án
 
 // ---- small reusable pieces ----

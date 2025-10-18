@@ -1,6 +1,13 @@
-import { Navigate } from "react-router-dom";
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
 
+// Tạm thời cho qua để test; khi có auth thực, sửa lại điều kiện.
 export default function ProtectedRoute({ children }) {
-  const isAuthenticated = localStorage.getItem("accessToken");
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  const isAuthenticated = true; // hoặc !!localStorage.getItem('accessToken')
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  return children;
 }

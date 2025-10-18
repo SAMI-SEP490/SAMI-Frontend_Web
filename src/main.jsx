@@ -1,9 +1,17 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import RootProvider from "./contexts/RootProvider";
+import App from "./App";
+import "./index.css";
+import "bootstrap/dist/css/bootstrap.min.css";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <RootProvider>
+        <App />
+      </RootProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );

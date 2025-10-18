@@ -1,7 +1,7 @@
 import React, { useContext, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../components/Header";
-import Sidebar from "../../components/Sidebar";
+import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { UserContext } from "../../contexts/UserContext";
 import { ContractContext } from "../../contexts/ContractContext";

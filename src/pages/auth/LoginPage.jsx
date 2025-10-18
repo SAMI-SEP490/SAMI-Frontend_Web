@@ -88,7 +88,8 @@ function LoginPage() {
           </button>
         </form>
 
-        <a href="#" className="forgot-password" style={{ color: colors.brand }}>
+        <a onClick={() => (navigate("/forgot-password"))} 
+        href="#" className="forgot-password" style={{ color: colors.brand }}>
           Bạn quên mật khẩu?
         </a>
       </div>

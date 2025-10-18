@@ -1,7 +1,11 @@
-import { ContractProvider } from "./ContractContext";
+import { ContractProvider } from "./ContractProvider";
 import { UserProvider } from "./UserContext";
+import { BillProvider } from "./BillContext";
 export const RootProvider = ({ children }) => (
   <UserProvider>
-    <ContractProvider>{children}</ContractProvider>
+    <ContractProvider>
+      {children}
+      <BillProvider>{children}</BillProvider>
+    </ContractProvider>
   </UserProvider>
 );

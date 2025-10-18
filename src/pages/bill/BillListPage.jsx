@@ -5,12 +5,23 @@ import SideBar from "../../components/Sidebar";
 import { colors } from "../../constants/colors";
 import { useBillContext } from "../../contexts/BillContext";
 
+const CATEGORY_OPTS = ["Chi phí sinh hoạt", "Dịch vụ"];
+const PERIOD_OPTS = ["Một tháng", "Một tuần", "Một ngày"];
+
 export default function BillListPage() {
   const navigate = useNavigate();
   const { bills, setBills } = useBillContext();
 
   const [keyword, setKeyword] = useState("");
   const [selected, setSelected] = useState(new Set());
+
+  // --- NEW: state cho modal Tạo ---
+  const [openCreate, setOpenCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: "",
+    category: CATEGORY_OPTS[0],
+    period: PERIOD_OPTS[0],
+  });
 
   const filtered = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
@@ -58,6 +69,88 @@ export default function BillListPage() {
     URL.revokeObjectURL(url);
   };
 
+  // --- NEW: tạo hóa đơn ---
+  const handleCreate = () => {
+    if (!createForm.name.trim()) {
+      alert("Vui lòng nhập tên hóa đơn");
+      return;
+    }
+    const maxNum = bills
+      .map((b) => parseInt(String(b.id).replace(/\D/g, ""), 10))
+      .filter((n) => !isNaN(n))
+      .reduce((a, b) => Math.max(a, b), 0);
+    const newId = `BL-${String(maxNum + 1).padStart(3, "0")}`;
+
+    const nowISO = new Date().toISOString();
+    const newBill = {
+      id: newId,
+      name: createForm.name.trim(),
+      category: createForm.category,
+      period: createForm.period,
+      createdAt: nowISO,
+    };
+    setBills((prev) => [newBill, ...prev]); // thêm đầu danh sách
+    setOpenCreate(false);
+    setCreateForm({
+      name: "",
+      category: CATEGORY_OPTS[0],
+      period: PERIOD_OPTS[0],
+    });
+  };
+  // --- EDIT MODAL state ---
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    id: "",
+    name: "",
+    category: CATEGORY_OPTS[0],
+    period: PERIOD_OPTS[0],
+    createdAt: "", // hiển thị readonly
+  });
+
+  // mở modal sửa với dữ liệu đang chọn
+  const openEditBill = (bill) => {
+    setEditForm({
+      id: bill.id,
+      name: bill.name,
+      category: bill.category,
+      period: bill.period,
+      createdAt: bill.createdAt || new Date().toISOString(),
+    });
+    setOpenEdit(true);
+  };
+
+  // cập nhật bill vào context
+  const handleUpdate = () => {
+    if (!editForm.name.trim()) {
+      alert("Vui lòng nhập tên hóa đơn");
+      return;
+    }
+    setBills((prev) =>
+      prev.map((b) =>
+        b.id === editForm.id
+          ? {
+              ...b,
+              name: editForm.name.trim(),
+              category: editForm.category,
+              period: editForm.period,
+              // createdAt giữ nguyên (đang readonly)
+            }
+          : b
+      )
+    );
+    setOpenEdit(false);
+  };
+
+  // util format ngày giờ kiểu VN
+  const formatVNDateTime = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return (
+      d.toLocaleDateString("vi-VN") +
+      " " +
+      d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+    );
+  };
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
       <Header />
@@ -112,7 +205,7 @@ export default function BillListPage() {
             >
               <span style={{ color: "#64748B" }}>🔎</span>
               <input
-                placeholder="Tìm kiếm..."
+                placeholder="Tìm kiếm…"
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 style={{
@@ -132,9 +225,10 @@ export default function BillListPage() {
               >
                 Lọc
               </button>
+              {/* Nút TẠO mở modal */}
               <button
                 style={pill("#16A34A", "#fff")}
-                onClick={() => alert("Tạo (demo)")}
+                onClick={() => setOpenCreate(true)}
               >
                 Tạo
               </button>
@@ -198,7 +292,7 @@ export default function BillListPage() {
                       </button>
                       <button
                         style={chip(colors.brand, "#fff")}
-                        onClick={() => alert("Sửa (demo)")}
+                        onClick={() => openEditBill(b)} // 👈 mở modal sửa
                       >
                         Sửa
                       </button>
@@ -228,6 +322,203 @@ export default function BillListPage() {
               </tbody>
             </table>
           </div>
+
+          {/* ====== NEW: Modal TẠO HÓA ĐƠN ====== */}
+          {openCreate && (
+            <div style={backdrop} onClick={() => setOpenCreate(false)}>
+              <div style={modal} onClick={(e) => e.stopPropagation()}>
+                {/* Header */}
+                <div style={modalHeader}>
+                  <div style={{ fontWeight: 700 }}>Tạo Hóa Đơn</div>
+                  <button style={closeX} onClick={() => setOpenCreate(false)}>
+                    ×
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: "18px 20px", display: "grid", gap: 14 }}>
+                  <Field label="Tên:">
+                    <input
+                      placeholder="VD: Tiền nước"
+                      value={createForm.name}
+                      onChange={(e) =>
+                        setCreateForm((f) => ({ ...f, name: e.target.value }))
+                      }
+                      style={input}
+                    />
+                  </Field>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 16,
+                    }}
+                  >
+                    <Field label="Loại:">
+                      <select
+                        value={createForm.category}
+                        onChange={(e) =>
+                          setCreateForm((f) => ({
+                            ...f,
+                            category: e.target.value,
+                          }))
+                        }
+                        style={select}
+                      >
+                        {CATEGORY_OPTS.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Thời gian:">
+                      <select
+                        value={createForm.period}
+                        onChange={(e) =>
+                          setCreateForm((f) => ({
+                            ...f,
+                            period: e.target.value,
+                          }))
+                        }
+                        style={select}
+                      >
+                        {PERIOD_OPTS.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div style={modalFooter}>
+                  <button
+                    style={pill("#9CA3AF", "#fff")}
+                    onClick={() => setOpenCreate(false)}
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    style={pill("#1E40AF", "#fff")}
+                    onClick={handleCreate}
+                  >
+                    Tạo
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ====== /Modal ====== */}
+
+          {/* ====== Modal CẬP NHẬT HÓA ĐƠN ====== */}
+          {openEdit && (
+            <div style={backdrop} onClick={() => setOpenEdit(false)}>
+              <div style={modal} onClick={(e) => e.stopPropagation()}>
+                {/* Header */}
+                <div style={modalHeader}>
+                  <div style={{ fontWeight: 700 }}>Cập Nhật Hóa Đơn</div>
+                  <button style={closeX} onClick={() => setOpenEdit(false)}>
+                    ×
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: "18px 20px", display: "grid", gap: 14 }}>
+                  <Field label="Tên:">
+                    <input
+                      value={editForm.name}
+                      onChange={(e) =>
+                        setEditForm((f) => ({ ...f, name: e.target.value }))
+                      }
+                      style={input}
+                    />
+                  </Field>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 16,
+                    }}
+                  >
+                    <Field label="Ngày tạo:">
+                      <input
+                        value={formatVNDateTime(editForm.createdAt)}
+                        style={input}
+                        disabled
+                      />
+                    </Field>
+                    <span /> {/* filler để canh lưới cho đẹp */}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 16,
+                    }}
+                  >
+                    <Field label="Loại:">
+                      <select
+                        value={editForm.category}
+                        onChange={(e) =>
+                          setEditForm((f) => ({
+                            ...f,
+                            category: e.target.value,
+                          }))
+                        }
+                        style={select}
+                      >
+                        {CATEGORY_OPTS.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Thời gian:">
+                      <select
+                        value={editForm.period}
+                        onChange={(e) =>
+                          setEditForm((f) => ({ ...f, period: e.target.value }))
+                        }
+                        style={select}
+                      >
+                        {PERIOD_OPTS.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div style={modalFooter}>
+                  <button
+                    style={pill("#9CA3AF", "#fff")}
+                    onClick={() => setOpenEdit(false)}
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    style={pill("#1E40AF", "#fff")}
+                    onClick={handleUpdate}
+                  >
+                    Cập Nhật
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ====== /Modal CẬP NHẬT ====== */}
         </div>
       </div>
     </div>
@@ -272,3 +563,72 @@ const chip = (bg, fg) => ({
   cursor: "pointer",
   fontWeight: 700,
 });
+
+// Modal styles
+const backdrop = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(15,23,42,.35)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 999,
+};
+const modal = {
+  width: 560,
+  background: "#fff",
+  borderRadius: 14,
+  boxShadow: "0 20px 60px rgba(0,0,0,.25)",
+  overflow: "hidden",
+};
+const modalHeader = {
+  padding: "14px 20px",
+  borderBottom: "1px solid #EEF2F7",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+const modalFooter = {
+  padding: "12px 20px",
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 10,
+  borderTop: "1px solid #EEF2F7",
+};
+const closeX = {
+  background: "none",
+  border: "none",
+  fontSize: 24,
+  lineHeight: 1,
+  cursor: "pointer",
+  color: "#94A3B8",
+};
+const Field = ({ label, children }) => (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "120px 1fr",
+      alignItems: "center",
+      gap: 10,
+    }}
+  >
+    <div style={{ color: "#334155" }}>{label}</div>
+    <div>{children}</div>
+  </div>
+);
+const input = {
+  width: "100%",
+  height: 40,
+  padding: "0 12px",
+  borderRadius: 10,
+  border: "1px solid #E5E7EB",
+  background: "#F8FAFC",
+};
+const select = {
+  width: "100%",
+  height: 40,
+  padding: "0 10px",
+  borderRadius: 10,
+  border: "1px solid #E5E7EB",
+  background: "#F8FAFC",
+};

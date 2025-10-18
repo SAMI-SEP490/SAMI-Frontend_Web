@@ -8,7 +8,7 @@ const SideBar = () => {
   return (
     <div
       style={{
-        width: "200px",
+        width: "220px",
         height: "100vh",
         backgroundColor: colors.brand,
         display: "flex",
@@ -31,9 +31,9 @@ const SideBar = () => {
       >
         Danh sách hợp đồng
       </button>
-      <button onClick={() => navigate("/tenants")}>Danh sách người thuê</button>
-      <button onClick={() => navigate("/bills")}>Danh sách hóa đơn</button>
+
       <button
+        onClick={() => navigate("/tenants")}
         style={{
           margin: "10px 0",
           background: "none",
@@ -43,9 +43,11 @@ const SideBar = () => {
           textAlign: "left",
         }}
       >
-        Page 2
+        Danh sách người thuê
       </button>
+
       <button
+        onClick={() => navigate("/bills")}
         style={{
           margin: "10px 0",
           background: "none",
@@ -55,31 +57,7 @@ const SideBar = () => {
           textAlign: "left",
         }}
       >
-        Page 3
-      </button>
-      <button
-        style={{
-          margin: "10px 0",
-          background: "none",
-          border: "none",
-          color: "#fff",
-          cursor: "pointer",
-          textAlign: "left",
-        }}
-      >
-        Page 4
-      </button>
-      <button
-        style={{
-          margin: "10px 0",
-          background: "none",
-          border: "none",
-          color: "#fff",
-          cursor: "pointer",
-          textAlign: "left",
-        }}
-      >
-        Page 5
+        Danh sách hóa đơn
       </button>
     </div>
   );

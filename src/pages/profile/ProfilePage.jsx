@@ -165,12 +165,23 @@ export default function ProfilePage() {
             }}
           >
             <Button
-              onClick={() => navigate("/change-password")}
+              type="button"
+              onClick={() => {
+                navigate("/change-password");
+                console.log("Navigating to change password");
+              }}
               variant="outline-primary"
             >
               Thay đổi mật khẩu
             </Button>
-            <Button onClick={() => navigate("/edit-profile")} variant="primary">
+            <Button
+              type="button"
+              onClick={() => {
+                navigate("/edit-profile");
+                console.log("Navigating to edit profile");
+              }}
+              variant="primary"
+            >
               Sửa
             </Button>
             <Button

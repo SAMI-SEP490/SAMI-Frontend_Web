@@ -29,8 +29,8 @@ export default function VerifyCodePage() {
       navigate("/new-password");
     } else {
       alert("Mã xác thực không đúng, vui lòng thử lại.");
+      setUserIdChangepassword(null);
     }
-    setUserIdChangepassword(null);
   };
 
   const handleResend = () => {

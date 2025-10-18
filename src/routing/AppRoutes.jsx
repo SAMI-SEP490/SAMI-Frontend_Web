@@ -4,7 +4,9 @@ import ProtectedRoute from "./ProtectedRoute";
 
 // AUTH
 import LoginPage from "../pages/auth/LoginPage";
-
+import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
+import VerifyCodePage from "../pages/auth/VerifyCodePage";
+import NewPasswordPage from "../pages/auth/NewPasswordPage";
 // PROFILE (đổi đường dẫn đúng với project bạn)
 import ProfilePage from "../pages/profile/ProfilePage";
 
@@ -20,18 +22,29 @@ import BillDetailPage from "../pages/bill/BillDetailPage";
 // CONTRACT (nếu có)
 import ContractListPage from "../pages/dashboard/ContractListPage";
 
+//PROFILE
+import ChangePasswordPage from "../pages/profile/ChangePasswordPage";
+import EditProfilePage from "../pages/profile/EditProfilePage";
+
+// Định nghĩa các route trong ứng dụng
+import { ROUTES } from "../constants/routes";
+
 export default function AppRoutes() {
   return (
     <Routes>
       {/* Trang gốc → điều hướng vào 1 trang an toàn (vd: /profile hoặc /tenants) */}
-      <Route path="/" element={<Navigate to="/profile" replace />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
       {/* PUBLIC */}
-      <Route path="/login" element={<LoginPage />} />
+      <Route path={ROUTES.login} element={<LoginPage />} />
+
+      <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
+      <Route path={ROUTES.verifyCode} element={<VerifyCodePage />} />
+      <Route path={ROUTES.newPassword} element={<NewPasswordPage />} />
 
       {/* PROTECTED: bọc bằng ProtectedRoute */}
       <Route
-        path="/profile"
+        path={ROUTES.profile}
         element={
           <ProtectedRoute>
             <ProfilePage />
@@ -40,7 +53,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/contracts"
+        path={ROUTES.contracts}
         element={
           <ProtectedRoute>
             <ContractListPage />
@@ -49,7 +62,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/tenants"
+        path={ROUTES.tenants}
         element={
           <ProtectedRoute>
             <TenantListPage />
@@ -57,7 +70,7 @@ export default function AppRoutes() {
         }
       />
       <Route
-        path="/tenants/:id"
+        path={ROUTES.tenantDetail}
         element={
           <ProtectedRoute>
             <TenantDetailPage />
@@ -65,7 +78,7 @@ export default function AppRoutes() {
         }
       />
       <Route
-        path="/tenants/:id/edit"
+        path={ROUTES.tenantEdit}
         element={
           <ProtectedRoute>
             <TenantEditPage />
@@ -74,7 +87,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/bills"
+        path={ROUTES.bills}
         element={
           <ProtectedRoute>
             <BillListPage />
@@ -82,7 +95,7 @@ export default function AppRoutes() {
         }
       />
       <Route
-        path="/bills/:id"
+        path={ROUTES.billDetail}
         element={
           <ProtectedRoute>
             <BillDetailPage />
@@ -90,8 +103,25 @@ export default function AppRoutes() {
         }
       />
 
+      <Route
+        path={ROUTES.changePassword}
+        element={
+          <ProtectedRoute>
+            <ChangePasswordPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTES.editProfile}
+        element={
+          <ProtectedRoute>
+            <EditProfilePage />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Fallback */}
-      <Route path="*" element={<Navigate to="/profile" replace />} />
+      <Route path="*" element={<Navigate to={ROUTES.profile} replace />} />
     </Routes>
   );
 }

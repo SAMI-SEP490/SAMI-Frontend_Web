@@ -8,5 +8,6 @@ export const ROUTES = {
   newPassword: "/new-password",
   changePassword: "/change-password",
   editProfile: "/edit-profile",
-  TENANT_DETAIL: "/tenants/:id",
+  tenantDetail: "/tenants/:id",
+  tenants: "/tenants",
 };

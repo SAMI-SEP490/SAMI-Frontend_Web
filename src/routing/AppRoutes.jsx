@@ -54,9 +54,16 @@ export default function AppRoutes() {
           }
         />
       </Routes>
-
       <Route
-        path={ROUTES.TENANT_DETAIL}
+        path={ROUTES.tenants}
+        element={
+          <ProtectedRoute>
+            <TenantListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTES.tenantDetail}
         element={
           <ProtectedRoute>
             <TenantDetailPage />

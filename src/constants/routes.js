@@ -1,5 +1,8 @@
+
 export const ROUTES = {
-  profile: "/profile",
-  login: "/login",
-  contracts: "/contracts",
+  LOGIN: "/login",
+  HOME: "/",
+  CONTRACTS: "/contracts",
+  PROFILE: "/profile",
+  TENANT_DETAIL: "/tenants/:id",
 };

@@ -13,7 +13,7 @@ export default function AppRoutes() {
         <Route path="/" element={<Navigate to={ROUTES.login} replace />} />
 
         <Route path={ROUTES.login} element={<LoginPage />} />
-        
+
         {/* Các trang yêu cầu đăng nhập */}
         <Route
           path={ROUTES.profile}
@@ -32,6 +32,15 @@ export default function AppRoutes() {
           }
         />
       </Routes>
+
+      <Route
+        path={ROUTES.TENANT_DETAIL}
+        element={
+          <ProtectedRoute>
+            <TenantDetailPage />
+          </ProtectedRoute>
+        }
+      />
     </div>
   );
 }

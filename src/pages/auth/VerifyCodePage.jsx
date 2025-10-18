@@ -4,7 +4,7 @@ import { colors } from "../../constants/colors";
 import { useNavigate } from "react-router-dom";
 
 export default function VerifyCodePage() {
-  const { trueCode } = useContext(UserContext);
+  const { trueCode, setUserIdChangepassword } = useContext(UserContext);
   const [code, setCode] = useState("");
   const navigate = useNavigate();
 
@@ -30,6 +30,7 @@ export default function VerifyCodePage() {
     } else {
       alert("Mã xác thực không đúng, vui lòng thử lại.");
     }
+    setUserIdChangepassword(null);
   };
 
   const handleResend = () => {

@@ -4,14 +4,16 @@ import { colors } from "../../constants/colors";
 import Headers from "../../components/Header";
 import Sidebar from "../../components/Sidebar";
 import { Button } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
 
 export default function ProfilePage() {
   const { userData, userIdLogin } = useContext(UserContext);
+  const navigate = useNavigate();
 
   // Tìm user đang đăng nhập
   const loggedInUser = userData.find((user) => user.id == userIdLogin);
   console.log(loggedInUser);
-  
+
   // Trường hợp không có dữ liệu user
   if (!loggedInUser) {
     return (
@@ -22,7 +24,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div
+      style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+    >
       {/* Header cố định ở trên */}
       <div
         style={{
@@ -160,9 +164,21 @@ export default function ProfilePage() {
               marginBottom: "30px",
             }}
           >
-            <Button variant="outline-primary">Thay đổi mật khẩu</Button>
-            <Button variant="primary">Sửa</Button>
-            <Button variant="outline-secondary">Quay lại</Button>
+            <Button
+              onClick={() => navigate("/change-password")}
+              variant="outline-primary"
+            >
+              Thay đổi mật khẩu
+            </Button>
+            <Button onClick={() => navigate("/edit-profile")} variant="primary">
+              Sửa
+            </Button>
+            <Button
+              onClick={() => navigate("/contracts")}
+              variant="outline-secondary"
+            >
+              Quay lại
+            </Button>
           </div>
         </div>
       </div>

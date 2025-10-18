@@ -4,7 +4,7 @@ import { ContractContext } from "../../contexts/ContractContext";
 import { Table, Form, Button, Row, Col, Container } from "react-bootstrap";
 import { colors } from "../../constants/colors";
 import Headers from "../../components/Header";
-import Sidebar from "../../components/Sidebar";
+import Sidebar from "../../components/SideBar";
 function ContractListPage() {
   const { userData } = useContext(UserContext);
   const { contractData } = useContext(ContractContext);

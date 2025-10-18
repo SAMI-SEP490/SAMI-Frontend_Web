@@ -2,7 +2,7 @@ import { useContext } from "react";
 import { UserContext } from "../../contexts/UserContext";
 import { colors } from "../../constants/colors";
 import Headers from "../../components/Header";
-import Sidebar from "../../components/Sidebar";
+import Sidebar from "../../components/SideBar";
 import { Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 

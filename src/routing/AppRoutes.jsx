@@ -20,7 +20,6 @@ export default function AppRoutes() {
         <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
         <Route path={ROUTES.verifyCode} element={<VerifyCodePage />} />
         <Route path={ROUTES.newPassword} element={<NewPasswordPage />} />
-
         {/* Các trang yêu cầu đăng nhập */}
         <Route
           path={ROUTES.profile}
@@ -55,6 +54,15 @@ export default function AppRoutes() {
           }
         />
       </Routes>
+
+      <Route
+        path={ROUTES.TENANT_DETAIL}
+        element={
+          <ProtectedRoute>
+            <TenantDetailPage />
+          </ProtectedRoute>
+        }
+      />
     </div>
   );
 }

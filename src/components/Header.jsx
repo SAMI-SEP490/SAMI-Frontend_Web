@@ -1,4 +1,4 @@
-import React, {useContext, useState} from "react";
+import React, {useContext} from "react";
 import { colors } from "../constants/colors";
 import { Bell, User, LogOut } from "lucide-react"; // gói icon
 import { Badge } from "react-bootstrap"; // hiển thị số thông báo

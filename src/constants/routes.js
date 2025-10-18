@@ -1,3 +1,4 @@
+
 export const ROUTES = {
   profile: "/profile",
   login: "/login",
@@ -7,4 +8,5 @@ export const ROUTES = {
   newPassword: "/new-password",
   changePassword: "/change-password",
   editProfile: "/edit-profile",
+  TENANT_DETAIL: "/tenants/:id",
 };

@@ -76,7 +76,7 @@ export default function TenantListPage() {
             height: "100%",
           }}
         >
-          <Sidebar/>
+          <Sidebar />
         </div>
 
         {/* Nội dung */}
@@ -227,7 +227,7 @@ export default function TenantListPage() {
                       </button>
                       <button
                         style={outlineBtn}
-                        onClick={() => alert("Sửa (demo)")}
+                        onClick={() => navigate(`/tenants/${r.id}/edit`)} 
                       >
                         Sửa
                       </button>

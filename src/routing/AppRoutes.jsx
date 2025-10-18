@@ -70,6 +70,14 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path={ROUTES.tenantEdit}
+        element={
+          <ProtectedRoute>
+            <TenantEditPage />
+          </ProtectedRoute>
+        }
+      />
     </div>
   );
 }

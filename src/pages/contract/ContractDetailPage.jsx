@@ -1,4 +1,3 @@
-// src/pages/contract/ContractDetailPage.js
 import React, { useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ContractContext } from "../../contexts/ContractContext";
@@ -11,32 +10,19 @@ import { colors } from "../../constants/colors";
 export default function ContractDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { contractData } = useContext(ContractContext);
+  const { contractData, appendices } = useContext(ContractContext);
   const { userData } = useContext(UserContext);
 
   // Tìm hợp đồng theo id
-  const contract = contractData.find((item) => item.id === id);
+  const contract = contractData.find((item) => String(item.id) === String(id));
+
+  // Lọc phụ lục theo hợp đồng
+  const relatedAppendices = appendices.filter(
+    (a) => String(a.contractId) === String(id)
+  );
 
   // Lấy tên người thuê
   const tenant = userData.find((u) => u.id === contract?.tenantId);
-
-  // Giả lập dữ liệu phụ lục (có thể thay bằng context hoặc API)
-  const appendices = [
-    {
-      id: "PL-001",
-      type: "Đổi giá thuê",
-      content: "Thay đổi giá",
-      effectiveDate: "2025-07-01",
-      status: "Đang hiệu lực",
-    },
-    {
-      id: "PL-002",
-      type: "Gia hạn",
-      content: "Gia hạn hợp đồng thêm 6 tháng",
-      effectiveDate: "2025-12-01",
-      status: "Chưa hiệu lực",
-    },
-  ];
 
   if (!contract) {
     return (
@@ -64,7 +50,6 @@ export default function ContractDetailPage() {
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
       <Headers />
-
       <div style={{ flex: 1, display: "flex" }}>
         {/* Sidebar */}
         <div
@@ -174,32 +159,36 @@ export default function ContractDetailPage() {
               Phụ lục hợp đồng
             </Card.Header>
             <Card.Body>
-              <Table bordered hover>
-                <thead>
-                  <tr>
-                    <th>Phụ lục số</th>
-                    <th>Phân loại</th>
-                    <th>Nội dung</th>
-                    <th>Ngày hiệu lực</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {appendices.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.id}</td>
-                      <td>{item.type}</td>
-                      <td>{item.content}</td>
-                      <td>
-                        {new Date(item.effectiveDate).toLocaleDateString(
-                          "vi-VN"
-                        )}
-                      </td>
-                      <td>{item.status}</td>
+              {relatedAppendices.length > 0 ? (
+                <Table bordered hover>
+                  <thead>
+                    <tr>
+                      <th>Phụ lục số</th>
+                      <th>Phân loại</th>
+                      <th>Nội dung</th>
+                      <th>Ngày hiệu lực</th>
+                      <th>Trạng thái</th>
                     </tr>
-                  ))}
-                </tbody>
-              </Table>
+                  </thead>
+                  <tbody>
+                    {relatedAppendices.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.id}</td>
+                        <td>{item.type}</td>
+                        <td>{item.content}</td>
+                        <td>
+                          {new Date(item.effectiveDate).toLocaleDateString(
+                            "vi-VN"
+                          )}
+                        </td>
+                        <td>{item.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              ) : (
+                <p>Không có phụ lục nào cho hợp đồng này.</p>
+              )}
 
               <div className="d-flex justify-content-end">
                 <Button
@@ -207,8 +196,9 @@ export default function ContractDetailPage() {
                     backgroundColor: colors.brand,
                     border: "none",
                   }}
+                  onClick={() => navigate(`/contracts/${id}/addendum`)}
                 >
-                  Thêm
+                  Thêm phụ lục
                 </Button>
               </div>
             </Card.Body>

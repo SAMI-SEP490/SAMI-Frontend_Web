@@ -20,7 +20,7 @@ import BillListPage from "../pages/bill/BillListPage";
 import BillDetailPage from "../pages/bill/BillDetailPage";
 
 // CONTRACT (nếu có)
-import ContractListPage from "../pages/dashboard/ContractListPage";
+import ContractListPage from "../pages/contract/ContractListPage";
 
 //PROFILE
 import ChangePasswordPage from "../pages/profile/ChangePasswordPage";
@@ -28,6 +28,7 @@ import EditProfilePage from "../pages/profile/EditProfilePage";
 
 // Định nghĩa các route trong ứng dụng
 import { ROUTES } from "../constants/routes";
+import ContractDetailPage from "../pages/contract/ContractDetailPage";
 
 export default function AppRoutes() {
   return (
@@ -57,6 +58,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <ContractListPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path={ROUTES.contractDetail}
+        element={
+          <ProtectedRoute>
+            <ContractDetailPage />
           </ProtectedRoute>
         }
       />

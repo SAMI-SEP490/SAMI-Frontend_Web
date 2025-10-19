@@ -1,6 +1,6 @@
 import React from "react";
 import { UserProvider } from "./UserContext";
-import { ContractProvider } from "./ContractProvider";
+import { ContractProvider } from "./ContractContext";
 import { BillProvider } from "./BillContext";
 
 export default function RootProvider({ children }) {

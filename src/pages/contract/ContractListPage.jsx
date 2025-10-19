@@ -234,6 +234,7 @@ function ContractListPage() {
                 border: "none",
                 padding: "10px 20px",
               }}
+              onClick={() => navigate("/contracts/create")}
             >
               Tạo hợp đồng mới
             </Button>

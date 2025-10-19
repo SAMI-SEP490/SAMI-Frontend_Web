@@ -29,6 +29,8 @@ import EditProfilePage from "../pages/profile/EditProfilePage";
 // Định nghĩa các route trong ứng dụng
 import { ROUTES } from "../constants/routes";
 import ContractDetailPage from "../pages/contract/ContractDetailPage";
+import ContractAddendumPage from "../pages/contract/ContractAddendumPage";
+import CreateContractPage from "../pages/contract/CreateContractPage";
 
 export default function AppRoutes() {
   return (
@@ -67,6 +69,24 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <ContractDetailPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path={ROUTES.contractAddendum}
+        element={
+          <ProtectedRoute>
+            <ContractAddendumPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path={ROUTES.createContract}
+        element={
+          <ProtectedRoute>
+            <CreateContractPage />
           </ProtectedRoute>
         }
       />

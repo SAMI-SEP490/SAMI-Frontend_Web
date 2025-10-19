@@ -1,3 +1,5 @@
+import ContractDetail from "../pages/contract/ContractDetailPage";
+
 export const ROUTES = {
   profile: "/profile",
   login: "/login",
@@ -12,4 +14,5 @@ export const ROUTES = {
   tenantEdit: "/tenants/:id/edit",
   bills: "/bills",
   billDetail: "/bills/:id",
+  contractDetail: "/contracts/:id",
 };

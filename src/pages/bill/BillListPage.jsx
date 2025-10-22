@@ -153,14 +153,30 @@ export default function BillListPage() {
   };
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <Header />
+      {/* Header cố định ở trên */}
+      <div
+        style={{
+          marginBottom: 10,
+          borderRadius: "10px",
+          flexShrink: 0,
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+        }}
+      >
+        <Header />
+      </div>
+
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         <div
           style={{
-            width: 220,
-            background: colors.brand,
-            color: "#fff",
-            borderRadius: 10,
+            width: "220px",
+            backgroundColor: colors.brand,
+            color: "white",
+            height: "100%",
+            position: "sticky",
+            top: 0,
+            borderRadius: "10px",
           }}
         >
           <SideBar />
@@ -267,7 +283,7 @@ export default function BillListPage() {
                   <th style={th()}>Tên</th>
                   <th style={th(260)}>Loại</th>
                   <th style={th(160)}>Thời Gian</th>
-                  <th style={{ ...th(220), textAlign: "right" }}>Hành Động</th>
+                  <th style={{ ...th(270), textAlign: "center" }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>

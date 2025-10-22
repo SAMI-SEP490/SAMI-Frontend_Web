@@ -62,18 +62,31 @@ export default function TenantListPage() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Header giữ nguyên */}
-      <Header />
+       {/* Header cố định ở trên */}
+            <div
+              style={{
+                marginBottom: 10,
+                borderRadius: "10px",
+                flexShrink: 0,
+                position: "sticky",
+                top: 0,
+                zIndex: 1000,
+              }}
+            >
+              <Header />
+            </div>
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Sidebar trái */}
         <div
           style={{
-            width: 220,
-            background: colors.brand,
-            color: "#fff",
-            borderRadius: 10,
+            width: "220px",
+            backgroundColor: colors.brand,
+            color: "white",
             height: "100%",
+            position: "sticky",
+            top: 0,
+            borderRadius: "10px",
           }}
         >
           <Sidebar />

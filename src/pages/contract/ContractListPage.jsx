@@ -3,7 +3,7 @@ import { UserContext } from "../../contexts/UserContext";
 import { ContractContext } from "../../contexts/ContractContext";
 import { Table, Form, Button, Row, Col, Container } from "react-bootstrap";
 import { colors } from "../../constants/colors";
-import Headers from "../../components/Header";
+import Header from "../../components/Header";
 import Sidebar from "../../components/SideBar";
 import { useNavigate } from "react-router-dom";
 function ContractListPage() {
@@ -56,7 +56,7 @@ function ContractListPage() {
           zIndex: 1000,
         }}
       >
-        <Headers />
+        <Header />
       </div>
 
       {/* Phần nội dung bên dưới header */}

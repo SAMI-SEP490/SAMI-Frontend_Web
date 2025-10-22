@@ -19,18 +19,22 @@ import TenantEditPage from "../pages/tenant/TenantEditPage";
 import BillListPage from "../pages/bill/BillListPage";
 import BillDetailPage from "../pages/bill/BillDetailPage";
 
-// CONTRACT (nếu có)
+// CONTRACT 
 import ContractListPage from "../pages/contract/ContractListPage";
+import ContractDetailPage from "../pages/contract/ContractDetailPage";
+import ContractAddendumPage from "../pages/contract/ContractAddendumPage";
+import CreateContractPage from "../pages/contract/CreateContractPage";
 
 //PROFILE
 import ChangePasswordPage from "../pages/profile/ChangePasswordPage";
 import EditProfilePage from "../pages/profile/EditProfilePage";
 
+//Guest Registration
+import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistrationPage";
+
 // Định nghĩa các route trong ứng dụng
 import { ROUTES } from "../constants/routes";
-import ContractDetailPage from "../pages/contract/ContractDetailPage";
-import ContractAddendumPage from "../pages/contract/ContractAddendumPage";
-import CreateContractPage from "../pages/contract/CreateContractPage";
+
 
 export default function AppRoutes() {
   return (
@@ -146,6 +150,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <EditProfilePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path={ROUTES.receiveGuestRegistration}
+        element={
+          <ProtectedRoute>
+            <ReceiveGuestRegistrationPage />
           </ProtectedRoute>
         }
       />

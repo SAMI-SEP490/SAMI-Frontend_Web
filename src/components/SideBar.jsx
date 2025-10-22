@@ -59,6 +59,20 @@ const SideBar = () => {
       >
         Danh sách hóa đơn
       </button>
+
+      <button
+        onClick={() => navigate("/receive-guest")}
+        style={{
+          margin: "10px 0",
+          background: "none",
+          border: "none",
+          color: "#fff",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        Danh sách đăng ký khách tạm trú
+      </button>
     </div>
   );
 };

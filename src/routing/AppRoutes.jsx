@@ -14,12 +14,13 @@ import ProfilePage from "../pages/profile/ProfilePage";
 import TenantListPage from "../pages/tenant/TenantListPage";
 import TenantDetailPage from "../pages/tenant/TenantDetailPage";
 import TenantEditPage from "../pages/tenant/TenantEditPage";
+import CreateTenantPage from "../pages/tenant/CreateTenantPage";
 
 // BILL
 import BillListPage from "../pages/bill/BillListPage";
 import BillDetailPage from "../pages/bill/BillDetailPage";
 
-// CONTRACT 
+// CONTRACT
 import ContractListPage from "../pages/contract/ContractListPage";
 import ContractDetailPage from "../pages/contract/ContractDetailPage";
 import ContractAddendumPage from "../pages/contract/ContractAddendumPage";
@@ -34,7 +35,6 @@ import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistratio
 
 // Định nghĩa các route trong ứng dụng
 import { ROUTES } from "../constants/routes";
-
 
 export default function AppRoutes() {
   return (
@@ -159,6 +159,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <ReceiveGuestRegistrationPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path={ROUTES.createTenants}
+        element={
+          <ProtectedRoute>
+            <CreateTenantPage />
           </ProtectedRoute>
         }
       />

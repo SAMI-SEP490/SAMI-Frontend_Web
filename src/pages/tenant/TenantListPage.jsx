@@ -62,20 +62,21 @@ export default function TenantListPage() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-       {/* Header cố định ở trên */}
-            <div
-              style={{
-                marginBottom: 10,
-                borderRadius: "10px",
-                flexShrink: 0,
-                position: "sticky",
-                top: 0,
-                zIndex: 1000,
-              }}
-            >
-              <Header />
-            </div>
-
+      {/* Header cố định ở trên */}
+      <div
+        style={{
+          marginBottom: 10,
+          borderRadius: "10px",
+          flexShrink: 0,
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+        }}
+      >
+        {" "}
+        <Header />{" "}
+      </div>
+      ```
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Sidebar trái */}
         <div
@@ -119,6 +120,7 @@ export default function TenantListPage() {
               marginBottom: 14,
             }}
           >
+            {/* Lọc theo phòng */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ color: "#334155" }}>Số phòng</span>
               <select
@@ -140,6 +142,7 @@ export default function TenantListPage() {
               </select>
             </div>
 
+            {/* Ô tìm kiếm và nút hành động */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ color: "#334155" }}>Tìm kiếm:</span>
               <input
@@ -165,6 +168,22 @@ export default function TenantListPage() {
                 }}
               >
                 Tìm
+              </button>
+
+              {/* 👉 Nút Đăng ký người thuê trọ */}
+              <button
+                onClick={() => navigate("/tenants/create")}
+                style={{
+                  background: "#059669",
+                  color: "#fff",
+                  border: "none",
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                + Đăng ký người thuê trọ
               </button>
             </div>
           </div>
@@ -240,7 +259,7 @@ export default function TenantListPage() {
                       </button>
                       <button
                         style={outlineBtn}
-                        onClick={() => navigate(`/tenants/${r.id}/edit`)} 
+                        onClick={() => navigate(`/tenants/${r.id}/edit`)}
                       >
                         Sửa
                       </button>

@@ -1,39 +1,37 @@
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserContext } from "../../contexts/UserContext";
 import Headers from "../../components/Header";
 import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { Button, Form, Alert } from "react-bootstrap";
+import { changePassword } from "../../services/api/auth";
 
 export default function ChangePasswordPage() {
-  const { userData, setUserData, userIdLogin } = useContext(UserContext);
   const navigate = useNavigate();
 
-  const loggedInUser = userData.find((user) => user.id == userIdLogin);
-
+  // === giữ nguyên state UI ===
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [variant, setVariant] = useState("danger");
+  const [loading, setLoading] = useState(false);
 
-  const handleChangePassword = () => {
+  // Thay kiểm tra UserContext bằng kiểm tra token (vẫn giữ nguyên UI thông báo)
+  const hasToken = !!localStorage.getItem("sami:access");
+  if (!hasToken) {
+    return (
+      <div>
+        <p>Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.</p>
+      </div>
+    );
+  }
+
+  const handleChangePassword = async () => {
+    // ===== Giữ nguyên rule validate như trước (đủ trường, >=6 ký tự, khớp confirm) =====
     if (!oldPassword || !newPassword || !confirmPassword) {
       setVariant("danger");
       setMessage("Vui lòng nhập đầy đủ các trường!");
-      return;
-    }
-
-    if (!loggedInUser) {
-      setVariant("danger");
-      setMessage("Không tìm thấy người dùng.");
-      return;
-    }
-
-    if (oldPassword !== loggedInUser.password) {
-      setVariant("danger");
-      setMessage("Mật khẩu cũ không chính xác!");
       return;
     }
 
@@ -48,28 +46,28 @@ export default function ChangePasswordPage() {
       setMessage("Mật khẩu nhập lại không khớp!");
       return;
     }
+    // =========================================================================
 
-    // ✅ Cập nhật lại userData trong context
-    const updatedUsers = userData.map((user) =>
-      user.id === userIdLogin ? { ...user, password: newPassword } : user
-    );
-    setUserData(updatedUsers);
-
-    setVariant("success");
-    setMessage("Đổi mật khẩu thành công!");
-
-    // Sau 1.5s quay lại trang profile
-    setTimeout(() => navigate("/profile"), 1500);
+    // KHÔNG so sánh oldPassword với dữ liệu mock nữa — để backend kiểm tra
+    setLoading(true);
+    setMessage("");
+    try {
+      await changePassword({ currentPassword: oldPassword, newPassword }); // gọi API thật
+      setVariant("success");
+      setMessage("Đổi mật khẩu thành công!");
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => navigate("/profile"), 1500);
+    } catch (e) {
+      setVariant("danger");
+      setMessage(e?.response?.data?.message || "Đổi mật khẩu thất bại!");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!loggedInUser) {
-    return (
-      <div>
-        <p>Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.</p>
-      </div>
-    );
-  }
-
+  // ===== TỪ ĐÂY TRỞ XUỐNG: GIỮ NGUYÊN UI/STYLE/STRUCTURE =====
   return (
     <div
       style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
@@ -176,8 +174,12 @@ export default function ChangePasswordPage() {
                   gap: "20px",
                 }}
               >
-                <Button variant="primary" onClick={handleChangePassword}>
-                  Xác nhận
+                <Button
+                  variant="primary"
+                  onClick={handleChangePassword}
+                  disabled={loading}
+                >
+                  {loading ? "Đang xử lý..." : "Xác nhận"}
                 </Button>
                 <Button
                   variant="outline-secondary"

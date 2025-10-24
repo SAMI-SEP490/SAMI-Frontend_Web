@@ -1,62 +1,58 @@
-import React, { useState, useContext } from "react";
-import { UserContext } from "../../contexts/UserContext";
+import React, { useState } from "react";
 import { colors } from "../../constants/colors";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
+import { login as apiLogin } from "../../services/api/auth"; // NEW: gọi API thật
 
 function LoginPage() {
-  const { userData, setUserIdLogin } = useContext(UserContext);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
   const navigate = useNavigate();
-  const handleLogin = (e) => {
+
+  // Giữ nguyên validate rỗng; thay logic đăng nhập bằng API
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
 
     if (!email || !password) {
       setError("Vui lòng nhập đầy đủ thông tin!");
       return;
     }
 
-    // Tìm user theo email
-    const foundUser = userData.find(
-      (user) => user.email.toLowerCase() === email.toLowerCase()
-    );
+    try {
+      // Gọi backend: có thể trả requiresOTP hoặc trả luôn access/refresh token
+      const res = await apiLogin({ email, password });
 
-    if (!foundUser) {
-      setError("Email không tồn tại!");
-      return;
+      if (res?.requiresOTP) {
+        // Giữ UI, chỉ điều hướng sang màn xác minh OTP
+        navigate("/verify-code", {
+          state: {
+            userId: res.userId,
+            email,
+            from: { pathname: "/contracts" },
+          },
+          replace: true,
+        });
+        return;
+      }
+
+      // Đăng nhập xong (token đã được lưu trong service) → điều hướng như cũ
+      alert("Đăng nhập thành công!");
+      navigate("/contracts");
+    } catch (err) {
+      const msg = err?.response?.data?.message || "Đăng nhập thất bại";
+      setError(msg);
     }
-
-    // Kiểm tra mật khẩu
-    if (foundUser.password !== password) {
-      setError("Mật khẩu không chính xác!");
-      return;
-    }
-
-    // Kiểm tra role được phép đăng nhập
-    if (foundUser.role !== "Chủ trọ" && foundUser.role !== "Quản lý trọ") {
-      setError("Tài khoản không có quyền truy cập hệ thống!");
-      return;
-    }
-
-    // Đăng nhập thành công
-    setError("");
-    setUserIdLogin(foundUser.id);
-    localStorage.setItem("accessToken", "dummy-token");
-    console.log("Đăng nhập thành công:", foundUser);
-    alert("Đăng nhập thành công!");
-
-    // Chuyển trang (nếu có dùng React Router)
-    navigate("/contracts");
   };
 
   return (
     <div className="login-container" style={{ backgroundColor: colors.brand }}>
       <div className="login-box">
         <h2>Đăng Nhập</h2>
-        <form onClick={handleLogin}>
+
+        {/* Giữ nguyên UI; chỉ đổi onClick -> onSubmit cho đúng hành vi form */}
+        <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>Email</label>
             <input
@@ -88,8 +84,12 @@ function LoginPage() {
           </button>
         </form>
 
-        <a onClick={() => (navigate("/forgot-password"))} 
-        href="#" className="forgot-password" style={{ color: colors.brand }}>
+        <a
+          onClick={() => navigate("/forgot-password")}
+          href="#"
+          className="forgot-password"
+          style={{ color: colors.brand }}
+        >
           Bạn quên mật khẩu?
         </a>
       </div>

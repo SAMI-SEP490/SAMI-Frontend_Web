@@ -1,41 +1,42 @@
-import React, { useState, useContext } from "react";
-import { UserContext } from "../../contexts/UserContext";
+// giữ nguyên import React, useState, colors, useNavigate...
+import React, { useState } from "react";
 import { colors } from "../../constants/colors";
 import { useNavigate } from "react-router-dom";
+import { forgotPassword } from "../../services/api/auth"; // GỌI API THẬT
 
 export default function ResetPasswordPage() {
-  const { userData, setUserIdChangepassword } = useContext(UserContext);
   const [identifier, setIdentifier] = useState("");
   const navigate = useNavigate();
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // === GIỮ NGUYÊN VALIDATE EMAIL NHƯ BẢN GỐC ===
     if (!identifier.trim()) {
       alert("Vui lòng nhập email khôi phục");
       return;
     }
-
-    // Regex kiểm tra định dạng email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(identifier.trim())) {
       alert("Vui lòng nhập đúng định dạng email hợp lệ");
       return;
     }
+    // ============================================
 
-    // Kiểm tra email có tồn tại trong userData không
-    const foundUser = userData.find(
-      (user) => user.email.toLowerCase() === identifier.trim().toLowerCase()
-    );
+    try {
+      const res = await forgotPassword(identifier.trim());
+      alert(res?.message || "Đã gửi mã xác thực tới email của bạn.");
 
-    if (!foundUser) {
-      alert("Email này không tồn tại trong hệ thống");
-      return;
+      // LƯU Ý: controller forgotPassword chỉ trả {message, email}; KHÔNG trả userId.
+      // Vì verify bước sau cần userId, ta chuyển sang trang VERIFY-RESET-OTP và
+      // mang theo email, còn userId sẽ do người dùng nhập (nếu email không kèm userId).
+      navigate("/verify-reset-otp", { state: { email: identifier.trim() } });
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message || "Không gửi được mã. Thử lại sau.";
+      alert(msg);
     }
-
-    // Lưu userId để đổi mật khẩu sau này và chuyển sang VerifyCodePage
-    setUserIdChangepassword(foundUser.id);
-    navigate("/verify-code");
   };
 
+  // ======= PHẦN DƯỚI LÀ UI GỐC — GIỮ NGUYÊN =======
   return (
     <div
       style={{

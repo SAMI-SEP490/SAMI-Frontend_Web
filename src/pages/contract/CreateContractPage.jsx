@@ -1,15 +1,15 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import { Button, Form, Row, Col, Container, Image } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
-import { ContractContext } from "../../contexts/ContractContext";
-import { UserContext } from "../../contexts/UserContext";
+// BỎ ContractContext/UserContext mock -> GỌI API THẬT:
+import { listTenants } from "../../services/api/users";
+import { createContract } from "../../services/api/contracts";
 import { colors } from "../../constants/colors";
 
 function CreateContractPage() {
-  const { addContract } = useContext(ContractContext);
-  const { userData } = useContext(UserContext);
   const navigate = useNavigate();
 
+  // GIỮ NGUYÊN state UI bạn đang có
   const [newContract, setNewContract] = useState({
     roomNumber: "",
     tenantId: "",
@@ -20,32 +20,82 @@ function CreateContractPage() {
     status: "Đang xử lý",
   });
 
+  // NEW: nạp tenants từ API để thay cho UserContext
+  const [tenants, setTenants] = useState([]);
+  const [loadingTenants, setLoadingTenants] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoadingTenants(true);
+        const data = await listTenants();
+        // Chuẩn hoá dữ liệu tenants về {id, full_name, avatar_url}
+        const arr = (data?.data || data?.users || data || []).map((u) => ({
+          id: u?.id ?? u?.user_id ?? u?._id,
+          full_name: u?.full_name ?? u?.name ?? u?.email ?? "Người thuê",
+          avatar_url: u?.avatar_url ?? u?.avatar ?? null,
+        }));
+        setTenants(arr);
+      } catch {
+        setTenants([]);
+      } finally {
+        setLoadingTenants(false);
+      }
+    })();
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setNewContract({ ...newContract, [name]: value });
   };
 
+  // LƯU NHÁP: backend thường không có "draft", nên mình giữ hành vi cũ
+  // bằng cách lưu cục bộ để bạn không mất dữ liệu.
   const handleSaveDraft = () => {
-    const draft = { ...newContract, id: Date.now(), isDraft: true };
-    addContract(draft); // thêm bản nháp vào context
-    alert("Đã lưu bản nháp!");
-    navigate("/contracts"); // về danh sách hợp đồng
+    const key = "sami:contract:draft";
+    const draft = { ...newContract, _savedAt: Date.now() };
+    try {
+      localStorage.setItem(key, JSON.stringify(draft));
+      alert("Đã lưu bản nháp (cục bộ)!");
+    } catch {
+      alert("Không thể lưu bản nháp trên trình duyệt.");
+    }
+    navigate("/contracts");
   };
 
-  const handleSubmit = (e) => {
+  // TẠO HỢP ĐỒNG THẬT: gọi API
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newData = { ...newContract, id: Date.now(), isDraft: false };
-    addContract(newData); // thêm hợp đồng chính thức vào context
-    alert("Tạo hợp đồng thành công!");
-    navigate("/contracts"); // quay về danh sách hợp đồng
+
+    // Map dữ liệu UI -> payload backend (bạn chỉnh key nếu BE khác)
+    const payload = {
+      // Thường BE sẽ nhận room_id hoặc room_number — bạn có roomNumber (101/102…)
+      room_number: newContract.roomNumber,
+      tenant_user_id: newContract.tenantId,
+      start_date: newContract.startDate, // "YYYY-MM-DD"
+      end_date: newContract.endDate,
+      deposit_amount:
+        newContract.deposit?.replace?.(/[^\d]/g, "") || newContract.deposit, // "4.000.000 vnd" -> "4000000"
+      rent_amount:
+        newContract.monthlyRent?.replace?.(/[^\d]/g, "") ||
+        newContract.monthlyRent,
+      status: newContract.status, // "Đang xử lý" / "Đang hiệu lực" / "Đã kết thúc"
+      note: "", // nếu form bạn bổ sung ghi chú sau này
+      // file: <File> // nếu UI sau này thêm input file
+    };
+
+    try {
+      await createContract(payload);
+      alert("Tạo hợp đồng thành công!");
+      navigate("/contracts");
+    } catch (e2) {
+      alert(e2?.response?.data?.message || "Tạo hợp đồng thất bại!");
+    }
   };
 
-  // Lọc ra người thuê trọ
-  const tenants = userData.filter((u) => u.role === "Người thuê trọ");
-
-  // Lấy avatar người thuê
+  // Lấy avatar người thuê theo lựa chọn hiện tại (giữ nguyên UI)
   const selectedTenant = tenants.find(
-    (tenant) => tenant.id === parseInt(newContract.tenantId)
+    (tenant) => String(tenant.id) === String(newContract.tenantId)
   );
 
   return (
@@ -71,6 +121,7 @@ function CreateContractPage() {
         Tạo hợp đồng
       </h5>
 
+      {/* GIỮ NGUYÊN UI FORM */}
       <Form onSubmit={handleSubmit}>
         <Form.Group as={Row} className="mb-3">
           <Form.Label column sm="4">
@@ -101,8 +152,11 @@ function CreateContractPage() {
               value={newContract.tenantId}
               onChange={handleChange}
               required
+              disabled={loadingTenants}
             >
-              <option value="">Chọn người thuê</option>
+              <option value="">
+                {loadingTenants ? "Đang tải..." : "Chọn người thuê"}
+              </option>
               {tenants.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.full_name}
@@ -216,6 +270,7 @@ function CreateContractPage() {
             variant="primary"
             style={{ backgroundColor: colors.brand }}
             onClick={handleSaveDraft}
+            type="button"
           >
             Lưu làm bản nháp
           </Button>

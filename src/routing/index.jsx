@@ -6,6 +6,9 @@ import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
 import VerifyCodePage from "../pages/auth/VerifyCodePage"; // OTP khi login 2FA
 import ProfilePage from "../pages/profile/ProfilePage";
 import ChangePasswordPage from "../pages/profile/ChangePasswordPage";
+import ContractsListPage from "../pages/contract/ContractsListPage";
+import CreateContractPage from "../pages/contract/CreateContractPage";
+import ContractDetailPage from "../pages/contract/ContractDetailPage";
 
 // NEW: trang nhập OTP cho quên mật khẩu (tạo ở bước 2)
 import VerifyResetOtpPage from "../pages/auth/VerifyResetOtpPage";
@@ -34,6 +37,30 @@ export default function AppRoutes() {
       <Route path="/new-password" element={<ChangePasswordPage />} />{" "}
       {/* bạn đang dùng UI này */}
       {/* Private */}
+      <Route
+        path="/contracts"
+        element={
+          <Protected>
+            <ContractsListPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/contracts/new"
+        element={
+          <Protected>
+            <CreateContractPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/contracts/:id"
+        element={
+          <Protected>
+            <ContractDetailPage />
+          </Protected>
+        }
+      />
       <Route
         path="/profile"
         element={

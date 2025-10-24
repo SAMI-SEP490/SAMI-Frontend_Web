@@ -11,6 +11,7 @@ export const ROUTES = {
   editProfile: "/edit-profile",
   tenantDetail: "/tenants/:id",
   tenants: "/tenants",
+  createTenants: "/tenants/create",
   tenantEdit: "/tenants/:id/edit",
   bills: "/bills",
   billDetail: "/bills/:id",

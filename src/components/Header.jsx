@@ -1,4 +1,5 @@
-import React, {useContext} from "react";
+import React, { useContext } from "react";
+import { logout } from "../services/api/auth";
 import { colors } from "../constants/colors";
 import { Bell, User, LogOut } from "lucide-react"; // gói icon
 import { Badge } from "react-bootstrap"; // hiển thị số thông báo
@@ -9,7 +10,7 @@ export default function Header() {
   const { userData, userIdLogin } = useContext(UserContext);
   const navigate = useNavigate();
 
-  const loggedInUser = userData.find(user => user.id == userIdLogin);
+  const loggedInUser = userData.find((user) => user.id == userIdLogin);
   return (
     <header
       style={{
@@ -34,7 +35,9 @@ export default function Header() {
         }}
       >
         {/* Tên người dùng */}
-        <span style={{ fontSize: "14px" }}>Xin chào {loggedInUser.full_name}!</span>
+        <span style={{ fontSize: "14px" }}>
+          Xin chào {loggedInUser.full_name}!
+        </span>
         {/* Icon chuông + badge đỏ */}
         <div style={{ position: "relative", cursor: "pointer" }}>
           <Bell size={20} color="#fff" />
@@ -53,10 +56,23 @@ export default function Header() {
         </div>
 
         {/* Icon user */}
-        <User onClick={() =>(navigate("/profile"))} size={20} color="#fff" style={{ cursor: "pointer" }} />
+        <User
+          onClick={() => navigate("/profile")}
+          size={20}
+          color="#fff"
+          style={{ cursor: "pointer" }}
+        />
 
         {/* Icon logout */}
-        <LogOut onClick={() => (navigate("/login"))} size={20} color="#fff" style={{ cursor: "pointer" }} />
+        <LogOut
+          onClick={async () => {
+            await logout();
+            window.location.href = "/login";
+          }}
+          size={20}
+          color="#fff"
+          style={{ cursor: "pointer" }}
+        />
       </div>
     </header>
   );

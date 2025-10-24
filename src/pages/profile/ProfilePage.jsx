@@ -1,27 +1,56 @@
-import { useContext } from "react";
-import { UserContext } from "../../contexts/UserContext";
+import React, { useEffect, useState } from "react";
 import { colors } from "../../constants/colors";
 import Headers from "../../components/Header";
 import Sidebar from "../../components/SideBar";
 import { Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
+import { getProfile } from "../../services/api/auth";
 
 export default function ProfilePage() {
-  const { userData, userIdLogin } = useContext(UserContext);
   const navigate = useNavigate();
 
-  // Tìm user đang đăng nhập
-  const loggedInUser = userData.find((user) => user.id == userIdLogin);
-  console.log(loggedInUser);
+  // NEW: lấy dữ liệu từ API thay vì UserContext
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
-  // Trường hợp không có dữ liệu user
-  if (!loggedInUser) {
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getProfile(); // gọi /auth/profile
+        setProfile(data);
+      } catch (e) {
+        setErr(e?.response?.data?.message || "Không tải được hồ sơ");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // Giữ nguyên thông điệp khi không có dữ liệu (tương tự file cũ)
+  if (!loading && (!profile || err)) {
     return (
       <div>
         <p>Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.</p>
       </div>
     );
   }
+
+  // Loading nhẹ khi chờ API
+  if (loading) {
+    return <div className="p-3">Đang tải...</div>;
+  }
+
+  // Để không phải sửa markup phía dưới, dùng biến có tên cũ
+  const loggedInUser = {
+    avatar_url: profile?.avatar_url,
+    full_name: profile?.full_name,
+    birthday: profile?.birthday,
+    gender: profile?.gender,
+    role: profile?.role,
+    email: profile?.email,
+    phone: profile?.phone,
+  };
 
   return (
     <div

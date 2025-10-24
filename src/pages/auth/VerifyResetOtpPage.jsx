@@ -1,62 +1,26 @@
 import React, { useState } from "react";
 import { colors } from "../../constants/colors";
-import { useNavigate, useLocation } from "react-router-dom";
-import { verifyOTP } from "../../services/api/auth";
+import { useNavigate } from "react-router-dom";
 
-export default function VerifyCodePage() {
+export default function VerifyResetOtpPage() {
   const [code, setCode] = useState("");
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
 
-  // userId được truyền từ LoginPage khi backend yêu cầu OTP:
-  // navigate("/verify-code", { state: { userId, email, from } })
-  const userId = location.state?.userId;
+  const handleVerify = () => {
+    if (!code.trim()) return alert("Vui lòng nhập mã xác thực");
+    if (code.length !== 6) return alert("Mã xác thực phải gồm 6 chữ số");
+    if (!/^\d{6}$/.test(code)) return alert("Mã xác thực chỉ được chứa chữ số");
 
-  const handleVerify = async () => {
-    // ======= VALIDATE: GIỮ NGUYÊN Y NHƯ TRƯỚC ======= //
-    if (!code.trim()) {
-      alert("Vui lòng nhập mã xác thực");
-      return;
-    }
-
-    if (code.length !== 6) {
-      alert("Mã xác thực phải gồm 6 chữ số");
-      return;
-    }
-
-    if (!/^\d{6}$/.test(code)) {
-      alert("Mã xác thực chỉ được chứa chữ số");
-      return;
-    }
-    // ======= HẾT PHẦN VALIDATE ======= //
-
-    if (!userId) {
-      // Phòng trường hợp mở thẳng /verify-code mà không đi từ /login
-      alert("Thiếu thông tin phiên đăng nhập. Vui lòng đăng nhập lại.");
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Gọi API verify OTP: hàm này sẽ tự lưu access/refresh token vào localStorage
-      await verifyOTP({ userId, otp: code.trim() });
-
-      // Nếu LoginPage có truyền 'from', quay lại đó; mặc định về /profile
-      const back = location.state?.from?.pathname || "/profile";
-      navigate(back, { replace: true });
-    } catch (e) {
-      const msg = e?.response?.data?.message || "OTP không hợp lệ";
-      alert(msg);
-    } finally {
-      setLoading(false);
-    }
+    // TẠM THỜI: giữ nguyên như VerifyCodePage – xác thực ok thì vào trang đặt mật khẩu mới
+    // Sau này khi nối API, bạn gọi POST /auth/verify-otp-forgot ở đây,
+    // rồi navigate("/new-password", { state: { userId, resetToken } })
+    alert("Mã xác thực chính xác!");
+    navigate("/new-password");
   };
 
   const handleResend = () => {
-    // Bạn có thể gắn API resend OTP ở đây nếu backend có endpoint tương ứng.
     alert("Mã xác thực đã được gửi lại!");
+    // Sau này gọi POST /auth/resend-otp-forgot
   };
 
   return (
@@ -106,7 +70,6 @@ export default function VerifyCodePage() {
 
         <button
           onClick={handleVerify}
-          disabled={loading}
           style={{
             width: "100%",
             backgroundColor: colors.brand,
@@ -118,10 +81,9 @@ export default function VerifyCodePage() {
             border: "none",
             cursor: "pointer",
             marginBottom: "10px",
-            opacity: loading ? 0.8 : 1,
           }}
         >
-          {loading ? "Đang xác minh..." : "Xác nhận"}
+          Xác nhận
         </button>
 
         <button

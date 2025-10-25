@@ -213,14 +213,6 @@ export default function CreateTenantPage() {
                   onChange={(e) => handleChange("phone", e.target.value)}
                 />
 
-                <label>Địa chỉ thường trú:</label>
-                <textarea
-                  rows="2"
-                  style={inputStyle}
-                  value={formData.address}
-                  onChange={(e) => handleChange("address", e.target.value)}
-                />
-
                 <label>Phòng:</label>
                 <select
                   style={inputStyle}

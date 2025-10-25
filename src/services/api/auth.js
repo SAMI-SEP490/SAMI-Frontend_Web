@@ -30,18 +30,34 @@ function persistSession(payload) {
   }
 }
 
-export async function login({ email, password }) {
-  const res = await http.post("/auth/login", { email, password });
+export async function login({ email, password, phone } = {}) {
+  const payload = email
+    ? { email: String(email).trim(), password }
+    : { phone: String(phone || "").trim(), password };
+
+  const res = await http.post("/auth/login", payload);
   const data = unwrap(res);
 
-  // Nếu back-end trả requiresOTP thì chưa lưu token
-  if (!data?.requiresOTP) {
-    persistSession(data);
+  // Lưu token để ProtectedRoute nhận ra đã đăng nhập
+  const access =
+    data?.accessToken || data?.access_token || data?.token || data?.data?.accessToken;
+  const refresh =
+    data?.refreshToken || data?.refresh_token || data?.data?.refreshToken;
+
+  if (access) {
+    localStorage.setItem("sami:access", access);
+    localStorage.setItem("accessToken", access);
   }
-  // data có thể là {requiresOTP,...} hoặc {accessToken, refreshToken, user}
+  if (refresh) {
+    localStorage.setItem("sami:refresh", refresh);
+    localStorage.setItem("refreshToken", refresh);
+  }
+  if (data?.user) {
+    localStorage.setItem("sami:user", JSON.stringify(data.user));
+  }
+
   return data;
 }
-
 export async function verifyOTP({ userId, otp }) {
   const res = await http.post("/auth/verify-otp", { userId, otp });
   const data = unwrap(res);

@@ -1,96 +1,107 @@
-// src/services/http.js
+// src/services/api/http.js
 import axios from "axios";
 
-const apiBase = import.meta.env.VITE_API_BASE_URL || "/api";
+// baseURL của bạn
+const baseURL =
+  (import.meta && import.meta.env && import.meta.env.VITE_API_BASE_URL) ||
+  "/api";
 
 export const http = axios.create({
-  baseURL: apiBase,
-  timeout: 20000,
-  withCredentials: false, // bật true nếu BE dùng cookie HttpOnly
+  baseURL,
+  withCredentials: false,
 });
 
-/** Lấy access token từ localStorage với các key có thể gặp */
-function readAccessToken() {
-  const KEYS = [
-    "sami:access",
-    "accessToken",
-    "token",
-    "sami_token",
-    "jwt",
-    "access_token",
-  ];
-  for (const k of KEYS) {
-    const v = localStorage.getItem(k);
-    if (!v) continue;
-    try {
-      const obj = JSON.parse(v);
-      if (obj?.accessToken) return obj.accessToken;
-      if (obj?.token) return obj.token;
-    } catch {
-      // v là chuỗi thuần → lọc bỏ prefix "Bearer "
-      return v.replace(/^Bearer\s+/i, "");
-    }
-  }
-  return null;
-}
+// Các endpoint PUBLIC (không cần token, KHÔNG auto-redirect khi 401)
+const PUBLIC_PATHS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/forgot-password",
+  "/auth/verify-otp-forgot",
+  "/auth/resend-otp-forgot",
+  "/auth/reset-password",
+];
 
-/** Gắn Authorization header */
+export const unwrap = (res) => res?.data ?? res;
+
 http.interceptors.request.use((config) => {
-  const token = readAccessToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  const access = localStorage.getItem("sami:access") || localStorage.getItem("accessToken");
+  const isPublic = PUBLIC_PATHS.some((p) => config.url?.startsWith(p));
+  if (access && !isPublic) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${access}`;
+  }
   return config;
 });
 
-/** Nếu 401 → xoá token và đưa về /login */
+// Refresh token nhẹ – và KHÔNG đá về login với public APIs
+let isRefreshing = false;
+let queue = [];
+
+function flushQueue(token) {
+  queue.forEach((cb) => cb(token));
+  queue = [];
+}
+
 http.interceptors.response.use(
-  (res) => res,
+  (r) => r,
   async (error) => {
-    if (error?.response?.status === 401) {
+    const { response, config } = error || {};
+    const status = response?.status;
+    const isPublic = PUBLIC_PATHS.some((p) => config?.url?.startsWith(p));
+
+    if (status === 401 && !isPublic) {
+      // chỉ auto-refresh cho API private
+      if (!config._retry) {
+        config._retry = true;
+        const refresh =
+          localStorage.getItem("sami:refresh") ||
+          localStorage.getItem("refreshToken");
+        if (refresh) {
+          try {
+            if (!isRefreshing) {
+              isRefreshing = true;
+              const res = await axios.post(`${baseURL}/auth/refresh-token`, {
+                refreshToken: refresh,
+              });
+              const newToken =
+                res?.data?.accessToken ||
+                res?.data?.token ||
+                res?.data?.access_token;
+              if (newToken) {
+                localStorage.setItem("sami:access", newToken);
+                localStorage.setItem("accessToken", newToken);
+              }
+              isRefreshing = false;
+              flushQueue(newToken);
+            }
+
+            return new Promise((resolve) => {
+              queue.push((newToken) => {
+                if (newToken) {
+                  config.headers.Authorization = `Bearer ${newToken}`;
+                }
+                resolve(http(config));
+              });
+            });
+          } catch {
+            isRefreshing = false;
+            flushQueue(null);
+          }
+        }
+      }
+
+      // Nếu vẫn 401: dọn token nhưng KHÔNG redirect nếu đang ở public flow
       [
         "sami:access",
-        "sami:refresh",
-        "sami:user",
         "accessToken",
+        "sami:refresh",
         "refreshToken",
+        "sami:user",
       ].forEach((k) => localStorage.removeItem(k));
-      if (window.location.pathname !== "/login")
-        window.location.href = "/login";
+      // Không window.location = "/login" ở đây -> để router tự xử lý
     }
+
+    // Với public endpoints, trả lỗi về trang hiện tại (không chuyển trang)
     return Promise.reject(error);
   }
 );
-
-/** Helper lấy payload chuẩn: ưu tiên data.data rồi tới data */
-export function unwrap(res) {
-  if (!res) return res;
-  const d = res.data;
-  return d && typeof d === "object" && "data" in d ? d.data : d;
-}
-
-/** Helper thử nhiều path GET (dùng ở vài service) */
-export async function tryGet(paths, config = {}) {
-  let lastErr;
-  for (const p of paths) {
-    try {
-      const r = await http.get(p, config);
-      return unwrap(r);
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr;
-}
-
-/** Helper thử nhiều path POST (nếu cần) */
-export async function tryPost(paths, body, config = {}) {
-  let lastErr;
-  for (const p of paths) {
-    try {
-      const r = await http.post(p, body, config);
-      return unwrap(r);
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr;
-}

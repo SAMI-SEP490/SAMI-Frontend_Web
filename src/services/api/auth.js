@@ -153,14 +153,21 @@ export async function forgotPassword(email) {
   return unwrap(res);
 }
 
-/** Verify OTP cho QUÊN MẬT KHẨU: trả (resetToken, userId) */
-export async function verifyResetOTP({ userId, otp }) {
-  const res = await http.post("/auth/verify-otp-forgot", { userId, otp });
-  return unwrap(res);
+/** Verify OTP cho QUÊN MẬT KHẨU: cho phép truyền email HOẶC userId */
+export async function verifyResetOTP({ userId, email, otp }) {
+  const body = { otp };
+  if (userId) body.userId = userId;
+  if (email) body.email = email;
+  const res = await http.post("/auth/verify-otp-forgot", body);
+  return unwrap(res); // expect { userId, resetToken, message }
 }
 
-export async function resendResetOTP(userId) {
-  const res = await http.post("/auth/resend-otp-forgot", { userId });
+/** Resend OTP: chấp nhận email hoặc userId */
+export async function resendResetOTP({ userId, email }) {
+  const body = {};
+  if (userId) body.userId = userId;
+  if (email) body.email = email;
+  const res = await http.post("/auth/resend-otp-forgot", body);
   return unwrap(res);
 }
 

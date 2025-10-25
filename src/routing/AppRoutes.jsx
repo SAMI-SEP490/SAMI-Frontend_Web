@@ -1,179 +1,175 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
+import { ROUTES } from "../constants/routes";
 
-// AUTH
+// ===== Auth (PUBLIC) =====
 import LoginPage from "../pages/auth/LoginPage";
 import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
-import VerifyCodePage from "../pages/auth/VerifyCodePage";
+import VerifyResetOtpPage from "../pages/auth/VerifyResetOtpPage"; // ✅ THÊM IMPORT
 import NewPasswordPage from "../pages/auth/NewPasswordPage";
-// PROFILE (đổi đường dẫn đúng với project bạn)
-import ProfilePage from "../pages/profile/ProfilePage";
+import VerifyCodePage from "../pages/auth/VerifyCodePage"; // (nếu dùng cho flow khác)
 
-// TENANT
+// ===== Profile =====
+import ProfilePage from "../pages/profile/ProfilePage";
+import ChangePasswordPage from "../pages/profile/ChangePasswordPage";
+import EditProfilePage from "../pages/profile/EditProfilePage";
+
+// ===== Tenants =====
 import TenantListPage from "../pages/tenant/TenantListPage";
 import TenantDetailPage from "../pages/tenant/TenantDetailPage";
 import TenantEditPage from "../pages/tenant/TenantEditPage";
 import CreateTenantPage from "../pages/tenant/CreateTenantPage";
 
-// BILL
-import BillListPage from "../pages/bill/BillListPage";
-import BillDetailPage from "../pages/bill/BillDetailPage";
-
-// CONTRACT
+// ===== Contracts =====
 import ContractListPage from "../pages/contract/ContractListPage";
 import ContractDetailPage from "../pages/contract/ContractDetailPage";
 import ContractAddendumPage from "../pages/contract/ContractAddendumPage";
 import CreateContractPage from "../pages/contract/CreateContractPage";
 
-//PROFILE
-import ChangePasswordPage from "../pages/profile/ChangePasswordPage";
-import EditProfilePage from "../pages/profile/EditProfilePage";
+// ===== Bills =====
+import BillListPage from "../pages/bill/BillListPage";
+import BillDetailPage from "../pages/bill/BillDetailPage";
 
-//Guest Registration
+// ===== Guest =====
 import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistrationPage";
 
-// Định nghĩa các route trong ứng dụng
-import { ROUTES } from "../constants/routes";
+const isAuthed = () =>
+  !!localStorage.getItem("sami:access") ||
+  !!localStorage.getItem("accessToken");
+
+const Private = ({ children }) =>
+  isAuthed() ? children : <Navigate to={ROUTES.login} replace />;
 
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Trang gốc → điều hướng vào 1 trang an toàn (vd: /profile hoặc /tenants) */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-
-      {/* PUBLIC */}
+      {/* ===== Public ===== */}
       <Route path={ROUTES.login} element={<LoginPage />} />
-
       <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
-      <Route path={ROUTES.verifyCode} element={<VerifyCodePage />} />
+      <Route
+        path={ROUTES.verifyResetOtp}
+        element={<VerifyResetOtpPage />}
+      />{" "}
+      {/* ✅ THÊM ROUTE */}
       <Route path={ROUTES.newPassword} element={<NewPasswordPage />} />
-
-      {/* PROTECTED: bọc bằng ProtectedRoute */}
+      <Route path={ROUTES.verifyCode} element={<VerifyCodePage />} />
+      {/* ===== Private ===== */}
       <Route
         path={ROUTES.profile}
         element={
-          <ProtectedRoute>
+          <Private>
             <ProfilePage />
-          </ProtectedRoute>
+          </Private>
         }
       />
-
-      <Route
-        path={ROUTES.contracts}
-        element={
-          <ProtectedRoute>
-            <ContractListPage />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path={ROUTES.contractDetail}
-        element={
-          <ProtectedRoute>
-            <ContractDetailPage />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path={ROUTES.contractAddendum}
-        element={
-          <ProtectedRoute>
-            <ContractAddendumPage />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path={ROUTES.createContract}
-        element={
-          <ProtectedRoute>
-            <CreateContractPage />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path={ROUTES.tenants}
-        element={
-          <ProtectedRoute>
-            <TenantListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.tenantDetail}
-        element={
-          <ProtectedRoute>
-            <TenantDetailPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.tenantEdit}
-        element={
-          <ProtectedRoute>
-            <TenantEditPage />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path={ROUTES.bills}
-        element={
-          <ProtectedRoute>
-            <BillListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.billDetail}
-        element={
-          <ProtectedRoute>
-            <BillDetailPage />
-          </ProtectedRoute>
-        }
-      />
-
       <Route
         path={ROUTES.changePassword}
         element={
-          <ProtectedRoute>
+          <Private>
             <ChangePasswordPage />
-          </ProtectedRoute>
+          </Private>
         }
       />
       <Route
         path={ROUTES.editProfile}
         element={
-          <ProtectedRoute>
+          <Private>
             <EditProfilePage />
-          </ProtectedRoute>
+          </Private>
         }
       />
-
+      <Route
+        path={ROUTES.tenants}
+        element={
+          <Private>
+            <TenantListPage />
+          </Private>
+        }
+      />
+      <Route
+        path={ROUTES.tenantDetail}
+        element={
+          <Private>
+            <TenantDetailPage />
+          </Private>
+        }
+      />
+      <Route
+        path={ROUTES.tenantEdit}
+        element={
+          <Private>
+            <TenantEditPage />
+          </Private>
+        }
+      />
+      <Route
+        path={ROUTES.tenantCreate}
+        element={
+          <Private>
+            <CreateTenantPage />
+          </Private>
+        }
+      />
+      <Route
+        path={ROUTES.contracts}
+        element={
+          <Private>
+            <ContractListPage />
+          </Private>
+        }
+      />
+      <Route
+        path={ROUTES.contractDetail}
+        element={
+          <Private>
+            <ContractDetailPage />
+          </Private>
+        }
+      />
+      <Route
+        path={ROUTES.contractAddendum}
+        element={
+          <Private>
+            <ContractAddendumPage />
+          </Private>
+        }
+      />
+      <Route
+        path={ROUTES.createContract}
+        element={
+          <Private>
+            <CreateContractPage />
+          </Private>
+        }
+      />
+      <Route
+        path={ROUTES.bills}
+        element={
+          <Private>
+            <BillListPage />
+          </Private>
+        }
+      />
+      <Route
+        path={ROUTES.billDetail}
+        element={
+          <Private>
+            <BillDetailPage />
+          </Private>
+        }
+      />
       <Route
         path={ROUTES.receiveGuestRegistration}
         element={
-          <ProtectedRoute>
+          <Private>
             <ReceiveGuestRegistrationPage />
-          </ProtectedRoute>
+          </Private>
         }
       />
-
-      <Route
-        path={ROUTES.createTenants}
-        element={
-          <ProtectedRoute>
-            <CreateTenantPage />
-          </ProtectedRoute>
-        }
-      />
-
       {/* Fallback */}
-      <Route path="*" element={<Navigate to={ROUTES.profile} replace />} />
+      <Route path="/" element={<Navigate to={ROUTES.login} replace />} />
+      <Route path="*" element={<Navigate to={ROUTES.login} replace />} />
     </Routes>
   );
 }

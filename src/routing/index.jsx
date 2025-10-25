@@ -110,14 +110,8 @@ export default function AppRoutes() {
           </Protected>
         }
       />
-      <Route
-        path="/change-password"
-        element={
-          <Protected>
-            <ChangePasswordPage />
-          </Protected>
-        }
-      />
+      <Route path="/edit-profile" element={<EditProfilePage />} />
+      <Route path="/change-password" element={<ChangePasswordPage />} />
 
       {/* Fallbacks */}
       <Route path="/" element={<HomeRedirect />} />

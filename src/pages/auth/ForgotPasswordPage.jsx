@@ -1,42 +1,33 @@
-// giữ nguyên import React, useState, colors, useNavigate...
 import React, { useState } from "react";
 import { colors } from "../../constants/colors";
 import { useNavigate } from "react-router-dom";
-import { forgotPassword } from "../../services/api/auth"; // GỌI API THẬT
+import { forgotPassword } from "../../services/api/auth";
 
-export default function ResetPasswordPage() {
-  const [identifier, setIdentifier] = useState("");
+export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
   const navigate = useNavigate();
 
   const handleNext = async () => {
-    // === GIỮ NGUYÊN VALIDATE EMAIL NHƯ BẢN GỐC ===
-    if (!identifier.trim()) {
-      alert("Vui lòng nhập email khôi phục");
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(identifier.trim())) {
-      alert("Vui lòng nhập đúng định dạng email hợp lệ");
-      return;
-    }
-    // ============================================
+    if (!email.trim()) return alert("Vui lòng nhập email khôi phục");
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!re.test(email.trim())) return alert("Email không hợp lệ");
 
     try {
-      const res = await forgotPassword(identifier.trim());
+      const res = await forgotPassword(email.trim());
       alert(res?.message || "Đã gửi mã xác thực tới email của bạn.");
-
-      // LƯU Ý: controller forgotPassword chỉ trả {message, email}; KHÔNG trả userId.
-      // Vì verify bước sau cần userId, ta chuyển sang trang VERIFY-RESET-OTP và
-      // mang theo email, còn userId sẽ do người dùng nhập (nếu email không kèm userId).
-      navigate("/verify-reset-otp", { state: { email: identifier.trim() } });
+      // chuyển sang trang nhập OTP, mang theo email
+      navigate(`/verify-reset-otp?email=${encodeURIComponent(email.trim())}`, {
+        state: { email: email.trim() },
+      });
     } catch (e) {
       const msg =
-        e?.response?.data?.message || "Không gửi được mã. Thử lại sau.";
+        e?.response?.data?.message ||
+        e?.message ||
+        "Không gửi được mã. Thử lại sau.";
       alert(msg);
     }
   };
 
-  // ======= PHẦN DƯỚI LÀ UI GỐC — GIỮ NGUYÊN =======
   return (
     <div
       style={{
@@ -45,36 +36,36 @@ export default function ResetPasswordPage() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        padding: "20px",
+        padding: 20,
       }}
     >
       <div
         style={{
-          backgroundColor: "#fff",
-          width: "400px",
-          padding: "30px",
-          borderRadius: "12px",
-          boxShadow: "0 3px 6px rgba(0,0,0,0.15)",
+          background: "#fff",
+          width: 400,
+          padding: 30,
+          borderRadius: 12,
+          boxShadow: "0 3px 6px rgba(0,0,0,.15)",
         }}
       >
-        <h2 style={{ fontSize: "22px", fontWeight: 700, marginBottom: "10px" }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>
           Tìm email của bạn
         </h2>
-        <p style={{ color: "#555", fontSize: "14px", marginBottom: "20px" }}>
+        <p style={{ color: "#555", fontSize: 14, marginBottom: 20 }}>
           Nhập email khôi phục
         </p>
 
         <input
           type="email"
           placeholder="Email"
-          value={identifier}
-          onChange={(e) => setIdentifier(e.target.value)}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           style={{
             width: "100%",
-            padding: "12px",
-            marginBottom: "20px",
-            fontSize: "16px",
-            borderRadius: "6px",
+            padding: 12,
+            marginBottom: 20,
+            fontSize: 16,
+            borderRadius: 6,
             border: "1px solid #ccc",
           }}
         />
@@ -85,9 +76,9 @@ export default function ResetPasswordPage() {
             width: "100%",
             backgroundColor: colors.brand,
             color: "#fff",
-            padding: "12px",
-            borderRadius: "6px",
-            fontSize: "16px",
+            padding: 12,
+            borderRadius: 6,
+            fontSize: 16,
             fontWeight: 600,
             border: "none",
             cursor: "pointer",

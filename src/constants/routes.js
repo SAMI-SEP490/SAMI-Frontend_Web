@@ -19,4 +19,5 @@ export const ROUTES = {
   contractAddendum: "/contracts/:id/addendum",
   createContract: "/contracts/create",
   receiveGuestRegistration: "/receive-guest",
+  tenantCreate: "/tenants/create",
 };

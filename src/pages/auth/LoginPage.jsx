@@ -1,16 +1,35 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { colors } from "../../constants/colors";
+import { ROUTES } from "../../constants/routes";
 import "./LoginPage.css";
-import { useNavigate } from "react-router-dom";
-import { login as apiLogin } from "../../services/api/auth"; // NEW: gọi API thật
+import { login as apiLogin } from "../../services/api/auth";
 
 function LoginPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
 
-  // Giữ nguyên validate rỗng; thay logic đăng nhập bằng API
+  // URL/State “from” (nếu PrivateRoute chuyển tới login sẽ gắn from)
+  const nextURL = useMemo(() => {
+    const fromState = location.state?.from;
+    const fromQuery = new URLSearchParams(location.search).get("from");
+    return fromState || fromQuery || ROUTES.contracts;
+  }, [location.state, location.search]);
+
+  // Nếu đã login thì tự chuyển về trang chính
+  useEffect(() => {
+    const access =
+      localStorage.getItem("sami:access") ||
+      localStorage.getItem("accessToken");
+    if (access) navigate(ROUTES.contracts, { replace: true });
+  }, [navigate]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -21,29 +40,31 @@ function LoginPage() {
     }
 
     try {
-      // Gọi backend: có thể trả requiresOTP hoặc trả luôn access/refresh token
-      const res = await apiLogin({ email, password });
+      setLoading(true);
+      const res = await apiLogin({ email: email.trim(), password });
 
+      // Nhánh cần xác minh OTP
       if (res?.requiresOTP) {
-        // Giữ UI, chỉ điều hướng sang màn xác minh OTP
-        navigate("/verify-code", {
-          state: {
-            userId: res.userId,
-            email,
-            from: { pathname: "/contracts" },
-          },
+        navigate(ROUTES.verifyCode, {
+          state: { userId: res.userId, email: email.trim(), from: nextURL },
           replace: true,
         });
         return;
       }
 
-      // Đăng nhập xong (token đã được lưu trong service) → điều hướng như cũ
-      alert("Đăng nhập thành công!");
-      navigate("/contracts");
+      // Đăng nhập thành công (token đã được lưu trong service)
+      navigate(nextURL, { replace: true });
     } catch (err) {
       const msg = err?.response?.data?.message || "Đăng nhập thất bại";
       setError(msg);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const gotoForgot = (e) => {
+    e.preventDefault(); // chặn nhảy #
+    navigate(ROUTES.forgotPassword);
   };
 
   return (
@@ -51,7 +72,6 @@ function LoginPage() {
       <div className="login-box">
         <h2>Đăng Nhập</h2>
 
-        {/* Giữ nguyên UI; chỉ đổi onClick -> onSubmit cho đúng hành vi form */}
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>Email</label>
@@ -60,33 +80,56 @@ function LoginPage() {
               placeholder="Nhập email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
             />
           </div>
 
           <div className="form-group">
             <label>Mật khẩu</label>
-            <input
-              type="password"
-              placeholder="Nhập mật khẩu"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPw ? "text" : "password"}
+                placeholder="Nhập mật khẩu"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  top: 8,
+                  background: "transparent",
+                  border: "none",
+                  color: colors.brand,
+                  cursor: "pointer",
+                }}
+                aria-label={showPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              >
+                {showPw ? "Ẩn" : "Hiện"}
+              </button>
+            </div>
           </div>
 
-          {error && <p className="error-text">{error}</p>}
+          {error ? <p className="error-text">{error}</p> : null}
 
           <button
             type="submit"
             className="login-btn"
-            style={{ backgroundColor: colors.brand }}
+            style={{
+              backgroundColor: colors.brand,
+              opacity: loading ? 0.8 : 1,
+            }}
+            disabled={loading}
           >
-            Đăng Nhập
+            {loading ? "Đang đăng nhập..." : "Đăng Nhập"}
           </button>
         </form>
 
         <a
-          onClick={() => navigate("/forgot-password")}
-          href="#"
+          onClick={gotoForgot}
           className="forgot-password"
           style={{ color: colors.brand }}
         >

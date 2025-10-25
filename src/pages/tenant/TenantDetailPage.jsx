@@ -1,12 +1,33 @@
 // src/pages/tenant/TenantDetailPage.jsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
 import Headers from "../../components/Header";
-import Sidebar from "../../components/SideBar"; // đúng tên file của bạn
-import { colors } from "../../constants/colors"; // đã có trong dự án
+import Sidebar from "../../components/SideBar";
+import { colors } from "../../constants/colors";
+import { getUserById } from "../../services/api/users";
 
-// ---- small reusable pieces ----
+// Helper: format DD/MM/YYYY (không có giờ)
+function formatDateOnly(v) {
+  if (!v) return "—";
+  const s = String(v);
+  // nếu backend trả '2003-05-07T00:00:00.000Z' -> cắt phần T
+  const isoDate = s.includes("T") ? s.split("T")[0] : s;
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  // nếu chuỗi đã là yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
+    const [yyyy, mm, dd] = isoDate.split("-");
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  return s; // fallback an toàn
+}
+
 const Card = ({ title, children }) => (
   <div
     style={{
@@ -45,27 +66,51 @@ const Row = ({ label, value, last }) => (
     }}
   >
     <div style={{ width: 220, color: "#64748B" }}>{label}</div>
-    <div style={{ flex: 1, color: "#0F172A", fontWeight: 600 }}>{value}</div>
+    <div style={{ flex: 1, color: "#0F172A", fontWeight: 600 }}>
+      {value ?? "—"}
+    </div>
   </div>
 );
 
-// ---- page ----
 export default function TenantDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // Mock data (UI only). Sau này thay bằng API/Context.
-  const tenant = {
-    id: id || "001",
-    full_name: "Nguyễn Văn A",
-    phone: "0123456789",
-    email: "abc@gmail.com",
-    roomNo: "101",
-    contractNo: "HD-001",
-    contractStatus: "Đang hiệu lực",
-    avatar:
-      "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=600&auto=format&fit=crop&q=60",
-  };
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setErr(null);
+        const data = await getUserById(id);
+        if (!mounted) return;
+        setUser(data); // services đã chuẩn hoá: data?.data ?? data
+      } catch (e) {
+        setErr(e?.response?.data?.message || e?.message || "Load failed");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  const avatar = user?.avatar_url || user?.avatarUrl || ""; // để trống khi không có
+  const userId = user?.user_id ?? user?.id ?? id;
+  const fullName = user?.full_name ?? user?.fullName;
+  const phone = user?.phone;
+  const email = user?.email;
+  const birthday = user?.birthday;
+  const gender = user?.gender;
+
+  if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
+  if (err)
+    return <div style={{ padding: 24, color: "red" }}>{String(err)}</div>;
 
   return (
     <div
@@ -85,7 +130,6 @@ export default function TenantDetailPage() {
           <Sidebar />
         </div>
 
-        {/* Content */}
         <div
           style={{
             flex: 1,
@@ -96,19 +140,28 @@ export default function TenantDetailPage() {
             overflow: "auto",
           }}
         >
-          {/* Avatar + caption */}
+          {/* Avatar trắng khi không có URL */}
           <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <img
-              src={tenant.avatar}
-              alt="avatar"
+            <div
               style={{
                 width: 130,
                 height: 130,
                 borderRadius: "50%",
-                objectFit: "cover",
-                boxShadow: "0 6px 18px rgba(0,0,0,.15)",
+                background: "#fff",
+                border: "1px solid #E5E7EB",
+                boxShadow: "0 6px 18px rgba(0,0,0,.08)",
+                overflow: "hidden",
+                margin: "0 auto",
               }}
-            />
+            >
+              {avatar ? (
+                <img
+                  src={avatar}
+                  alt="avatar"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : null}
+            </div>
             <div
               style={{
                 marginTop: 10,
@@ -125,33 +178,16 @@ export default function TenantDetailPage() {
             </div>
           </div>
 
-          {/* Card: Thông tin người thuê */}
-          <Card title="Thông tin người thuê">
-            <Row label="ID" value={tenant.id} />
-            <Row label="Tên người thuê" value={tenant.full_name} />
-            <Row label="SDT" value={tenant.phone} />
-            <Row label="Email" value={tenant.email} />
-            <Row label="Số phòng" value={tenant.roomNo} last />
+          <Card title="Thông tin người dùng">
+            <Row label="ID" value={userId} />
+            <Row label="Tên người dùng" value={fullName} />
+            <Row label="SDT" value={phone} />
+            <Row label="Email" value={email} />
+            {/* ✅ Chỉ ngày/tháng/năm */}
+            <Row label="Ngày sinh" value={formatDateOnly(birthday)} />
+            <Row label="Giới tính" value={gender} last />
           </Card>
 
-          {/* Card: Thông tin hợp đồng */}
-          <Card title="Thông tin hợp đồng">
-            <Row
-              label="Hợp đồng số"
-              value={
-                <Link
-                  to="#"
-                  onClick={(e) => e.preventDefault()}
-                  style={{ color: colors.brand, textDecoration: "underline" }}
-                >
-                  {tenant.contractNo}
-                </Link>
-              }
-            />
-            <Row label="Trạng thái" value={tenant.contractStatus} last />
-          </Card>
-
-          {/* Action buttons */}
           <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
             <button
               onClick={() => navigate(-1)}
@@ -167,7 +203,6 @@ export default function TenantDetailPage() {
             >
               Quay lại
             </button>
-
             <button
               onClick={() => alert("Xoá (demo)")}
               style={{
@@ -182,9 +217,8 @@ export default function TenantDetailPage() {
             >
               Xoá
             </button>
-
             <button
-              onClick={() => alert("Sửa (demo)")}
+              onClick={() => navigate(`/tenants/${userId}/edit`)}
               style={{
                 height: 42,
                 padding: "0 24px",

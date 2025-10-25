@@ -1,58 +1,141 @@
 import { http, unwrap } from "../http";
 
+// Thử lần lượt các đường dẫn cho cùng một ý nghĩa
+const LIST_PATHS = [
+  "/contracts",
+  "/contract",
+  "/contracts/list",
+  "/contract/list",
+];
+const DETAIL_PATHS = ["/contracts/:id", "/contract/:id"];
+const CREATE_PATHS = ["/contracts", "/contract"];
+const UPDATE_PATHS = ["/contracts/:id", "/contract/:id"];
+const DELETE_PATHS = ["/contracts/:id", "/contract/:id"];
+const DOWNLOAD_PATHS = ["/contracts/:id/download", "/contract/:id/download"];
+const DOWNLOAD_DIRECT_PATHS = [
+  "/contracts/:id/download/direct",
+  "/contract/:id/download/direct",
+];
+
+// Helper: gọi từng path cho tới khi thành công (2xx)
+async function tryGet(paths, replace = {}) {
+  let lastErr;
+  for (const p of paths) {
+    const url = p.replace(/:id/g, replace.id ?? "");
+    try {
+      const res = await http.get(url, replace.options || {});
+      return unwrap(res);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
+async function tryPost(paths, body, replace = {}) {
+  let lastErr;
+  for (const p of paths) {
+    const url = p.replace(/:id/g, replace.id ?? "");
+    try {
+      const res = await http.post(url, body, replace.options || {});
+      return unwrap(res);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
+async function tryPut(paths, body, replace = {}) {
+  let lastErr;
+  for (const p of paths) {
+    const url = p.replace(/:id/g, replace.id ?? "");
+    try {
+      const res = await http.put(url, body, replace.options || {});
+      return unwrap(res);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
+async function tryDelete(paths, replace = {}) {
+  let lastErr;
+  for (const p of paths) {
+    const url = p.replace(/:id/g, replace.id ?? "");
+    try {
+      const res = await http.delete(url, replace.options || {});
+      return unwrap(res);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
+
+/** Danh sách hợp đồng */
 export async function listContracts(params = {}) {
-  const res = await http.get("/contracts", { params });
-  return unwrap(res);
+  return tryGet(LIST_PATHS, { options: { params } });
 }
 
+/** Chi tiết hợp đồng */
 export async function getContract(id) {
-  const res = await http.get(`/contracts/${id}`);
-  return unwrap(res);
+  return tryGet(DETAIL_PATHS, { id });
 }
 
+/** Tạo hợp đồng (multipart/form-data) */
 export async function createContract(body = {}) {
   const fd = new FormData();
   Object.entries(body).forEach(([k, v]) => {
-    if (v === undefined || v === null) return;
+    if (v == null) return;
     if (k === "file" && v instanceof File) fd.append("file", v);
     else fd.append(k, String(v));
   });
-  const res = await http.post("/contracts", fd, {
-    headers: { "Content-Type": "multipart/form-data" },
+  return tryPost(CREATE_PATHS, fd, {
+    options: { headers: { "Content-Type": "multipart/form-data" } },
   });
-  return unwrap(res);
 }
 
+/** Cập nhật hợp đồng (multipart/form-data) */
 export async function updateContract(id, body = {}) {
   const fd = new FormData();
   Object.entries(body).forEach(([k, v]) => {
-    if (v === undefined || v === null) return;
+    if (v == null) return;
     if (k === "file" && v instanceof File) fd.append("file", v);
     else fd.append(k, String(v));
   });
-  const res = await http.put(`/contracts/${id}`, fd, {
-    headers: { "Content-Type": "multipart/form-data" },
+  return tryPut(UPDATE_PATHS, fd, {
+    id,
+    options: { headers: { "Content-Type": "multipart/form-data" } },
   });
-  return unwrap(res);
 }
 
+/** Xoá hợp đồng */
 export async function deleteContract(id) {
-  const res = await http.delete(`/contracts/${id}`);
-  return unwrap(res);
+  return tryDelete(DELETE_PATHS, { id });
 }
 
+/** Lấy link tải PDF (nếu BE cấp presigned URL) */
 export async function getDownloadUrl(id) {
-  const res = await http.get(`/contracts/${id}/download`);
-  return unwrap(res); // kỳ vọng { download_url, ... }
+  return tryGet(DOWNLOAD_PATHS, { id });
 }
 
+/** Tải trực tiếp (blob) */
 export async function downloadContractDirect(id, filename = "contract.pdf") {
-  const res = await http.get(`/contracts/${id}/download/direct`, {
-    responseType: "blob",
-  });
-  const url = URL.createObjectURL(
-    new Blob([res.data], { type: "application/pdf" })
-  );
+  // thử các path trả blob
+  let blob;
+  for (const p of DOWNLOAD_DIRECT_PATHS) {
+    const url = p.replace(/:id/g, id);
+    try {
+      const res = await http.get(url, { responseType: "blob" });
+      blob = res.data;
+      break; // đã tải được => thoát vòng lặp
+    } catch {
+      continue; // thất bại => thử path tiếp theo (không vi phạm no-empty)
+    }
+  }
+  if (!blob) throw new Error("Không tải được file hợp đồng");
+
+  const file = new Blob([blob], { type: "application/pdf" });
+  const url = URL.createObjectURL(file);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;

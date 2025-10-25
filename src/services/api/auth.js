@@ -1,6 +1,12 @@
 // src/services/api/auth.js
 import { http, unwrap } from "../http";
 
+const PROFILE_PATHS = [
+  "/auth/profile",
+  "/auth/me",
+  "/user/profile",
+  "/user/me",
+];
 /** Lưu session về localStorage theo cả 2 dạng key để tránh lệch với chỗ khác */
 function persistSession(payload) {
   if (!payload) return;
@@ -44,21 +50,102 @@ export async function verifyOTP({ userId, otp }) {
 }
 
 export async function getProfile() {
-  const res = await http.get("/auth/profile");
-  return unwrap(res);
+  let lastErr;
+  for (const p of PROFILE_PATHS) {
+    try {
+      const res = await http.get(p);
+      const raw = unwrap(res);
+      return normalizeProfile(raw);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("Không lấy được hồ sơ");
 }
 
-export async function updateProfile(body) {
-  const res = await http.put("/auth/profile", body);
-  return unwrap(res);
+/** Chuẩn hoá dữ liệu hồ sơ về dạng phẳng để UI destructure */
+function normalizeProfile(raw) {
+  // chấp nhận: {data:{user}}, {user}, {data}, {...}
+  const u = raw?.data?.user ?? raw?.user ?? raw?.data ?? raw ?? {};
+  return {
+    id: u.user_id ?? u.id ?? u.uid ?? u._id ?? null,
+    full_name: u.full_name ?? u.fullName ?? u.name ?? "",
+    email: u.email ?? "",
+    phone: u.phone ?? "",
+    birthday: u.birthday ?? u.dob ?? "",
+    gender: u.gender ?? u.sex ?? "",
+    role: u.role ?? u.role_name ?? u.roleName ?? "",
+    avatar_url: u.avatar_url ?? u.avatarUrl ?? "",
+    _raw: u, // giữ lại nếu cần debug
+  };
 }
+
+const UPDATE_PROFILE_PATHS = [["put", "/auth/profile"]];
+
+const GENDER_TO_SERVER = {
+  Nam: "Male",
+  Nữ: "Female",
+  Khác: "Other",
+  male: "Male",
+  female: "Female",
+  other: "Other",
+  Male: "Male",
+  Female: "Female",
+  Other: "Other",
+};
+
+function toISODate(v) {
+  if (!v) return undefined;
+  const s = String(v);
+  const base = s.includes("T") ? s.split("T")[0] : s;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(base)) return base;
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return undefined;
+}
+
+export async function updateProfile(form = {}) {
+  // Chỉ gửi những field mà backend cho phép
+  const payload = {
+    full_name: form.full_name ?? form.fullName,
+    gender: GENDER_TO_SERVER[form.gender] ?? form.gender,
+    birthday: toISODate(form.birthday),
+    avatar_url: form.avatar_url,
+  };
+
+  // Xoá key rỗng
+  Object.keys(payload).forEach((k) => {
+    if (payload[k] === "" || payload[k] === undefined) delete payload[k];
+  });
+
+  // Gọi đúng endpoint BE
+  const [method, path] = UPDATE_PROFILE_PATHS[0]; // ["put", "/auth/profile"]
+  const res = await http[method](path, payload);
+  const raw = unwrap(res);
+  return normalizeProfile(raw);
+}
+
+const CHANGE_PW_PATHS = [
+  ["post", "/auth/change-password"],
+  ["put", "/auth/change-password"],
+  ["post", "/auth/password"],
+  ["put", "/user/change-password"],
+];
 
 export async function changePassword({ currentPassword, newPassword }) {
-  const res = await http.post("/auth/change-password", {
-    currentPassword,
-    newPassword,
-  });
-  return unwrap(res);
+  let lastErr;
+  for (const [method, path] of CHANGE_PW_PATHS) {
+    try {
+      const res = await http[method](path, {
+        currentPassword,
+        newPassword,
+      });
+      return unwrap(res);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("Đổi mật khẩu thất bại");
 }
 
 export async function forgotPassword(email) {

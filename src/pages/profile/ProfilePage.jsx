@@ -6,10 +6,51 @@ import { Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { getProfile } from "../../services/api/auth";
 
+// Format DD/MM/YYYY (không kèm giờ)
+function formatDateOnly(v) {
+  if (!v) return "—";
+  const s = String(v);
+  const base = s.includes("T") ? s.split("T")[0] : s;
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(base)) {
+    const [yyyy, mm, dd] = base.split("-");
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  return s;
+}
+
+// === VIETNAMIZE helpers ===
+const GENDER_VI = {
+  male: "Nam",
+  female: "Nữ",
+  other: "Khác",
+};
+function viGender(g) {
+  if (!g) return "—";
+  const key = String(g).toLowerCase();
+  return GENDER_VI[key] || g; // fallback nếu backend trả khác
+}
+
+const ROLE_VI = {
+  owner: "Chủ trọ",
+  manager: "Quản lý",
+  tenant: "Người thuê",
+};
+function viRole(r) {
+  if (!r) return "—";
+  const key = String(r).toLowerCase();
+  return ROLE_VI[key] || r; // fallback nếu có role khác
+}
+
 export default function ProfilePage() {
   const navigate = useNavigate();
 
-  // NEW: lấy dữ liệu từ API thay vì UserContext
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -17,7 +58,7 @@ export default function ProfilePage() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await getProfile(); // gọi /auth/profile
+        const data = await getProfile(); // /auth/profile
         setProfile(data);
       } catch (e) {
         setErr(e?.response?.data?.message || "Không tải được hồ sơ");
@@ -27,40 +68,26 @@ export default function ProfilePage() {
     })();
   }, []);
 
-  // Giữ nguyên thông điệp khi không có dữ liệu (tương tự file cũ)
-  if (!loading && (!profile || err)) {
+  if (loading) return <div className="p-3">Đang tải...</div>;
+  if (!profile || err)
     return (
-      <div>
+      <div className="p-3">
         <p>Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.</p>
       </div>
     );
-  }
 
-  // Loading nhẹ khi chờ API
-  if (loading) {
-    return <div className="p-3">Đang tải...</div>;
-  }
-
-  // Để không phải sửa markup phía dưới, dùng biến có tên cũ
-  const loggedInUser = {
-    avatar_url: profile?.avatar_url,
-    full_name: profile?.full_name,
-    birthday: profile?.birthday,
-    gender: profile?.gender,
-    role: profile?.role,
-    email: profile?.email,
-    phone: profile?.phone,
-  };
+  const { avatar_url, full_name, birthday, gender, role, email, phone } =
+    profile || {};
 
   return (
     <div
       style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
     >
-      {/* Header cố định ở trên */}
+      {/* Header */}
       <div
         style={{
           marginBottom: 10,
-          borderRadius: "10px",
+          borderRadius: 10,
           flexShrink: 0,
           position: "sticky",
           top: 0,
@@ -70,24 +97,24 @@ export default function ProfilePage() {
         <Headers />
       </div>
 
-      {/* Phần nội dung bên dưới header */}
+      {/* Body */}
       <div style={{ flex: 1, display: "flex", overflow: "auto" }}>
-        {/* Sidebar cố định bên trái */}
+        {/* Sidebar */}
         <div
           style={{
-            width: "220px",
+            width: 220,
             backgroundColor: colors.brand,
             color: "white",
             height: "100%",
             position: "sticky",
             top: 0,
-            borderRadius: "10px",
+            borderRadius: 10,
           }}
         >
           <Sidebar />
         </div>
 
-        {/* Nội dung chính bên phải */}
+        {/* Content */}
         <div
           style={{
             flex: 1,
@@ -99,26 +126,34 @@ export default function ProfilePage() {
             overflowY: "auto",
           }}
         >
-          {/* Ảnh đại diện */}
-          <img
-            src={loggedInUser.avatar_url || "https://via.placeholder.com/120"}
-            alt="Avatar"
+          {/* Avatar: trắng nếu không có URL */}
+          <div
             style={{
-              width: "200px",
-              height: "200px",
+              width: 200,
+              height: 200,
               borderRadius: "50%",
-              objectFit: "cover",
-              marginBottom: "30px",
+              background: "#fff",
+              border: "1px solid #E5E7EB",
+              marginBottom: 30,
+              overflow: "hidden",
             }}
-          />
+          >
+            {avatar_url ? (
+              <img
+                src={avatar_url}
+                alt="Avatar"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : null}
+          </div>
 
-          {/* Thông tin cơ bản */}
+          {/* Card: Thông tin cơ bản */}
           <div
             style={{
               width: "60%",
               backgroundColor: "#fff",
-              borderRadius: "10px",
-              marginBottom: "20px",
+              borderRadius: 10,
+              marginBottom: 20,
               boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
               overflow: "hidden",
             }}
@@ -129,35 +164,33 @@ export default function ProfilePage() {
                 color: "#fff",
                 padding: "10px 20px",
                 fontWeight: "bold",
-                borderTopLeftRadius: "10px",
-                borderTopRightRadius: "10px",
               }}
             >
               Thông tin cơ bản
             </div>
-            <div style={{ padding: "20px" }}>
+            <div style={{ padding: 20 }}>
               <p>
-                <strong>Tên:</strong> {loggedInUser.full_name || "Null"}
+                <strong>Tên:</strong> {full_name || "—"}
               </p>
               <p>
-                <strong>Ngày sinh:</strong> {loggedInUser.birthday || "Null"}
+                <strong>Ngày sinh:</strong> {formatDateOnly(birthday)}
               </p>
               <p>
-                <strong>Giới tính:</strong> {loggedInUser.gender || "Null"}
+                <strong>Giới tính:</strong> {viGender(gender)}
               </p>
               <p>
-                <strong>Vai trò:</strong> {loggedInUser.role || "Null"}
+                <strong>Vai trò:</strong> {viRole(role)}
               </p>
             </div>
           </div>
 
-          {/* Thông tin liên hệ */}
+          {/* Card: Thông tin liên hệ */}
           <div
             style={{
               width: "60%",
               backgroundColor: "#fff",
-              borderRadius: "10px",
-              marginBottom: "30px",
+              borderRadius: 10,
+              marginBottom: 30,
               boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
               overflow: "hidden",
             }}
@@ -168,55 +201,44 @@ export default function ProfilePage() {
                 color: "#fff",
                 padding: "10px 20px",
                 fontWeight: "bold",
-                borderTopLeftRadius: "10px",
-                borderTopRightRadius: "10px",
               }}
             >
               Thông tin liên hệ
             </div>
-            <div style={{ padding: "20px" }}>
+            <div style={{ padding: 20 }}>
               <p>
-                <strong>Email:</strong> {loggedInUser.email || "abc@gmail.com"}
+                <strong>Email:</strong> {email || "—"}
               </p>
               <p>
-                <strong>SĐT:</strong> {loggedInUser.phone || "0123456789"}
+                <strong>SĐT:</strong> {phone || "—"}
               </p>
             </div>
           </div>
 
-          {/* Các nút hành động */}
+          {/* Actions */}
           <div
             style={{
               display: "flex",
               justifyContent: "center",
-              gap: "20px",
-              marginBottom: "30px",
+              gap: 20,
+              marginBottom: 30,
             }}
           >
             <Button
               type="button"
-              onClick={() => {
-                navigate("/change-password");
-                console.log("Navigating to change password");
-              }}
+              onClick={() => navigate("/change-password")}
               variant="outline-primary"
             >
               Thay đổi mật khẩu
             </Button>
             <Button
               type="button"
-              onClick={() => {
-                navigate("/edit-profile");
-                console.log("Navigating to edit profile");
-              }}
+              onClick={() => navigate("/edit-profile")}
               variant="primary"
             >
               Sửa
             </Button>
-            <Button
-              onClick={() => navigate("/contracts")}
-              variant="outline-secondary"
-            >
+            <Button onClick={() => navigate(-1)} variant="outline-secondary">
               Quay lại
             </Button>
           </div>

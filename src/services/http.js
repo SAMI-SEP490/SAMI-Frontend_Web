@@ -11,7 +11,14 @@ export const http = axios.create({
 
 /** Lấy access token từ localStorage với các key có thể gặp */
 function readAccessToken() {
-  const KEYS = ["sami:access", "accessToken", "token", "sami_token"];
+  const KEYS = [
+    "sami:access",
+    "accessToken",
+    "token",
+    "sami_token",
+    "jwt",
+    "access_token",
+  ];
   for (const k of KEYS) {
     const v = localStorage.getItem(k);
     if (!v) continue;
@@ -20,13 +27,14 @@ function readAccessToken() {
       if (obj?.accessToken) return obj.accessToken;
       if (obj?.token) return obj.token;
     } catch {
-      return v; // là chuỗi thuần
+      // v là chuỗi thuần → lọc bỏ prefix "Bearer "
+      return v.replace(/^Bearer\s+/i, "");
     }
   }
   return null;
 }
 
-/** Gắn Authorization: Bearer <token> vào mọi request */
+/** Gắn Authorization header */
 http.interceptors.request.use((config) => {
   const token = readAccessToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;

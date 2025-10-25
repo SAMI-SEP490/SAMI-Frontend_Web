@@ -1,146 +1,126 @@
-import { useContext, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { UserContext } from "../../contexts/UserContext";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Headers from "../../components/Header";
 import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { Form, Button, Alert, Image } from "react-bootstrap";
+import { getProfile, updateProfile } from "../../services/api/auth";
+
+const toInputDate = (v) => {
+  if (!v) return "";
+  const s = String(v);
+  const base = s.includes("T") ? s.split("T")[0] : s;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(base)) return base;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+};
+
+const toUiGender = (g) =>
+  g === "Male" ? "Nam" : g === "Female" ? "Nữ" : g ? "Khác" : "Nam";
 
 export default function EditProfilePage() {
-  const { userData, userIdLogin, setUserData } = useContext(UserContext);
   const navigate = useNavigate();
-  const location = useLocation();
-
-  // Nhận user truyền từ trang trước (ProfilePage)
-  const incomingUser = location.state?.user;
-  const user = userData.find((u) => u.id === userIdLogin) || incomingUser;
-
-  const [name, setName] = useState(user?.full_name || "");
-  const [dob, setDob] = useState(user?.birthday || "");
-  const [gender, setGender] = useState(
-    user?.gender === "male" ? "Nam" : user?.gender === "female" ? "Nữ" : "Khác"
-  );
-  const [email, setEmail] = useState(user?.email || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [avatar] = useState(user?.avatar || "");
+  const [form, setForm] = useState({
+    id: "",
+    full_name: "",
+    birthday: "",
+    gender: "Nam", // UI: Nam|Nữ|Khác
+    email: "",
+    phone: "",
+    avatar_url: "",
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [variant, setVariant] = useState("danger");
 
-  const handleSave = () => {
-    // 1️⃣ Kiểm tra trống
-    if (!name.trim() || !dob.trim() || !email.trim() || !phone.trim()) {
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const p = await getProfile();
+        setForm({
+          id: p.id || "",
+          full_name: p.full_name || "",
+          birthday: toInputDate(p.birthday),
+          gender: toUiGender(p.gender),
+          email: p.email || "",
+          phone: p.phone || "",
+          avatar_url: p.avatar_url || "",
+        });
+      } catch (e) {
+        setMessage(e?.response?.data?.message || "Không tải được hồ sơ");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const onChange = (k) => (e) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const onSave = async () => {
+    if (!form.full_name || !form.email || !form.phone) {
       setVariant("danger");
-      setMessage("Vui lòng nhập đầy đủ tất cả các trường.");
+      setMessage("Vui lòng nhập đủ tên, email, SĐT.");
       return;
     }
-
-    // 2️⃣ Kiểm tra ngày sinh DD-MM-YYYY hoặc DD/MM/YYYY
-    const dobRegex = /^(0[1-9]|[12][0-9]|3[01])[-/](0[1-9]|1[0-2])[-/]\d{4}$/;
-    if (!dobRegex.test(dob.trim())) {
+    try {
+      setSaving(true);
+      setMessage("");
+      await updateProfile(form); // form.gender sẽ được map -> 'Male|Female|Other' ở service
+      setVariant("success");
+      setMessage("Cập nhật hồ sơ thành công!");
+      setTimeout(() => navigate("/profile"), 800);
+    } catch (e) {
       setVariant("danger");
       setMessage(
-        "Ngày sinh phải theo định dạng DD-MM-YYYY (ví dụ: 06-03-1998)."
+        e?.response?.data?.message || e?.message || "Cập nhật hồ sơ thất bại!"
       );
-      return;
+    } finally {
+      setSaving(false);
     }
-
-    // 3️⃣ Kiểm tra số điện thoại
-    const phoneRegex = /^0\d{9}$/;
-    if (!phoneRegex.test(phone.trim())) {
-      setVariant("danger");
-      setMessage("Số điện thoại phải gồm 10 số và bắt đầu bằng 0.");
-      return;
-    }
-
-    // 4️⃣ Kiểm tra email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setVariant("danger");
-      setMessage("Email không hợp lệ, vui lòng kiểm tra lại.");
-      return;
-    }
-
-    // 5️⃣ Cập nhật dữ liệu user trong context
-    const updatedData = userData.map((u) =>
-      u.id === userIdLogin
-        ? {
-            ...u,
-            full_name: name.trim(),
-            birthday: dob.trim(),
-            gender:
-              gender === "Nam" ? "male" : gender === "Nữ" ? "female" : "other",
-            email: email.trim(),
-            phone: phone.trim(),
-          }
-        : u
-    );
-    setUserData(updatedData);
-
-    // 6️⃣ Thông báo thành công
-    setVariant("success");
-    setMessage("Thông tin đã được cập nhật thành công!");
-
-    setTimeout(() => navigate("/profile"), 1500);
   };
 
-  if (!user) {
-    return <p>Không tìm thấy thông tin người dùng.</p>;
-  }
+  if (loading) return <div className="p-3">Đang tải...</div>;
 
   return (
     <div
       style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
     >
-      {/* Header */}
       <div
-        style={{
-          marginBottom: 10,
-          borderRadius: "10px",
-          flexShrink: 0,
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
-        }}
+        style={{ marginBottom: 10, position: "sticky", top: 0, zIndex: 1000 }}
       >
         <Headers />
       </div>
-
-      {/* Nội dung */}
       <div style={{ flex: 1, display: "flex", overflow: "auto" }}>
-        {/* Sidebar */}
         <div
           style={{
-            width: "220px",
+            width: 220,
             backgroundColor: colors.brand,
-            color: "white",
-            height: "100%",
-            position: "sticky",
-            top: 0,
-            borderRadius: "10px",
+            color: "#fff",
+            borderRadius: 10,
           }}
         >
           <Sidebar />
         </div>
 
-        {/* Form chỉnh sửa hồ sơ */}
         <div
           style={{
             flex: 1,
-            backgroundColor: colors.background,
+            background: colors.background,
             display: "flex",
             justifyContent: "center",
-            alignItems: "flex-start",
             padding: "40px 20px",
-            overflowY: "auto",
           }}
         >
           <div
             style={{
               width: "60%",
-              backgroundColor: "#fff",
-              borderRadius: "10px",
-              padding: "30px",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+              background: "#fff",
+              borderRadius: 10,
+              padding: 30,
+              boxShadow: "0 2px 6px rgba(0,0,0,.1)",
             }}
           >
             <h4 style={{ textAlign: "center", color: colors.brand }}>
@@ -150,73 +130,76 @@ export default function EditProfilePage() {
             {message && <Alert variant={variant}>{message}</Alert>}
 
             <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <Image
-                src={avatar}
-                roundedCircle
-                style={{ width: 120, height: 120, objectFit: "cover" }}
-              />
+              <div
+                style={{
+                  width: 120,
+                  height: 120,
+                  margin: "0 auto",
+                  borderRadius: "50%",
+                  background: "#fff",
+                  border: "1px solid #E5E7EB",
+                  overflow: "hidden",
+                }}
+              >
+                {form.avatar_url ? (
+                  <Image
+                    src={form.avatar_url}
+                    roundedCircle
+                    style={{ width: 120, height: 120, objectFit: "cover" }}
+                  />
+                ) : null}
+              </div>
               <div>
                 <Button
                   variant="link"
-                  onClick={() =>
-                    alert("Bạn có thể dùng chức năng chọn ảnh sau này.")
-                  }
+                  onClick={() => alert("Upload avatar sẽ thêm sau.")}
                 >
                   <i className="bi bi-camera"></i> Đổi ảnh
                 </Button>
               </div>
             </div>
 
-            {/* Thông tin cơ bản */}
             <Section title="Thông tin cơ bản">
               <Form.Group className="mb-3">
                 <Form.Label>Tên</Form.Label>
                 <Form.Control
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="VD: Nguyễn Văn A"
+                  value={form.full_name}
+                  onChange={onChange("full_name")}
                 />
               </Form.Group>
 
               <Form.Group className="mb-3">
                 <Form.Label>Ngày sinh</Form.Label>
                 <Form.Control
-                  type="text"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  placeholder="VD: 06-03-1998"
+                  type="date"
+                  value={form.birthday}
+                  onChange={onChange("birthday")}
                 />
               </Form.Group>
 
               <Form.Group className="mb-3">
                 <Form.Label>Giới tính</Form.Label>
-                <GenderSelect value={gender} onChange={setGender} />
+                <Gender
+                  value={form.gender}
+                  onChange={(v) => setForm((f) => ({ ...f, gender: v }))}
+                />
               </Form.Group>
             </Section>
 
             <div style={{ height: 20 }} />
 
-            {/* Thông tin liên hệ */}
             <Section title="Thông tin liên hệ">
               <Form.Group className="mb-3">
                 <Form.Label>Email</Form.Label>
                 <Form.Control
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="VD: example@email.com"
+                  value={form.email}
+                  onChange={onChange("email")}
                 />
               </Form.Group>
-
               <Form.Group className="mb-3">
                 <Form.Label>Số điện thoại</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="VD: 0912345678"
-                />
+                <Form.Control value={form.phone} onChange={onChange("phone")} />
               </Form.Group>
             </Section>
 
@@ -224,8 +207,8 @@ export default function EditProfilePage() {
               style={{
                 display: "flex",
                 justifyContent: "center",
-                gap: "20px",
-                marginTop: "25px",
+                gap: 20,
+                marginTop: 25,
               }}
             >
               <Button
@@ -234,8 +217,8 @@ export default function EditProfilePage() {
               >
                 Quay lại
               </Button>
-              <Button variant="primary" onClick={handleSave}>
-                Lưu
+              <Button variant="primary" onClick={onSave} disabled={saving}>
+                {saving ? "Đang lưu..." : "Lưu"}
               </Button>
             </div>
           </div>
@@ -250,23 +233,22 @@ function Section({ title, children }) {
     <div style={{ marginBottom: 20 }}>
       <div
         style={{
-          alignSelf: "flex-start",
-          backgroundColor: colors.brand,
+          background: colors.brand,
+          color: "#fff",
+          padding: "8px 12px",
           borderTopLeftRadius: 8,
           borderTopRightRadius: 8,
-          padding: "8px 12px",
-          color: "#fff",
-          fontWeight: "600",
+          fontWeight: 600,
         }}
       >
         {title}
       </div>
       <div
         style={{
-          border: `1px solid ${colors.border}`,
+          border: "1px solid #E5E7EB",
           borderBottomLeftRadius: 8,
           borderBottomRightRadius: 8,
-          padding: "16px",
+          padding: 16,
         }}
       >
         {children}
@@ -275,29 +257,20 @@ function Section({ title, children }) {
   );
 }
 
-function GenderSelect({ value, onChange }) {
-  const genders = ["Nam", "Nữ", "Khác"];
+function Gender({ value, onChange }) {
+  const items = ["Nam", "Nữ", "Khác"];
   return (
-    <div style={{ display: "flex", gap: "10px" }}>
-      {genders.map((g) => {
-        const active = value === g;
-        return (
-          <Button
-            key={g}
-            variant={active ? "primary" : "outline-secondary"}
-            style={{
-              borderRadius: "20px",
-              padding: "5px 15px",
-              backgroundColor: active ? "#E6F0FF" : "transparent",
-              color: active ? colors.brand : colors.text,
-              borderColor: active ? colors.brand : colors.border,
-            }}
-            onClick={() => onChange(g)}
-          >
-            {g}
-          </Button>
-        );
-      })}
+    <div style={{ display: "flex", gap: 10 }}>
+      {items.map((g) => (
+        <Button
+          key={g}
+          variant={value === g ? "primary" : "outline-secondary"}
+          style={{ borderRadius: 20, padding: "5px 15px" }}
+          onClick={() => onChange(g)}
+        >
+          {g}
+        </Button>
+      ))}
     </div>
   );
 }

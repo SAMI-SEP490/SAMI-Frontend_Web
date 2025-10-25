@@ -11,7 +11,6 @@ import { getUserById } from "../../services/api/users";
 function formatDateOnly(v) {
   if (!v) return "—";
   const s = String(v);
-  // nếu backend trả '2003-05-07T00:00:00.000Z' -> cắt phần T
   const isoDate = s.includes("T") ? s.split("T")[0] : s;
   const d = new Date(s);
   if (!Number.isNaN(d.getTime())) {
@@ -20,12 +19,21 @@ function formatDateOnly(v) {
     const yyyy = d.getFullYear();
     return `${dd}/${mm}/${yyyy}`;
   }
-  // nếu chuỗi đã là yyyy-mm-dd
   if (/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
     const [yyyy, mm, dd] = isoDate.split("-");
     return `${dd}/${mm}/${yyyy}`;
   }
-  return s; // fallback an toàn
+  return s;
+}
+
+// Helper: chuyển giới tính sang tiếng Việt
+function viGender(g) {
+  if (!g) return "—";
+  const key = String(g).toLowerCase();
+  if (key === "male") return "Nam";
+  if (key === "female") return "Nữ";
+  if (key === "other") return "Khác";
+  return g; // fallback nếu BE trả dạng khác
 }
 
 const Card = ({ title, children }) => (
@@ -88,7 +96,7 @@ export default function TenantDetailPage() {
         setErr(null);
         const data = await getUserById(id);
         if (!mounted) return;
-        setUser(data); // services đã chuẩn hoá: data?.data ?? data
+        setUser(data);
       } catch (e) {
         setErr(e?.response?.data?.message || e?.message || "Load failed");
       } finally {
@@ -100,13 +108,13 @@ export default function TenantDetailPage() {
     };
   }, [id]);
 
-  const avatar = user?.avatar_url || user?.avatarUrl || ""; // để trống khi không có
+  const avatar = user?.avatar_url || user?.avatarUrl || "";
   const userId = user?.user_id ?? user?.id ?? id;
   const fullName = user?.full_name ?? user?.fullName;
   const phone = user?.phone;
   const email = user?.email;
   const birthday = user?.birthday;
-  const gender = user?.gender;
+  const genderVi = viGender(user?.gender); // ⬅️ dùng TV
 
   if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
   if (err)
@@ -181,11 +189,10 @@ export default function TenantDetailPage() {
           <Card title="Thông tin người dùng">
             <Row label="ID" value={userId} />
             <Row label="Tên người dùng" value={fullName} />
-            <Row label="SDT" value={phone} />
+            <Row label="SĐT" value={phone} />
             <Row label="Email" value={email} />
-            {/* ✅ Chỉ ngày/tháng/năm */}
             <Row label="Ngày sinh" value={formatDateOnly(birthday)} />
-            <Row label="Giới tính" value={gender} last />
+            <Row label="Giới tính" value={genderVi} last />
           </Card>
 
           <div style={{ display: "flex", gap: 12, marginTop: 6 }}>

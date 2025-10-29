@@ -3,12 +3,11 @@ import Header from "../../components/Header";
 import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { useNavigate } from "react-router-dom";
-import { registerTenantQuick } from "../../services/api/users";
+import { registerTenantQuick } from "../../services/api/tenants"; // ✅ Đúng file
 
 export default function CreateTenantPage() {
   const navigate = useNavigate();
 
-  // 2 bước: 1) Thông tin cơ bản (kèm chọn phòng)  2) Thông tin đăng nhập
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
@@ -18,10 +17,10 @@ export default function CreateTenantPage() {
     dob: "",
     gender: "",
     phone: "",
-    address: "",
+    address: "", // làm TUỲ CHỌN
     room: "",
-    idNumber: "", // <— CCCD/CMND (bắt buộc)
-    emergencyPhone: "", // <— SĐT liên hệ khẩn (tuỳ chọn; nếu trống sẽ dùng phone)
+    idNumber: "",
+    emergencyPhone: "",
 
     // Bước 2
     email: "",
@@ -29,39 +28,37 @@ export default function CreateTenantPage() {
     confirmPassword: "",
   });
 
-  const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-  };
+  const handleChange = (field, value) =>
+    setFormData((s) => ({ ...s, [field]: value }));
 
   const onlyDigits = (v) => String(v || "").replace(/\D/g, "");
 
   const handleNext = async () => {
     if (step === 1) {
-      // Validate cơ bản
+      // ✅ BỎ address khỏi validation bắt buộc
       if (
         !formData.name ||
         !formData.dob ||
         !formData.gender ||
         !formData.phone ||
-        !formData.address ||
         !formData.room ||
         !formData.idNumber
       ) {
         alert("Vui lòng nhập đầy đủ thông tin cơ bản (bao gồm Phòng & CCCD)!");
         return;
       }
-      // Phone ≥ 10 số
+
       if (onlyDigits(formData.phone).length < 10) {
         alert("Số điện thoại phải có ít nhất 10 chữ số.");
         return;
       }
-      // CCCD/CMND: 9–12 số
+
       const idLen = onlyDigits(formData.idNumber).length;
       if (idLen < 9 || idLen > 12) {
         alert("CCCD/CMND phải có từ 9 đến 12 chữ số.");
         return;
       }
-      // Emergency (nếu nhập): 10–11 số
+
       if (
         formData.emergencyPhone &&
         (onlyDigits(formData.emergencyPhone).length < 10 ||
@@ -70,62 +67,59 @@ export default function CreateTenantPage() {
         alert("Số liên hệ khẩn cấp (nếu nhập) phải có 10–11 chữ số.");
         return;
       }
+
       setStep(2);
       return;
     }
 
-    if (step === 2) {
-      // Validate đăng nhập
-      if (!formData.email || !formData.password || !formData.confirmPassword) {
-        alert("Vui lòng nhập đầy đủ thông tin đăng nhập!");
-        return;
-      }
-      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
-      if (!passwordRegex.test(formData.password)) {
-        alert(
-          "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ hoa, 1 chữ thường và 1 ký tự đặc biệt!"
-        );
-        return;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        alert("Mật khẩu nhập lại không khớp!");
-        return;
-      }
+    // Bước 2
+    if (!formData.email || !formData.password || !formData.confirmPassword) {
+      alert("Vui lòng nhập đầy đủ thông tin đăng nhập!");
+      return;
+    }
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!passwordRegex.test(formData.password)) {
+      alert(
+        "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ hoa, 1 chữ thường và 1 ký tự đặc biệt!"
+      );
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      alert("Mật khẩu nhập lại không khớp!");
+      return;
+    }
 
-      // GỌI API
-      if (saving) return;
-      try {
-        setSaving(true);
+    if (saving) return;
+    try {
+      setSaving(true);
 
-        await registerTenantQuick({
-          // Thông tin người dùng
-          full_name: formData.name.trim(),
-          email: formData.email.trim(),
-          password: formData.password,
-          phone: formData.phone.trim(),
-          gender: formData.gender, // "Nam" | "Nữ" | "Khác" -> service map "Male|Female|Other"
-          birthday: formData.dob, // service chuẩn yyyy-mm-dd
+      await registerTenantQuick({
+        // map sang BE (hàm nằm trong services/api/tenants.js)
+        full_name: formData.name.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        phone: formData.phone.trim(),
+        gender: formData.gender, // "Nam"|"Nữ"|"Khác" -> service sẽ map nếu cần
+        birthday: formData.dob, // yyyy-mm-dd
 
-          // Thông tin cho change-to-tenant (validator backend yêu cầu)
-          idNumber: formData.idNumber, // bắt buộc 9–12 số
-          emergencyPhone: formData.emergencyPhone, // nếu trống service sẽ dùng phone
+        idNumber: formData.idNumber,
+        emergencyPhone: formData.emergencyPhone || "",
 
-          // Gửi thêm để ghi chú
-          address: formData.address,
-          room: formData.room,
-        });
+        // tuỳ chọn, không bắt buộc
+        address: formData.address || "",
+        room: formData.room,
+      });
 
-        alert("Tạo tài khoản thành công!");
-        navigate("/tenants", { replace: true });
-      } catch (err) {
-        const msg =
-          err?.response?.data?.message ||
-          err?.message ||
-          "Tạo tenant thất bại. Vui lòng thử lại.";
-        alert(msg);
-      } finally {
-        setSaving(false);
-      }
+      alert("Tạo tài khoản thành công!");
+      navigate("/tenants", { replace: true });
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Tạo tenant thất bại. Vui lòng thử lại.";
+      alert(msg);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -139,7 +133,6 @@ export default function CreateTenantPage() {
     }
   };
 
-  // Styles (giữ nguyên tone bạn đang dùng)
   const inputStyle = {
     width: "100%",
     padding: "8px 10px",
@@ -220,7 +213,6 @@ export default function CreateTenantPage() {
                   onChange={(e) => handleChange("room", e.target.value)}
                 >
                   <option value="">-- Chọn phòng --</option>
-                  {/* TODO: thay bằng danh sách từ API phòng nếu có */}
                   <option value="101">101</option>
                   <option value="102">102</option>
                   <option value="201">201</option>

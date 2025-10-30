@@ -1,16 +1,51 @@
-import React, { useContext } from "react";
-import { logout } from "../services/api/auth";
+import React, { useEffect, useState } from "react";
 import { colors } from "../constants/colors";
-import { Bell, User, LogOut } from "lucide-react"; // gói icon
-import { Badge } from "react-bootstrap"; // hiển thị số thông báo
-import { UserContext } from "../contexts/UserContext";
+import { Badge } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
+import { getProfile, logout as apiLogout } from "../services/api/auth";
 
 export default function Header() {
-  const { userData, userIdLogin } = useContext(UserContext);
+  // cache tạm để không trắng tên
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("sami:user") || "null");
+    } catch {
+      return null;
+    }
+  });
   const navigate = useNavigate();
 
-  const loggedInUser = userData.find((user) => user.id == userIdLogin);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const data = await getProfile();
+        const u = data?.data || data;
+        if (alive) setUser(u);
+        localStorage.setItem("sami:user", JSON.stringify(u));
+      } catch {
+        // không chặn render
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const displayName = user?.full_name || user?.name || user?.email || "bạn";
+
+  const handleLogout = async () => {
+   try {
+  await apiLogout();
+} catch (err) {
+  console.warn("Logout API failed:", err);
+} finally {
+  ["sami:access", "sami:refresh", "sami:user", "accessToken", "refreshToken"]
+    .forEach((k) => localStorage.removeItem(k));
+  navigate("/login", { replace: true });
+} 
+  };
+
   return (
     <header
       style={{
@@ -23,56 +58,40 @@ export default function Header() {
         height: "50px",
       }}
     >
-      {/* Bên trái: logo hoặc tên app */}
       <strong style={{ fontSize: "16px" }}>SAMI</strong>
 
-      {/* Bên phải: icon + tên user */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "20px",
-        }}
-      >
-        {/* Tên người dùng */}
-        <span style={{ fontSize: "14px" }}>
-          Xin chào {loggedInUser.full_name}!
-        </span>
-        {/* Icon chuông + badge đỏ */}
-        <div style={{ position: "relative", cursor: "pointer" }}>
-          <Bell size={20} color="#fff" />
+      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <span style={{ fontSize: 14 }}>Xin chào {displayName}!</span>
+
+        <div
+          style={{ position: "relative", cursor: "pointer" }}
+          title="Thông báo"
+        >
+          {/* chuông đơn giản để giữ UI tương tự */}
+          <span style={{ fontSize: 18 }}>🔔</span>
           <Badge
             bg="danger"
             pill
-            style={{
-              position: "absolute",
-              top: "-5px",
-              right: "-8px",
-              fontSize: "10px",
-            }}
+            style={{ position: "absolute", top: -5, right: -8, fontSize: 10 }}
           >
             1
           </Badge>
         </div>
 
-        {/* Icon user */}
-        <User
+        <span
           onClick={() => navigate("/profile")}
-          size={20}
-          color="#fff"
-          style={{ cursor: "pointer" }}
-        />
-
-        {/* Icon logout */}
-        <LogOut
-          onClick={async () => {
-            await logout();
-            window.location.href = "/login";
-          }}
-          size={20}
-          color="#fff"
-          style={{ cursor: "pointer" }}
-        />
+          style={{ cursor: "pointer", fontSize: 18 }}
+          title="Hồ sơ"
+        >
+          👤
+        </span>
+        <span
+          onClick={handleLogout}
+          style={{ cursor: "pointer", fontSize: 18 }}
+          title="Đăng xuất"
+        >
+          ↩️
+        </span>
       </div>
     </header>
   );

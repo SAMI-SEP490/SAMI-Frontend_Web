@@ -1,75 +1,103 @@
-import React, { useContext, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/Header";
 import SideBar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
-import { UserContext } from "../../contexts/UserContext";
+import { getUserById, updateUser } from "../../services/api/users";
+
+// helper: convert mọi dạng về 'YYYY-MM-DD' cho input[type=date]
+function toInputDate(v) {
+  if (!v) return "";
+  const s = String(v);
+  // '2003-05-07T00:00:00.000Z' -> '2003-05-07'
+  const base = s.includes("T") ? s.split("T")[0] : s;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(base)) return base;
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return "";
+}
 
 export default function TenantEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { userData, setUserData } = useContext(UserContext); // setUserData có trong context để cập nhật mock
 
-  const origin = useMemo(
-    () => userData.find((u) => String(u.id) === String(id)),
-    [userData, id]
-  );
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(null);
 
   const [form, setForm] = useState({
-    id: origin?.id ?? "",
-    full_name: origin?.full_name ?? "",
-    phone: origin?.phone ?? "",
-    email: origin?.email ?? "",
-    birthday: origin?.birthday ?? "1/1/2000",
-    gender: origin?.gender ?? "Nam", // "Nam" | "Nữ" | "Khác"
-    avatar_url: origin?.avatar_url ?? "",
-    avatar_preview: origin?.avatar_url ?? "",
+    id: "",
+    full_name: "",
+    phone: "",
+    email: "",
+    birthday: "",
+    gender: "Nam",
+    avatar_url: "",
+    avatar_preview: "",
   });
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setErr(null);
+        const data = await getUserById(id);
+        if (!mounted) return;
+        const u = data;
+        setForm((f) => ({
+          ...f,
+          id: u?.user_id ?? u?.id ?? id,
+          full_name: u?.full_name ?? u?.fullName ?? "",
+          phone: u?.phone ?? "",
+          email: u?.email ?? "",
+          birthday: toInputDate(u?.birthday), // ✅ chuẩn hoá vào input date
+          gender: u?.gender ?? "Nam",
+          avatar_url: u?.avatar_url ?? "",
+          avatar_preview: u?.avatar_url ?? "",
+        }));
+      } catch (e) {
+        setErr(e?.response?.data?.message || e?.message || "Load failed");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   const onChange = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const onPickAvatar = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setForm((f) => ({ ...f, avatar_preview: url, avatar_file: file }));
-  };
-
-  const onSubmit = (e) => {
+  async function onSubmit(e) {
     e.preventDefault();
-    // cập nhật mock vào UserContext (chưa có backend)
-    const next = userData.map((u) =>
-      String(u.id) === String(form.id)
-        ? {
-            ...u,
-            full_name: form.full_name,
-            phone: form.phone,
-            email: form.email,
-            birthday: form.birthday,
-            gender: form.gender,
-            avatar_url: form.avatar_preview || u.avatar_url,
-          }
-        : u
-    );
-    setUserData(next);
-    alert("Cập nhật thành công (mock)");
-    navigate(`/tenants/${form.id}`); // quay về trang detail
-  };
-
-  if (!origin) {
-    return (
-      <div style={{ padding: 24 }}>Không tìm thấy người thuê (ID: {id})</div>
-    );
+    try {
+      setSaving(true);
+      setErr(null);
+      await updateUser(form.id, {
+        full_name: form.full_name,
+        phone: form.phone,
+        email: form.email,
+        // Gửi đúng định dạng 'YYYY-MM-DD' (BE sẽ tự parse, không có giờ)
+        birthday: form.birthday,
+        gender: form.gender,
+      });
+      alert("Cập nhật thành công");
+      navigate(`/tenants/${form.id}`);
+    } catch (e) {
+      setErr(e?.response?.data?.message || e?.message || "Update failed");
+    } finally {
+      setSaving(false);
+    }
   }
+
+  if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Header GIỮ NGUYÊN */}
       <Header />
-
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {/* Sidebar */}
         <div
           style={{
             width: 220,
@@ -81,7 +109,6 @@ export default function TenantEditPage() {
           <SideBar />
         </div>
 
-        {/* Content */}
         <div
           style={{
             flex: 1,
@@ -93,74 +120,6 @@ export default function TenantEditPage() {
             overflowY: "auto",
           }}
         >
-          {/* Avatar zone */}
-          <div
-            style={{
-              textAlign: "center",
-              marginBottom: 18,
-              position: "relative",
-            }}
-          >
-            <div
-              style={{
-                width: 140,
-                height: 140,
-                borderRadius: 14,
-                border: "1.5px dashed #CBD5E1",
-                background: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-                margin: "0 auto",
-              }}
-            >
-              {form.avatar_preview ? (
-                <img
-                  src={form.avatar_preview}
-                  alt="avatar"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <span style={{ color: "#94A3B8" }}>Ảnh</span>
-              )}
-            </div>
-
-            {/* nút + */}
-            <label
-              htmlFor="avatarInput"
-              style={{
-                position: "absolute",
-                right: -10,
-                bottom: -10,
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: colors.brand,
-                color: "#fff",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 22,
-                cursor: "pointer",
-                boxShadow: "0 6px 14px rgba(0,0,0,.15)",
-              }}
-              title="Tải ảnh"
-            >
-              +
-            </label>
-            <input
-              id="avatarInput"
-              type="file"
-              accept="image/*"
-              onChange={onPickAvatar}
-              hidden
-            />
-
-            <div style={{ marginTop: 8, color: "#64748B" }}>Ảnh Đại Diện</div>
-          </div>
-
-          {/* Form card */}
           <form
             onSubmit={onSubmit}
             style={{
@@ -179,7 +138,7 @@ export default function TenantEditPage() {
                 fontWeight: 700,
               }}
             >
-              Thông tin người thuê
+              Thông tin người dùng
             </div>
 
             <div style={{ padding: 20 }}>
@@ -187,7 +146,7 @@ export default function TenantEditPage() {
                 <input value={form.id} disabled style={input} />
               </Field>
 
-              <Field label="Tên người thuê">
+              <Field label="Tên người dùng">
                 <input
                   value={form.full_name}
                   onChange={onChange("full_name")}
@@ -211,8 +170,10 @@ export default function TenantEditPage() {
                 />
               </Field>
 
+              {/* ✅ input date (không giờ) */}
               <Field label="Ngày sinh">
                 <input
+                  type="date"
                   value={form.birthday}
                   onChange={onChange("birthday")}
                   style={input}
@@ -239,47 +200,42 @@ export default function TenantEditPage() {
                 </div>
               </Field>
             </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: 16,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                style={btnGhost}
+              >
+                Quay lại
+              </button>
+              <button type="submit" disabled={saving} style={btnPrimary}>
+                {saving ? "Đang lưu..." : "Xác nhận"}
+              </button>
+            </div>
           </form>
 
-          {/* Action buttons */}
-          <div
-            style={{
-              width: 760,
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: 16,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
+          {err ? (
+            <div
               style={{
-                background: "transparent",
-                border: "none",
-                color: "#0F172A",
-                fontWeight: 700,
-                padding: "10px 12px",
-                cursor: "pointer",
+                width: 760,
+                marginTop: 12,
+                border: "1px solid #fecaca",
+                background: "#fee2e2",
+                color: "#b91c1c",
+                borderRadius: 10,
+                padding: 12,
               }}
             >
-              Quay lại
-            </button>
-
-            <button
-              onClick={onSubmit}
-              style={{
-                background: colors.brand,
-                color: "#fff",
-                border: "none",
-                padding: "10px 18px",
-                borderRadius: 8,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Xác nhận
-            </button>
-          </div>
+              {String(err)}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -309,4 +265,22 @@ const input = {
   background: "#F1F5F9",
   borderRadius: 8,
   border: "1px solid #E5E7EB",
+};
+
+const btnPrimary = {
+  background: colors.brand,
+  color: "#fff",
+  border: "none",
+  padding: "10px 18px",
+  borderRadius: 8,
+  fontWeight: 700,
+  cursor: "pointer",
+};
+const btnGhost = {
+  background: "transparent",
+  border: "none",
+  color: "#0F172A",
+  fontWeight: 700,
+  padding: "10px 12px",
+  cursor: "pointer",
 };

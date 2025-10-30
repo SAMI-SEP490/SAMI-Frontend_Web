@@ -9,7 +9,11 @@ export default function RootProvider({ children }) {
     <GuestRegistrationProvider>
       <UserProvider>
         <ContractProvider>
-          <BillProvider>{children}</BillProvider>
+          <BillProvider>
+            <MaintenanceProvider>
+              <RegulationProvider>{children}</RegulationProvider>
+            </MaintenanceProvider>
+          </BillProvider>
         </ContractProvider>
       </UserProvider>
     </GuestRegistrationProvider>

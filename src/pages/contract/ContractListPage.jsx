@@ -1,326 +1,192 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Table, Form, Button, Row, Col } from "react-bootstrap";
-import { colors } from "../../constants/colors";
-import Header from "../../components/Header";
+// src/pages/contract/ContractListPage.jsx
+import React, { useEffect, useState } from "react";
 import Sidebar from "../../components/SideBar";
 import { useNavigate } from "react-router-dom";
 import {
   listContracts,
-  getDownloadUrl,
-  downloadContractDirect,
+  getDownloadUrl, // đã được export trong service mới
   deleteContract,
+  downloadContractDirect,
 } from "../../services/api/contracts";
 
 function ContractListPage() {
-  const navigate = useNavigate();
+  const nav = useNavigate();
 
-  // GIỮ NGUYÊN state filter
-  const [statusFilter, setStatusFilter] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-
-  // DỮ LIỆU THẬT
-  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
+  const [rows, setRows] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10); // giữ 10/trang
+  const [error, setError] = useState("");
 
-  const normalize = (it) => ({
-    id: it?.id ?? it?.contract_id ?? it?._id ?? "",
-    tenantId: it?.tenant_user_id ?? it?.tenant?.id ?? it?.user_id,
-    tenantName:
-      it?.tenant?.full_name ??
-      it?.tenant_full_name ??
-      it?.tenant_name ??
-      it?.user?.full_name ??
-      "N/A",
-    room:
-      it?.room?.number ??
-      it?.room_number ??
-      it?.room?.name ??
-      it?.room ??
-      "N/A",
-    startDate: it?.start_date ?? it?.startDate ?? "",
-    endDate: it?.end_date ?? it?.endDate ?? "",
-    status: it?.status ?? it?.contract_status ?? "Đang xử lý",
-  });
-
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
+    setLoading(true);
+    setError("");
     try {
-      setLoading(true);
-      setErr("");
-      const data = await listContracts({
-        keyword: searchTerm || undefined,
-        status: statusFilter || undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-      });
-      const items = (data?.data || data?.contracts || data || []).map(
-        normalize
-      );
-      setRows(items);
+      // chỉ gọi '/contract/list?page=...&limit=...'
+      const data = await listContracts({ page, limit });
+      // Tuỳ response của BE. Mặc định mình hỗ trợ 2 dạng:
+      // 1) {items: [...], total: n} hoặc
+      // 2) {data: {items: [...], total: n}}
+      const items =
+        data?.items ?? data?.data?.items ?? data?.data ?? data ?? [];
+      setRows(Array.isArray(items) ? items : []);
     } catch (e) {
-      setErr(
-        e?.response?.data?.message || e.message || "Không tải được danh sách"
+      console.error(e);
+      setError(
+        e?.response?.data?.message ||
+          e?.message ||
+          "Không tải được danh sách hợp đồng"
       );
+      setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, statusFilter, startDate, endDate]);
+  };
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
-  // tên người thuê theo id — để GIỮ giao diện cột như cũ
-  const nameById = useMemo(() => {
-    const m = {};
-    rows.forEach((r) => {
-      if (r.tenantId) m[r.tenantId] = r.tenantName;
-    });
-    return m;
-  }, [rows]);
-  const getTenantName = (id) => nameById[id] || "N/A";
-
-  const filtered = useMemo(
-    () =>
-      rows.filter((c) => {
-        const sOk =
-          !statusFilter ||
-          (c.status || "").toLowerCase().includes(statusFilter.toLowerCase());
-        const qOk =
-          !searchTerm ||
-          String(c.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (getTenantName(c.tenantId) || "")
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase());
-        const fromOk =
-          !startDate || new Date(c.startDate || "") >= new Date(startDate);
-        const toOk = !endDate || new Date(c.endDate || "") <= new Date(endDate);
-        return sOk && qOk && fromOk && toOk;
-      }),
-    [rows, statusFilter, searchTerm, startDate, endDate]
-  );
-
-  const handleSearch = () => fetchData();
-  const onView = (id) => navigate(`/contracts/${id}`);
   const onDelete = async (id) => {
     if (!window.confirm("Xoá hợp đồng này?")) return;
-    await deleteContract(id);
-    await fetchData();
-  };
-  const onDownload = async (id, filename = `contract-${id}.pdf`) => {
     try {
-      const r = await getDownloadUrl(id);
-      const url = r?.download_url || r?.url;
-      if (url) window.open(url, "_blank");
-      else await downloadContractDirect(id, filename);
-    } catch {
-      await downloadContractDirect(id, filename);
+      await deleteContract(id);
+      await fetchData();
+      alert("Đã xoá!");
+    } catch (e) {
+      alert(
+        e?.response?.data?.message || e?.message || "Xoá hợp đồng thất bại"
+      );
+    }
+  };
+
+  const onDownload = async (id) => {
+    try {
+      // Nếu BE có URL ký sẵn:
+      const { url } = await getDownloadUrl(id);
+      if (url) {
+        window.open(url, "_blank", "noopener");
+        return;
+      }
+      // Nếu không có URL ký sẵn → tải trực tiếp
+      const res = await downloadContractDirect(id);
+      const blob = new Blob([res.data]);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `contract-${id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      console.error(err);
+      alert("Không tải được hợp đồng");
     }
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <div
-        style={{
-          marginBottom: 10,
-          borderRadius: "10px",
-          flexShrink: 0,
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
-        }}
-      >
-        <Header />
-      </div>
-
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div
-          style={{
-            width: 220,
-            backgroundColor: colors.brand,
-            color: "white",
-            height: "100%",
-            position: "sticky",
-            top: 0,
-            borderRadius: 10,
-          }}
-        >
-          <Sidebar />
+    <div className="flex">
+      <Sidebar />
+      <div className="flex-1 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold">Danh Sách Hợp Đồng</h1>
+          <button
+            className="px-4 py-2 bg-[#123b82] text-white rounded"
+            onClick={() => nav("/contracts/create")}
+          >
+            Tạo hợp đồng mới
+          </button>
         </div>
 
-        <div
-          style={{
-            flex: 1,
-            padding: 30,
-            backgroundColor: colors.background,
-            overflowY: "auto",
-          }}
-        >
-          <h4 style={{ fontWeight: 600, marginBottom: 20 }}>
-            Danh Sách Hợp Đồng
-          </h4>
+        {error && (
+          <div className="mb-3 p-3 rounded bg-red-50 text-red-700">{error}</div>
+        )}
 
-          {/* Bộ lọc — GIỮ NGUYÊN UI */}
-          <Row className="align-items-end mb-3">
-            <Col md={3}>
-              <Form.Label>Trạng thái:</Form.Label>
-              <Form.Select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">Tất cả</option>
-                <option value="Đang hoạt động">Đang hoạt động</option>
-                <option value="Đang xử lý">Đang xử lý</option>
-                <option value="Hết hạn">Hết hạn</option>
-                <option value="Đã hủy">Đã hủy</option>
-              </Form.Select>
-            </Col>
-            <Col md={4}>
-              <Form.Label>Ngày:</Form.Label>
-              <div className="d-flex gap-2">
-                <Form.Control
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-                <Form.Control
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
-            </Col>
-            <Col md={3}>
-              <Form.Label>Tìm kiếm:</Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Nhập tên hoặc mã hợp đồng..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </Col>
-            <Col md={2}>
-              <Button
-                variant="primary"
-                style={{
-                  width: "100%",
-                  backgroundColor: colors.brand,
-                  border: "none",
-                  marginTop: 5,
-                }}
-                onClick={handleSearch}
-              >
-                Tìm
-              </Button>
-            </Col>
-          </Row>
-
-          {/* Bảng */}
-          <Table bordered hover responsive>
-            <thead style={{ backgroundColor: "#E6E8ED" }}>
+        <div className="border rounded">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100">
               <tr>
-                <th>ID Hợp Đồng</th>
-                <th>Tên Người Thuê</th>
-                <th>Số phòng</th>
-                <th>Ngày Bắt Đầu</th>
-                <th>Ngày Kết Thúc</th>
-                <th>Trạng Thái</th>
-                <th>Hành Động</th>
+                <th className="p-2 text-left">ID Hợp Đồng</th>
+                <th className="p-2 text-left">Tên Người Thuê</th>
+                <th className="p-2 text-left">Số phòng</th>
+                <th className="p-2 text-left">Ngày Bắt Đầu</th>
+                <th className="p-2 text-left">Ngày Kết Thúc</th>
+                <th className="p-2 text-left">Trạng Thái</th>
+                <th className="p-2 text-left">Hành Động</th>
               </tr>
             </thead>
             <tbody>
-              {!loading && filtered.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan="7" className="text-center">
-                    {err || "Không có hợp đồng nào phù hợp"}
+                  <td className="p-3" colSpan={7}>
+                    Đang tải...
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td className="p-3" colSpan={7}>
+                    Chưa có hợp đồng nào.
                   </td>
                 </tr>
               ) : (
-                filtered.map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.id}</td>
-                    <td>{getTenantName(c.tenantId)}</td>
-                    <td>{c.room}</td>
-                    <td>
-                      {c.startDate
-                        ? new Date(c.startDate).toLocaleDateString("vi-VN")
-                        : ""}
+                rows.map((r) => (
+                  <tr key={r.contract_id || r.id} className="border-t">
+                    <td className="p-2">{r.contract_id || r.id}</td>
+                    <td className="p-2">
+                      {r?.tenant?.full_name || r?.tenant_name || "-"}
                     </td>
-                    <td>
-                      {c.endDate
-                        ? new Date(c.endDate).toLocaleDateString("vi-VN")
-                        : ""}
+                    <td className="p-2">
+                      {r?.room?.room_number || r?.room_number || "-"}
                     </td>
-                    <td>{c.status}</td>
-                    <td className="d-flex gap-3">
-                      <span
-                        style={{
-                          color: colors.brand,
-                          cursor: "pointer",
-                          fontWeight: 500,
-                        }}
-                        onClick={() => onView(c.id)}
+                    <td className="p-2">
+                      {r?.start_date || r?.startDate || "-"}
+                    </td>
+                    <td className="p-2">{r?.end_date || r?.endDate || "-"}</td>
+                    <td className="p-2">{r?.status || "-"}</td>
+                    <td className="p-2 space-x-2">
+                      <button
+                        className="px-2 py-1 text-xs bg-gray-200 rounded"
+                        onClick={() =>
+                          nav(`/contracts/${r.contract_id || r.id}`)
+                        }
                       >
-                        Xem chi tiết
-                      </span>
-                      <span
-                        style={{ color: "#0d6efd", cursor: "pointer" }}
-                        onClick={() => onDownload(c.id)}
+                        Xem
+                      </button>
+                      <button
+                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded"
+                        onClick={() => onDownload(r.contract_id || r.id)}
                       >
                         Tải
-                      </span>
-                      <span
-                        style={{ color: "#dc3545", cursor: "pointer" }}
-                        onClick={() => onDelete(c.id)}
+                      </button>
+                      <button
+                        className="px-2 py-1 text-xs bg-red-600 text-white rounded"
+                        onClick={() => onDelete(r.contract_id || r.id)}
                       >
                         Xoá
-                      </span>
+                      </button>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
-          </Table>
+          </table>
+        </div>
 
-          {/* Khu vực tải file & nút tạo mới — GIỮ NGUYÊN UI */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: 20,
-            }}
+        {/* Bộ phân trang đơn giản */}
+        <div className="mt-4 flex items-center gap-2">
+          <button
+            className="px-3 py-1 bg-gray-200 rounded"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            <div>
-              <Form.Group controlId="formFile">
-                <Form.Label style={{ fontWeight: 500 }}>Chọn file:</Form.Label>
-                <div className="d-flex align-items-center gap-2">
-                  <Form.Control type="file" style={{ width: 250 }} disabled />
-                  <Button
-                    variant="primary"
-                    style={{ backgroundColor: colors.brand, border: "none" }}
-                    disabled
-                  >
-                    Tải lên
-                  </Button>
-                </div>
-              </Form.Group>
-            </div>
-
-            <Button
-              variant="primary"
-              style={{
-                backgroundColor: colors.brand,
-                border: "none",
-                padding: "10px 20px",
-              }}
-              onClick={() => navigate("/contracts/create")}
-            >
-              Tạo hợp đồng mới
-            </Button>
-          </div>
+            ← Trước
+          </button>
+          <span>Trang {page}</span>
+          <button
+            className="px-3 py-1 bg-gray-200 rounded"
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Sau →
+          </button>
         </div>
       </div>
     </div>

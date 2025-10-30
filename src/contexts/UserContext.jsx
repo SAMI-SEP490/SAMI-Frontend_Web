@@ -18,7 +18,7 @@ export const UserProvider = ({ children }) => {
     status: "active",
     created_at: "2025-01-10T08:15:30Z",
     updated_at: "2025-06-12T10:20:00Z",
-    role: "Người thuê trọ"
+    role: "Owner"
   },
   {
     id: 2,
@@ -34,7 +34,7 @@ export const UserProvider = ({ children }) => {
     status: "active",
     created_at: "2025-02-22T09:30:00Z",
     updated_at: "2025-07-01T14:05:10Z",
-    role: "Quản lý trọ"
+    role: "Manager"
   },
   {
     id: 3,

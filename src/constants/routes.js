@@ -20,4 +20,7 @@ export const ROUTES = {
   createContract: "/contracts/create",
   receiveGuestRegistration: "/receive-guest",
   tenantCreate: "/tenants/create",
+  notifications: "/notifications",
+  createNotification: "/notifications/create",
+  editNotification: "/notifications/:id/edit",
 };

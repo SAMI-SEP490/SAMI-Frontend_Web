@@ -32,7 +32,10 @@ import EditProfilePage from "../pages/profile/EditProfilePage";
 
 //Guest Registration
 import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistrationPage";
-
+// Notification
+import NotificationListPage from "../pages/notification/NotificationListPage";
+import CreateNotificationPage from "../pages/notification/CreateNotificationPage";
+import EditNotificationPage from "../pages/notification/EditNotificationPage";
 // Định nghĩa các route trong ứng dụng
 import { ROUTES } from "../constants/routes";
 
@@ -168,6 +171,31 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <CreateTenantPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Notification */}
+      <Route
+        path={ROUTES.notifications}
+        element={
+          <ProtectedRoute>
+            <NotificationListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTES.createNotification}
+        element={
+          <ProtectedRoute>
+            <CreateNotificationPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTES.editNotification}
+        element={
+          <ProtectedRoute>
+            <EditNotificationPage />
           </ProtectedRoute>
         }
       />

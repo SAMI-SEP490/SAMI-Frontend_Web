@@ -73,6 +73,20 @@ const SideBar = () => {
       >
         Danh sách đăng ký khách tạm trú
       </button>
+
+      <button
+        onClick={() => navigate("/notifications")}
+        style={{
+          margin: "10px 0",
+          background: "none",
+          border: "none",
+          color: "#fff",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        Danh sách thông báo
+      </button>
     </div>
   );
 };

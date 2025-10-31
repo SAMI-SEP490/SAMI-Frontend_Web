@@ -39,7 +39,6 @@ import NotificationListPage from "../pages/notification/NotificationListPage";
 import CreateNotificationPage from "../pages/notification/CreateNotificationPage";
 import EditNotificationPage from "../pages/notification/EditNotificationPage";
 // Định nghĩa các route trong ứng dụng
-import { ROUTES } from "../constants/routes";
 
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||

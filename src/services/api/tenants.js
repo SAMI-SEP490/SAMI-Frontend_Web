@@ -62,7 +62,7 @@ export async function registerTenantQuick(form) {
     phone: form.phone,
     full_name: form.full_name, // chú ý: BE dùng full_name (snake)
     gender: form.gender, // "male"/"female"...
-    birthday: form.birthday, // yyyy-mm-dd (chuẩn ISO càng tốt)
+    birthday: form.birthday, // yyyy-mm-dd
   });
 
   const userId = reg?.id; // auth.register() trả về 'id' = user_id
@@ -76,4 +76,91 @@ export async function registerTenantQuick(form) {
   });
 
   return { userId, user: reg, tenant: tenantRes };
+}
+
+/* ===========================
+ *  BỔ SUNG CHO CREATE CONTRACT
+ * =========================== */
+
+/** Thử nhiều endpoint phòng để tương thích nhiều BE khác nhau */
+const ROOM_ENDPOINTS = [
+  { url: "/room/list", params: { status: "active", take: 200 } },
+  { url: "/room", params: { status: "active" } },
+  { url: "/rooms", params: { status: "active" } },
+];
+
+function normalizeRoom(r) {
+  const id = r?.room_id ?? r?.id ?? r?.roomId ?? r?.room?.id;
+  const label =
+    r?.room_number ??
+    r?.number ??
+    r?.name ??
+    r?.room?.room_number ??
+    (id != null ? `Phòng ${id}` : "Phòng");
+  const floor = r?.floor ?? r?.level ?? r?.room?.floor ?? null;
+  return id == null ? null : { id, label, floor };
+}
+
+/** Lấy danh sách phòng rút gọn cho dropdown */
+export async function listRoomsLite() {
+  for (const ep of ROOM_ENDPOINTS) {
+    try {
+      const res = await http.get(ep.url, {
+        params: ep.params,
+        validateStatus: () => true,
+      });
+      if (res.status >= 200 && res.status < 300) {
+        const raw = unwrap(res);
+        const arr = raw?.items ?? raw?.data ?? raw;
+        const items = (Array.isArray(arr) ? arr : [])
+          .map(normalizeRoom)
+          .filter(Boolean);
+        if (items.length) return items;
+      }
+    } catch {
+      /* thử endpoint tiếp theo */
+    }
+  }
+  return [];
+}
+
+function normalizeTenant(t) {
+  const id = t?.tenant_user_id ?? t?.user_id ?? t?.id ?? t?.tenant?.id;
+  const name =
+    (t?.full_name && t.full_name.trim()) ||
+    [t?.first_name, t?.last_name].filter(Boolean).join(" ").trim() ||
+    t?.tenant?.full_name ||
+    "Người thuê";
+
+  const roomId = t?.room_id ?? t?.roomId ?? t?.room?.id ?? null;
+  const phone = t?.phone ?? t?.phone_number ?? t?.mobile ?? null;
+  return id == null ? null : { id, name, roomId, phone };
+}
+
+/** Lấy tenants theo phòng; nếu BE chưa filter, FE sẽ filter sau */
+export async function listTenantsByRoom(roomId) {
+  // cố gắng nhờ BE filter trước
+  try {
+    const res = await listTenants({
+      room_id: roomId,
+      status: "active",
+      take: 200,
+    });
+    const arr = res?.items ?? res?.data ?? res;
+    let items = (Array.isArray(arr) ? arr : [])
+      .map(normalizeTenant)
+      .filter(Boolean);
+    if (!items.length) {
+      // fallback: lấy tất cả tenant rồi tự filter
+      const resAll = await listTenants({ status: "active", take: 500 });
+      const arrAll = resAll?.items ?? resAll?.data ?? resAll;
+      items = (Array.isArray(arrAll) ? arrAll : [])
+        .map(normalizeTenant)
+        .filter(Boolean)
+        .filter((x) => String(x.roomId) === String(roomId));
+    }
+    return items;
+  } catch {
+    return [];
+  }
 }

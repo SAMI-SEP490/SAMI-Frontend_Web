@@ -1,110 +1,126 @@
 // src/services/api/contracts.js
 import { http } from "../http";
 
-// gọn nhẹ: unwrap dữ liệu (tránh phụ thuộc nếu http.js chưa export unwrap)
-const u = (res) => res?.data?.data ?? res?.data ?? res;
+const un = (res) => res?.data?.data ?? res?.data ?? res;
+const FILE_FIELD = "contract_file"; // <-- khớp Multer ở BE
 
-// chuẩn hoá response list về { items, total, page, limit }
-function normalizeList(raw, fallbackPage = 1, fallbackLimit = 10) {
-  const items = raw?.items ?? raw?.data ?? (Array.isArray(raw) ? raw : []);
-  return {
-    items,
-    total: raw?.total ?? raw?.pagination?.total ?? items.length ?? 0,
-    page: raw?.page ?? raw?.pagination?.page ?? fallbackPage,
-    limit: raw?.limit ?? raw?.pagination?.limit ?? fallbackLimit,
-  };
-}
-
-// GET /api/contract/list hoặc /api/contract
-export async function listContracts({ page = 1, limit = 10, ...filters } = {}) {
-  const params = { page, limit, ...filters };
-  const CANDIDATES = ["/contract/list", "/contract"]; // fallback tránh 404
-  let lastErr;
-  for (const p of CANDIDATES) {
-    try {
-      const res = await http.get(p, { params });
-      return normalizeList(u(res), page, limit);
-    } catch (e) {
-      lastErr = e;
+/** ===== LIST: không phân trang (tạm) ===== */
+export async function listContracts() {
+  try {
+    const res = await http.get("/contract/list", {
+      validateStatus: () => true,
+    });
+    if (res.status >= 200 && res.status < 300) {
+      const data = un(res);
+      const items =
+        data?.items ??
+        (Array.isArray(data?.data) ? data.data : undefined) ??
+        (Array.isArray(data) ? data : undefined) ??
+        [];
+      return { items, total: items.length, _status: res.status };
     }
+    return { items: [], total: 0, _status: res.status };
+  } catch {
+    return { items: [], total: 0, _status: "network_error" };
   }
-  throw lastErr;
 }
 
-// GET /api/contract/:id
+/** ===== DETAIL ===== */
 export async function getContract(id) {
   if (!id) throw new Error("Missing contract id");
   const res = await http.get(`/contract/${id}`);
-  return u(res);
+  return un(res);
 }
 
-// POST /api/contract (multipart/form-data)
-// Nhận cả FormData hoặc object thường
-export async function createContract(payload = {}) {
-  let body;
-  if (payload instanceof FormData) {
-    body = payload;
-  } else {
-    body = new FormData();
-    Object.entries(payload).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== "") body.append(k, v);
-    });
+/** ===== CREATE (multipart) =====
+ * form: {
+ *  roomId, tenantUserId, startDate, endDate,
+ *  rentAmount?, depositAmount?, status?, note?, file?(File)
+ * }
+ */
+export async function createContract(form = {}) {
+  const fd = new FormData();
+
+  // map camelCase -> snake_case; chỉ append khi có giá trị
+  if (form.roomId) fd.append("room_id", Number(form.roomId));
+  if (form.tenantUserId) fd.append("tenant_user_id", Number(form.tenantUserId));
+  if (form.startDate) fd.append("start_date", toISODate(form.startDate));
+  if (form.endDate) fd.append("end_date", toISODate(form.endDate));
+  if (form.rentAmount) fd.append("rent_amount", String(form.rentAmount));
+  if (form.depositAmount)
+    fd.append("deposit_amount", String(form.depositAmount));
+  // default status 'pending' nếu không truyền từ form
+  fd.append("status", String(form.status ?? "pending"));
+  if (form.note) fd.append("note", String(form.note));
+
+  // file: BE yêu cầu 'contract_file'
+  if (form.file instanceof File) {
+    fd.append(FILE_FIELD, form.file);
   }
-  // field file => 'file' (đúng với BE dùng multer.single('file'))
-  const res = await http.post("/contract", body, {
+
+  const res = await http.post("/contract", fd, {
     headers: { "Content-Type": "multipart/form-data" },
   });
-  return u(res);
+  return un(res);
 }
 
-// PUT /api/contract/:id (multipart nếu có file mới)
-export async function updateContract(id, payload = {}) {
+/** ===== UPDATE (multipart nếu có file) ===== */
+export async function updateContract(id, form = {}) {
   if (!id) throw new Error("Missing contract id");
-  let body;
-  const maybeMultipart =
-    payload instanceof FormData ||
-    Object.values(payload).some((v) => v instanceof File || v instanceof Blob);
+  const hasFile = form.file instanceof File || form.file instanceof Blob;
 
-  if (payload instanceof FormData) {
-    body = payload;
-  } else if (maybeMultipart) {
-    body = new FormData();
-    Object.entries(payload).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) body.append(k, v);
+  if (hasFile) {
+    const fd = new FormData();
+    if (form.startDate) fd.append("start_date", toISODate(form.startDate));
+    if (form.endDate) fd.append("end_date", toISODate(form.endDate));
+    if (form.rentAmount) fd.append("rent_amount", String(form.rentAmount));
+    if (form.depositAmount)
+      fd.append("deposit_amount", String(form.depositAmount));
+    if (form.status) fd.append("status", String(form.status));
+    if (form.note) fd.append("note", String(form.note));
+    fd.append(FILE_FIELD, form.file); // <-- tên field file khi update
+
+    const res = await http.put(`/contract/${id}`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
-  } else {
-    body = payload;
+    return un(res);
   }
 
-  const res = await http.put(`/contract/${id}`, body, {
-    headers: maybeMultipart ? { "Content-Type": "multipart/form-data" } : {},
-  });
-  return u(res);
+  const body = {
+    ...(form.startDate ? { start_date: toISODate(form.startDate) } : {}),
+    ...(form.endDate ? { end_date: toISODate(form.endDate) } : {}),
+    ...(form.rentAmount ? { rent_amount: String(form.rentAmount) } : {}),
+    ...(form.depositAmount
+      ? { deposit_amount: String(form.depositAmount) }
+      : {}),
+    ...(form.status ? { status: String(form.status) } : {}),
+    ...(form.note ? { note: String(form.note) } : {}),
+  };
+
+  const res = await http.put(`/contract/${id}`, body);
+  return un(res);
 }
 
-// DELETE /api/contract/:id (soft delete)
+/** ===== DELETE ===== */
 export async function deleteContract(id) {
   if (!id) throw new Error("Missing contract id");
   const res = await http.delete(`/contract/${id}`);
-  return u(res);
+  return un(res);
 }
 
-// GET /api/contract/:id/download  -> trả về { url } (presigned URL)
+/** ===== DOWNLOADS ===== */
 export async function getDownloadUrl(id) {
   if (!id) throw new Error("Missing contract id");
   try {
     const res = await http.get(`/contract/${id}/download`);
-    const data = u(res);
-    // chuẩn: { url }, fallback: { data: { url } } hoặc { downloadUrl }
+    const data = un(res);
     const url = data?.url ?? data?.downloadUrl ?? data?.data?.url;
-    return { url };
+    return { url: url || null };
   } catch {
     return { url: null };
   }
 }
 
-// GET /api/contract/:id/download/direct -> stream PDF
-// Hàm này chủ động tải file luôn (để gọi thẳng từ UI)
 export async function downloadContractDirect(id) {
   if (!id) throw new Error("Missing contract id");
   const res = await http.get(`/contract/${id}/download/direct`, {
@@ -122,16 +138,15 @@ export async function downloadContractDirect(id) {
   URL.revokeObjectURL(url);
 }
 
-// (tuỳ nhu cầu BE) các API nâng cao
-export async function restoreContract(id) {
-  const res = await http.post(`/contract/${id}/restore`);
-  return u(res);
-}
-export async function hardDeleteContract(id) {
-  const res = await http.delete(`/contract/${id}/hard`);
-  return u(res);
-}
-export async function terminateContract(id, reason) {
-  const res = await http.post(`/contract/${id}/terminate`, { reason });
-  return u(res);
+/** ===== Helpers ===== */
+function toISODate(v) {
+  if (!v) return "";
+  if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0, 10);
+  const m = String(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    const d = m[1].padStart(2, "0");
+    const mo = m[2].padStart(2, "0");
+    return `${m[3]}-${mo}-${d}`;
+  }
+  return String(v).slice(0, 10);
 }

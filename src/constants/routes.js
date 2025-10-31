@@ -35,4 +35,7 @@ export const ROUTES = {
   notifications: "/notifications",
   createNotification: "/notifications/create",
   editNotification: "/notifications/:id/edit",
+
+  //maintaince
+  maintainceRequests: "/maintaince-requests",
 };

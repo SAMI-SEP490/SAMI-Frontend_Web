@@ -2,7 +2,6 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
-import { ROUTES } from "../constants/routes";
 
 // ===== Auth (Public) =====
 import LoginPage from "../pages/auth/LoginPage";
@@ -40,6 +39,7 @@ import CreateNotificationPage from "../pages/notification/CreateNotificationPage
 import EditNotificationPage from "../pages/notification/EditNotificationPage";
 // Định nghĩa các route trong ứng dụng
 import { ROUTES } from "../constants/routes";
+import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
 
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
@@ -215,6 +215,15 @@ export default function AppRoutes() {
       {/* Fallback */}
       <Route path="/" element={<HomeRedirect />} />
       <Route path="*" element={<HomeRedirect />} />
+
+      <Route
+        path={ROUTES.maintainceRequests}
+        element={
+          <ProtectedRoute>
+            <MaintenanceListPage />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }

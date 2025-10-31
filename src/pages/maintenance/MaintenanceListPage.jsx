@@ -1,14 +1,30 @@
-import React, { useContext, useState } from "react";
-import { MaintenanceContext } from "../../contexts/MaintenanceContext";
+import React, { useContext, useState, useEffect } from "react";
+import { MaintenanceContext } from "../../contexts/MaintainanceContext";
 import { Table, Form, Button, Row, Col } from "react-bootstrap";
 import Header from "../../components/Header";
 import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
+import { listMaintenance } from "../../services/api/maintainance";
 
 function MaintenanceListPage() {
-  const { maintenanceRequests } = useContext(MaintenanceContext);
+  const [maintenanceRequests, setMaintenanceRequests] = useState([]);
+  console.log("maintenace : " + maintenanceRequests);
+
   const [statusFilter, setStatusFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    async function fetchMaintenance() {
+      try {
+        const data = await listMaintenance();
+        console.log("Fetched maintenance:", data);
+        setMaintenanceRequests(data);
+      } catch (error) {
+        console.error("Error fetching maintenance:", error);
+      }
+    }
+    fetchMaintenance();
+  }, []); // ✅ chỉ gọi 1 lần khi component mount
 
   const filteredRequests = maintenanceRequests.filter((req) => {
     const matchesStatus = statusFilter ? req.status === statusFilter : true;
@@ -26,7 +42,9 @@ function MaintenanceListPage() {
           <Sidebar />
         </div>
 
-        <div style={{ flex: 1, padding: 30, backgroundColor: colors.background }}>
+        <div
+          style={{ flex: 1, padding: 30, backgroundColor: colors.background }}
+        >
           <h4 style={{ fontWeight: "600", marginBottom: "20px" }}>
             Danh sách yêu cầu bảo trì
           </h4>

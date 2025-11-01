@@ -1,5 +1,9 @@
 // src/routing/AppRoutes.jsx
 import React from "react";
+
+// Định nghĩa các route trong ứng dụng
+import { ROUTES } from "../constants/routes";
+
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -41,8 +45,9 @@ import EditNotificationPage from "../pages/notification/EditNotificationPage";
 // Maintenance
 import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
 
-// Định nghĩa các route trong ứng dụng
-import { ROUTES } from "../constants/routes";
+//Building
+import BuildingListPage from "../pages/building/BuildingListPage";
+import EditBuildingPage from "../pages/building/EditBuildingPage";
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
   !!localStorage.getItem("accessToken");
@@ -218,11 +223,30 @@ export default function AppRoutes() {
       <Route path="/" element={<HomeRedirect />} />
       <Route path="*" element={<HomeRedirect />} />
 
+      {/* maintenance */}
       <Route
         path={ROUTES.maintainceRequests}
         element={
           <ProtectedRoute>
             <MaintenanceListPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* buildings */}
+      <Route
+        path={ROUTES.buildings}
+        element={
+          <ProtectedRoute>
+            <BuildingListPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path={ROUTES.editBuilding}
+        element={
+          <ProtectedRoute>
+            <EditBuildingPage />
           </ProtectedRoute>
         }
       />

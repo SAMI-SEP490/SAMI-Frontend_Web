@@ -87,6 +87,20 @@ const SideBar = () => {
       >
         Danh sách thông báo
       </button>
+
+      <button
+        onClick={() => navigate("/maintaince-requests")}
+        style={{
+          margin: "10px 0",
+          background: "none",
+          border: "none",
+          color: "#fff",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        Danh sách bảo trì
+      </button>
     </div>
   );
 };

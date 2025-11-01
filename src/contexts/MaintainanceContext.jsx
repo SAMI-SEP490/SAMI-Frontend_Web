@@ -62,9 +62,7 @@ export const MaintenanceProvider = ({ children }) => {
     const found = maintenanceRequests.find((r) => r.request_id === id);
     if (found) {
       setAcknowledgedRequests((prev) => [...prev, found]);
-      setMaintenanceRequests((prev) =>
-        prev.filter((r) => r.request_id !== id)
-      );
+      setMaintenanceRequests((prev) => prev.filter((r) => r.request_id !== id));
     }
   };
 
@@ -74,9 +72,7 @@ export const MaintenanceProvider = ({ children }) => {
 
   const updateRequestStatus = (id, newStatus) => {
     setMaintenanceRequests((prev) =>
-      prev.map((r) =>
-        r.request_id === id ? { ...r, status: newStatus } : r
-      )
+      prev.map((r) => (r.request_id === id ? { ...r, status: newStatus } : r))
     );
   };
 

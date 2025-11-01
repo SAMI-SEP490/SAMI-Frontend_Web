@@ -1,22 +1,76 @@
 // src/services/api/tenants.js
-import { http, unwrap } from "../http";
+import { http } from "../http";
 
-/** BE của bạn mount /api/user (singular). Lấy DS tenant — thử vài path phổ biến để tránh 404. */
+// unwrap: hỗ trợ các kiểu trả về phổ biến {data:{data}}, {data}, hoặc mảng
+const un = (res) => res?.data?.data ?? res?.data ?? res;
+
+/* =======================
+ *  LIST TENANTS
+ * ======================= */
+// Thử nhiều endpoint để hợp backend hiện tại
+const TENANT_LIST_ENDPOINTS = [
+  { url: "/user/list-users", params: { role: "tenant", take: 200 } },
+  { url: "/user", params: { role: "tenant", take: 200 } },
+  { url: "/user/tenants", params: { take: 200 } },
+  { url: "/tenants", params: {} },
+];
+
 export async function listTenants(params = {}) {
-  const CANDIDATES = ["/user", "/user/tenants"];
   let lastErr;
-  for (const p of CANDIDATES) {
+  for (const ep of TENANT_LIST_ENDPOINTS) {
     try {
-      const res = await http.get(p, { params: { role: "tenant", ...params } });
-      return unwrap(res);
+      const res = await http.get(ep.url, {
+        params: { ...ep.params, ...params },
+        validateStatus: () => true,
+      });
+      if (res.status >= 200 && res.status < 300) {
+        const raw = un(res);
+        const arr = raw?.items ?? raw?.data ?? raw;
+        return Array.isArray(arr) ? arr : [];
+      }
     } catch (e) {
       lastErr = e;
     }
   }
-  throw lastErr;
+  if (lastErr) throw lastErr;
+  return [];
 }
 
-/** Bước 1: Đăng ký user mới */
+/* =======================
+ *  LIST TENANTS BY ROOM
+ *  (chọn phòng -> lọc tenant)
+ * ======================= */
+export async function listTenantsByRoom(roomId) {
+  if (!roomId) return [];
+  // Ưu tiên nhờ BE filter; nếu không có thì FE tự filter
+  try {
+    // Thử gọi giống listTenants nhưng truyền room_id
+    const res = await listTenants({ room_id: roomId, status: "active" });
+    if (Array.isArray(res) && res.length) {
+      return res.filter((t) => {
+        const rid = t?.room_id ?? t?.roomId ?? t?.room?.id ?? t?.room?.room_id;
+        return String(rid) === String(roomId);
+      });
+    }
+  } catch {   
+    return [];
+  }
+  // Fallback: lấy tất cả rồi lọc FE
+  try {
+    const all = await listTenants({ status: "active", take: 500 });
+    return all.filter((t) => {
+      const rid = t?.room_id ?? t?.roomId ?? t?.room?.id ?? t?.room?.room_id;
+      return String(rid) === String(roomId);
+    });
+  } catch {
+    return [];
+  }
+}
+
+/* =======================
+ *  REGISTER TENANT QUICK
+ *  (đăng ký user -> change-to-tenant)
+ * ======================= */
 async function registerUser({
   email,
   password,
@@ -29,15 +83,13 @@ async function registerUser({
     email,
     password,
     phone,
-    full_name,
+    full_name, // BE dùng full_name (snake)
     gender,
     birthday,
   });
-  const data = unwrap(res); // { id, email, phone, full_name, status }
-  return data;
+  return un(res); // => { id, email, phone, full_name, ... }
 }
 
-/** Bước 2: Chuyển user vừa tạo thành TENANT (yêu cầu role owner/manager) */
 async function changeToTenant({
   userId,
   idNumber,
@@ -50,30 +102,29 @@ async function changeToTenant({
     emergencyContactPhone,
     note,
   });
-  return unwrap(res);
+  return un(res);
 }
 
-/** API “đăng ký tenant nhanh”: gộp 2 bước ở trên */
 export async function registerTenantQuick(form) {
-  // map từ form UI → payload backend
+  // 1) đăng ký user
   const reg = await registerUser({
     email: form.email,
     password: form.password,
     phone: form.phone,
-    full_name: form.full_name, // chú ý: BE dùng full_name (snake)
-    gender: form.gender, // "male"/"female"...
-    birthday: form.birthday, // yyyy-mm-dd (chuẩn ISO càng tốt)
+    full_name: form.full_name,
+    gender: form.gender,
+    birthday: form.birthday,
   });
-
-  const userId = reg?.id; // auth.register() trả về 'id' = user_id
+  const userId = reg?.id ?? reg?.user_id;
   if (!userId) throw new Error("Không lấy được userId sau khi đăng ký.");
 
-  const tenantRes = await changeToTenant({
+  // 2) đổi sang tenant
+  const tenant = await changeToTenant({
     userId,
-    idNumber: form.idNumber, // CMND/CCCD
-    emergencyContactPhone: form.emergencyPhone, // SĐT người thân/liên hệ khẩn
+    idNumber: form.idNumber,
+    emergencyContactPhone: form.emergencyPhone,
     note: form.note || "",
   });
 
-  return { userId, user: reg, tenant: tenantRes };
+  return { userId, user: reg, tenant };
 }

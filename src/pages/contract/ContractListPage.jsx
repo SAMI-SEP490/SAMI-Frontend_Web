@@ -1,330 +1,354 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Table, Form, Button, Row, Col } from "react-bootstrap";
-import { colors } from "../../constants/colors";
-import Header from "../../components/Header";
+// src/pages/contract/ContractListPage.jsx
+import React, { useEffect, useState } from "react";
 import Sidebar from "../../components/SideBar";
+import Header from "../../components/Header"; // thêm header giống Tenant List
 import { useNavigate } from "react-router-dom";
 import {
   listContracts,
   getDownloadUrl,
-  downloadContractDirect,
   deleteContract,
+  downloadContractDirect,
 } from "../../services/api/contracts";
 
-function ContractListPage() {
-  const navigate = useNavigate();
+export default function ContractListPage() {
+  const nav = useNavigate();
 
-  // GIỮ NGUYÊN state filter
-  const [statusFilter, setStatusFilter] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-
-  // DỮ LIỆU THẬT
-  const [rows, setRows] = useState([]);
+  // data
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
+  const [rows, setRows] = useState([]);
 
-  const normalize = (it) => ({
-    id: it?.id ?? it?.contract_id ?? it?._id ?? "",
-    tenantId: it?.tenant_user_id ?? it?.tenant?.id ?? it?.user_id,
-    tenantName:
-      it?.tenant?.full_name ??
-      it?.tenant_full_name ??
-      it?.tenant_name ??
-      it?.user?.full_name ??
-      "N/A",
-    room:
-      it?.room?.number ??
-      it?.room_number ??
-      it?.room?.name ??
-      it?.room ??
-      "N/A",
-    startDate: it?.start_date ?? it?.startDate ?? "",
-    endDate: it?.end_date ?? it?.endDate ?? "",
-    status: it?.status ?? it?.contract_status ?? "Đang xử lý",
-  });
-
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setErr("");
-      const data = await listContracts({
-        keyword: searchTerm || undefined,
-        status: statusFilter || undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-      });
-      const items = (data?.data || data?.contracts || data || []).map(
-        normalize
-      );
-      setRows(items);
-    } catch (e) {
-      setErr(
-        e?.response?.data?.message || e.message || "Không tải được danh sách"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [searchTerm, statusFilter, startDate, endDate]);
+  // filter (UI-only)
+  const [status, setStatus] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [q, setQ] = useState("");
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    (async () => {
+      setLoading(true);
+      try {
+        const data = await listContracts(); // không gửi page/size để tránh 400
+        setRows(Array.isArray(data?.items) ? data.items : []);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-  // tên người thuê theo id — để GIỮ giao diện cột như cũ
-  const nameById = useMemo(() => {
-    const m = {};
-    rows.forEach((r) => {
-      if (r.tenantId) m[r.tenantId] = r.tenantName;
-    });
-    return m;
-  }, [rows]);
-  const getTenantName = (id) => nameById[id] || "N/A";
-
-  const filtered = useMemo(
-    () =>
-      rows.filter((c) => {
-        const sOk =
-          !statusFilter ||
-          (c.status || "").toLowerCase().includes(statusFilter.toLowerCase());
-        const qOk =
-          !searchTerm ||
-          String(c.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (getTenantName(c.tenantId) || "")
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase());
-        const fromOk =
-          !startDate || new Date(c.startDate || "") >= new Date(startDate);
-        const toOk = !endDate || new Date(c.endDate || "") <= new Date(endDate);
-        return sOk && qOk && fromOk && toOk;
-      }),
-    [rows, statusFilter, searchTerm, startDate, endDate]
-  );
-
-  const handleSearch = () => fetchData();
-  const onView = (id) => navigate(`/contracts/${id}`);
   const onDelete = async (id) => {
     if (!window.confirm("Xoá hợp đồng này?")) return;
-    await deleteContract(id);
-    await fetchData();
-  };
-  const onDownload = async (id, filename = `contract-${id}.pdf`) => {
     try {
-      const r = await getDownloadUrl(id);
-      const url = r?.download_url || r?.url;
-      if (url) window.open(url, "_blank");
-      else await downloadContractDirect(id, filename);
-    } catch {
-      await downloadContractDirect(id, filename);
+      await deleteContract(id);
+      const data = await listContracts();
+      setRows(Array.isArray(data?.items) ? data.items : []);
+      alert("Đã xoá!");
+    } catch (e) {
+      alert(
+        e?.response?.data?.message || e?.message || "Xoá hợp đồng thất bại"
+      );
     }
+  };
+
+  const onDownload = async (id) => {
+    try {
+      const { url } = await getDownloadUrl(id);
+      if (url) window.open(url, "_blank", "noopener");
+      else await downloadContractDirect(id);
+    } catch {
+      alert("Không tải được hợp đồng");
+    }
+  };
+
+  const onSearch = (e) => {
+    e?.preventDefault?.();
+    // khi BE sẵn lọc, map các state status/from/to/q vào params của listContracts
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <div
-        style={{
-          marginBottom: 10,
-          borderRadius: "10px",
-          flexShrink: 0,
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
-        }}
-      >
-        <Header />
-      </div>
+    <div className="contracts-page">
+      {/* CSS cục bộ (không phụ thuộc Tailwind/Bootstrap) */}
+      <style>{`
+        .contracts-page {
+          display: flex;
+          min-height: 100vh;
+          background: #F8FAFC; /* slate-50 */
+          color: #0f172a;      /* slate-900 */
+        }
+        .contracts-content {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-width: 0; /* fix overflow khi bảng dài */
+        }
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div
-          style={{
-            width: 220,
-            backgroundColor: colors.brand,
-            color: "white",
-            height: "100%",
-            position: "sticky",
-            top: 0,
-            borderRadius: 10,
-          }}
-        >
-          <Sidebar />
-        </div>
+        /* FULL-WIDTH: container 100% */
+        .contracts-container {
+          width: 100%;
+          padding: 20px 24px 36px;
+          box-sizing: border-box;
+        }
 
-        <div
-          style={{
-            flex: 1,
-            padding: 30,
-            backgroundColor: colors.background,
-            overflowY: "auto",
-          }}
-        >
-          <h4 style={{ fontWeight: 600, marginBottom: 20 }}>
-            Danh Sách Hợp Đồng
-          </h4>
+        .contracts-title {
+          font-size: 28px;
+          line-height: 1.2;
+          font-weight: 700;
+          margin: 12px 0 16px 0;
+          text-align: center; /* giống ảnh bạn gửi */
+        }
 
-          {/* Bộ lọc — GIỮ NGUYÊN UI */}
-          <Row className="align-items-end mb-3">
-            <Col md={3}>
-              <Form.Label>Trạng thái:</Form.Label>
-              <Form.Select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">Tất cả</option>
-                <option value="Đang hoạt động">Đang hoạt động</option>
-                <option value="Đang xử lý">Đang xử lý</option>
-                <option value="Hết hạn">Hết hạn</option>
-                <option value="Đã hủy">Đã hủy</option>
-              </Form.Select>
-            </Col>
-            <Col md={4}>
-              <Form.Label>Ngày:</Form.Label>
-              <div className="d-flex gap-2">
-                <Form.Control
+        .card {
+          background: #fff;
+          border: 1px solid #E5E7EB;       /* slate-200 */
+          border-radius: 12px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+          padding: 16px;
+        }
+
+        /* Filter grid full-width */
+        .filter-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        @media (min-width: 1100px) {
+          .filter-grid {
+            grid-template-columns: 220px 1fr 1fr 360px 100px; /* trạng thái | từ | đến | ô tìm | nút */
+            align-items: end;
+          }
+        }
+
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .label { font-size: 13px; color: #475569; } /* slate-600 */
+
+        input[type="text"], input[type="date"], select {
+          height: 38px;
+          border: 1px solid #CBD5E1; /* slate-300 */
+          border-radius: 8px;
+          padding: 0 10px;
+          outline: none;
+          font-size: 14px;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        input[type="text"]:focus, input[type="date"]:focus, select:focus {
+          border-color: #0EA5E9;        /* sky-500 */
+          box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
+        }
+
+        .btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          height: 38px;
+          padding: 0 16px;
+          border-radius: 8px;
+          border: 0;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background .15s, opacity .15s;
+          user-select: none;
+          white-space: nowrap;
+        }
+        .btn-primary {
+          background: #0EA5E9; color: #fff; /* sky-500 */
+        }
+        .btn-primary:hover { background: #0284C7; } /* sky-600 */
+        .btn-danger { background: #E11D48; color: #fff; }  /* rose-600 */
+        .btn-danger:hover { background: #BE123C; }         /* rose-700 */
+        .btn-link {
+          background: transparent; color: #0EA5E9; padding: 0; height: auto;
+        }
+        .btn-link:hover { color: #0284C7; text-decoration: underline; }
+        .btn:disabled { opacity: .6; cursor: default; }
+
+        /* CARD table */
+        .table-card { margin-top: 16px; }
+        .table-wrap { overflow-x: auto; }
+        table { min-width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; }
+        thead tr { background: #F1F5F9; } /* slate-100 */
+        th, td { padding: 12px 16px; text-align: left; white-space: nowrap; }
+        tbody tr { border-top: 1px solid #E5E7EB; }
+        tbody tr:hover { background: #F8FAFC; }
+
+        /* FOOTER: upload trái, nút tạo phải (full-width) */
+        .footer-row {
+          display: flex; gap: 12px; margin-top: 16px;
+          flex-direction: column;
+        }
+        @media (min-width: 900px) {
+          .footer-row { flex-direction: row; justify-content: space-between; align-items: center; }
+        }
+        .upload-left { display: flex; align-items: center; gap: 12px; }
+        .file-input { font-size: 14px; }
+      `}</style>
+
+      {/* Sidebar giữ nguyên */}
+      <Sidebar />
+
+      {/* Cột nội dung + Header bar giống Tenant List */}
+      <div className="contracts-content">
+        <Header /> {/* header xanh, lấy user & logout giống trang khác */}
+        <div className="contracts-container">
+          {/* Title */}
+          <h1 className="contracts-title">Danh Sách Hợp Đồng</h1>
+
+          {/* FILTER CARD */}
+          <form className="card" onSubmit={onSearch}>
+            <div className="filter-grid">
+              <div className="form-group">
+                <label className="label">Trạng thái:</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="all">Tất cả</option>
+                  <option value="active">Hoạt động</option>
+                  <option value="pending">Đang xử lý</option>
+                  <option value="expired">Hết hạn</option>
+                  <option value="cancelled">Đã huỷ</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="label">Ngày (Từ):</label>
+                <input
                   type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-                <Form.Control
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  placeholder="dd/mm/yyyy"
                 />
               </div>
-            </Col>
-            <Col md={3}>
-              <Form.Label>Tìm kiếm:</Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Nhập tên hoặc mã hợp đồng..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </Col>
-            <Col md={2}>
-              <Button
-                variant="primary"
-                style={{
-                  width: "100%",
-                  backgroundColor: colors.brand,
-                  border: "none",
-                  marginTop: 5,
-                }}
-                onClick={handleSearch}
-              >
-                Tìm
-              </Button>
-            </Col>
-          </Row>
 
-          {/* Bảng */}
-          <Table bordered hover responsive>
-            <thead style={{ backgroundColor: "#E6E8ED" }}>
-              <tr>
-                <th>ID Hợp Đồng</th>
-                <th>Tên Người Thuê</th>
-                <th>Số phòng</th>
-                <th>Ngày Bắt Đầu</th>
-                <th>Ngày Kết Thúc</th>
-                <th>Trạng Thái</th>
-                <th>Hành Động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!loading && filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="text-center">
-                    {err || "Không có hợp đồng nào phù hợp"}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.id}</td>
-                    <td>{getTenantName(c.tenantId)}</td>
-                    <td>{c.room}</td>
-                    <td>
-                      {c.startDate
-                        ? new Date(c.startDate).toLocaleDateString("vi-VN")
-                        : ""}
-                    </td>
-                    <td>
-                      {c.endDate
-                        ? new Date(c.endDate).toLocaleDateString("vi-VN")
-                        : ""}
-                    </td>
-                    <td>{c.status}</td>
-                    <td className="d-flex gap-3">
-                      <span
-                        style={{
-                          color: colors.brand,
-                          cursor: "pointer",
-                          fontWeight: 500,
-                        }}
-                        onClick={() => onView(c.id)}
-                      >
-                        Xem chi tiết
-                      </span>
-                      <span
-                        style={{ color: "#0d6efd", cursor: "pointer" }}
-                        onClick={() => onDownload(c.id)}
-                      >
-                        Tải
-                      </span>
-                      <span
-                        style={{ color: "#dc3545", cursor: "pointer" }}
-                        onClick={() => onDelete(c.id)}
-                      >
-                        Xoá
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </Table>
+              <div className="form-group">
+                <label className="label">Ngày (Đến):</label>
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
 
-          {/* Khu vực tải file & nút tạo mới — GIỮ NGUYÊN UI */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: 20,
-            }}
-          >
-            <div>
-              <Form.Group controlId="formFile">
-                <Form.Label style={{ fontWeight: 500 }}>Chọn file:</Form.Label>
-                <div className="d-flex align-items-center gap-2">
-                  <Form.Control type="file" style={{ width: 250 }} disabled />
-                  <Button
-                    variant="primary"
-                    style={{ backgroundColor: colors.brand, border: "none" }}
-                    disabled
-                  >
-                    Tải lên
-                  </Button>
-                </div>
-              </Form.Group>
+              <div className="form-group" style={{ gridColumn: "span 1" }}>
+                <label className="label">Tìm kiếm:</label>
+                <input
+                  type="text"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Nhập tên hoặc mã hợp đồng..."
+                />
+              </div>
+
+              <div className="form-group" style={{ alignItems: "flex-end" }}>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ width: "100%" }}
+                >
+                  Tìm
+                </button>
+              </div>
             </div>
+          </form>
 
-            <Button
-              variant="primary"
-              style={{
-                backgroundColor: colors.brand,
-                border: "none",
-                padding: "10px 20px",
-              }}
-              onClick={() => navigate("/contracts/create")}
-            >
-              Tạo hợp đồng mới
-            </Button>
+          {/* TABLE CARD */}
+          <div className="card table-card">
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID Hợp Đồng</th>
+                    <th>Tên Người Thuê</th>
+                    <th>Số phòng</th>
+                    <th>Ngày Bắt Đầu</th>
+                    <th>Ngày Kết Thúc</th>
+                    <th>Trạng Thái</th>
+                    <th>Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        style={{ color: "#64748B" /* slate-500 */ }}
+                      >
+                        Đang tải...
+                      </td>
+                    </tr>
+                  ) : rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ color: "#64748B" }}>
+                        Chưa có hợp đồng nào.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((r) => {
+                      const id = r.contract_id || r.id;
+                      const tenantName =
+                        r?.tenant?.full_name || r?.tenant_name || "-";
+                      const roomNo =
+                        r?.room?.room_number || r?.room_number || "-";
+                      const start = r?.start_date || r?.startDate || "-";
+                      const end = r?.end_date || r?.endDate || "-";
+                      const statusText = r?.status || "-";
+
+                      return (
+                        <tr key={id}>
+                          <td>{id}</td>
+                          <td>{tenantName}</td>
+                          <td>{roomNo}</td>
+                          <td>{start}</td>
+                          <td>{end}</td>
+                          <td>{statusText}</td>
+                          <td>
+                            <button
+                              className="btn btn-link"
+                              onClick={() => nav(`/contracts/${id}`)}
+                            >
+                              Xem chi tiết
+                            </button>
+                            <span style={{ margin: "0 8px", color: "#94A3B8" }}>
+                              |
+                            </span>
+                            <button
+                              className="btn btn-link"
+                              onClick={() => onDownload(id)}
+                            >
+                              Tải
+                            </button>
+                            <span style={{ margin: "0 8px", color: "#94A3B8" }}>
+                              |
+                            </span>
+                            <button
+                              className="btn btn-link"
+                              style={{ color: "#E11D48" }}
+                              onClick={() => onDelete(id)}
+                            >
+                              Xoá
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {/* FOOTER ROW */}
+
+          <button
+            className="btn btn-primary"
+            onClick={() => nav("/contracts/create")}
+            style={{ alignSelf: "flex-start" }}
+          >
+            Tạo hợp đồng mới
+          </button>
         </div>
       </div>
     </div>
   );
 }
-
-export default ContractListPage;

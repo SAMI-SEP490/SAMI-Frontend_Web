@@ -1,432 +1,322 @@
+// src/pages/tenant/TenantListPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "../../components/Header";
 import Sidebar from "../../components/SideBar";
-import { colors } from "../../constants/colors";
+import Header from "../../components/Header";
+import { listTenants } from "../../services/api/tenants";
+import { listRoomsLite } from "../../services/api/rooms"; // đã export từ rooms.js
 
-// API services
-import { listTenants } from "../../services/api/users";
-import { listContracts } from "../../services/api/contracts"; // nếu chưa có, service đã có fallback
+// Helper: lấy giá trị đầu tiên != null/""
+const pick = (...vals) => {
+  for (const v of vals) if (v !== undefined && v !== null && v !== "") return v;
+  return undefined;
+};
+
+// Chuẩn hoá item tenant về 1 shape thống nhất
+function normalize(item) {
+  const user = pick(item?.user, item); // có nơi trả { user: {...} }, có nơi trả trực tiếp
+
+  const id = pick(
+    user?.user_id,
+    user?.id,
+    item?.tenant?.user_id,
+    item?.userId,
+    item?._id
+  );
+
+  const name = pick(
+    user?.full_name,
+    user?.name,
+    [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim(),
+    "Người thuê"
+  );
+
+  const email = pick(user?.email, "");
+  const phone = pick(user?.phone, user?.phone_number, "");
+  const avatar = pick(user?.avatar_url, "");
+
+  // room_id có thể nằm ở nhiều vị trí
+  const room_id = pick(
+    item?.room_id,
+    item?.roomId,
+    item?.room?.room_id,
+    item?.room?.id,
+    item?.tenant?.room_id,
+    item?.tenant?.room?.room_id,
+    item?.tenants?.room_id,
+    Array.isArray(item?.tenants) ? item?.tenants?.[0]?.room_id : undefined,
+    Array.isArray(item?.tenants) ? item?.tenants?.[0]?.room?.room_id : undefined
+  );
+
+  // room_number để hiển thị cột “Số phòng”
+  const room = pick(
+    item?.room?.room_number,
+    item?.room_number,
+    item?.tenant?.room?.room_number,
+    Array.isArray(item?.tenants)
+      ? item?.tenants?.[0]?.room?.room_number
+      : undefined,
+    room_id != null ? `Phòng ${room_id}` : "" // fallback nhẹ
+  );
+
+  return {
+    id,
+    name,
+    email,
+    phone,
+    avatar,
+    room_id: room_id != null ? String(room_id) : undefined, // ép string để so sánh
+    room: room != null ? String(room) : "",
+  };
+}
 
 export default function TenantListPage() {
-  const navigate = useNavigate();
+  const nav = useNavigate();
 
-  // raw data từ API
-  const [tenants, setTenants] = useState([]);
-  const [contracts, setContracts] = useState([]);
-
-  // ui state
+  // tenants
   const [loading, setLoading] = useState(true);
-  const [errMsg, setErrMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [items, setItems] = useState([]);
 
-  // filter state
+  // rooms dropdown
+  const [rooms, setRooms] = useState([]); // [{ id: room_id(string), label: room_number(string) }]
   const [roomFilter, setRoomFilter] = useState("all");
-  const [keyword, setKeyword] = useState("");
 
+  // search
+  const [q, setQ] = useState("");
+  const [searchKey, setSearchKey] = useState("");
+
+  // lấy tenants
   useEffect(() => {
-    let alive = true;
-    async function fetchAll() {
-      setLoading(true);
-      setErrMsg("");
+    let mounted = true;
+    (async () => {
       try {
-        // BE: /api/user?role=tenant (service đã có nhiều fallback)
-        const [t, c] = await Promise.all([
-          listTenants(), // => mảng user có role tenant
-          listContracts?.() // có thể lỗi/404 -> service sẽ fallback; nếu không có, rows vẫn hiển thị
-            .catch(() => []),
-        ]);
-        if (!alive) return;
-        setTenants(Array.isArray(t) ? t : []);
-        setContracts(Array.isArray(c) ? c : []);
+        setLoading(true);
+        setErr("");
+        // BE có thể đã lọc role=tenant rồi; nếu không thì vẫn OK
+        const data = await listTenants({ take: 500 });
+        if (!mounted) return;
+        const raw = Array.isArray(data) ? data : data?.items ?? [];
+        setItems(raw.map(normalize));
       } catch (e) {
-        if (!alive) return;
-        setErrMsg(
+        setErr(
           e?.response?.data?.message ||
             e?.message ||
             "Không tải được danh sách người thuê."
         );
       } finally {
-        if (alive) setLoading(false);
+        if (mounted) setLoading(false);
       }
-    }
-    fetchAll();
-    return () => {
-      alive = false;
-    };
+    })();
+    return () => (mounted = false);
   }, []);
 
-  // map ra rows: ghép phòng từ contract (nếu có)
-  const rows = useMemo(() => {
-    return (tenants || []).map((t) => {
-      const ct = (contracts || []).find(
-        (c) =>
-          String(c?.tenantId ?? c?.tenant_id ?? c?.tenant?.id) ===
-          String(t.id ?? t.user_id ?? t._id)
-      );
-      return {
-        id: t.id ?? t.user_id ?? t._id,
-        name: t.full_name ?? t.name ?? "—",
-        email: t.email ?? "—",
-        phone: t.phone ?? "—",
-        room: ct?.room ?? ct?.roomNumber ?? ct?.room_no ?? "—",
-        avatar: t.avatar_url ?? t.avatar ?? "",
-      };
-    });
-  }, [tenants, contracts]);
-
-  // options lọc phòng
-  const roomOptions = useMemo(() => {
-    const set = new Set(
-      (contracts || [])
-        .map((c) => c?.room ?? c?.roomNumber ?? c?.room_no)
-        .filter(Boolean)
-    );
-    return [
-      "all",
-      ...Array.from(set).sort((a, b) => String(a).localeCompare(String(b))),
-    ];
-  }, [contracts]);
-
-  // áp filter
-  const filtered = useMemo(() => {
-    const kw = keyword.trim().toLowerCase();
-    return rows.filter((r) => {
-      const byRoom =
-        roomFilter === "all" || String(r.room) === String(roomFilter);
-      const byKw =
-        kw === "" ||
-        (r.name || "").toLowerCase().includes(kw) ||
-        (r.email || "").toLowerCase().includes(kw) ||
-        String(r.phone || "")
-          .toLowerCase()
-          .includes(kw);
-      return byRoom && byKw;
-    });
-  }, [rows, roomFilter, keyword]);
-
-  const refresh = () => {
-    // trigger lại useEffect bằng cách reset state và gọi lại API
-    setLoading(true);
-    setErrMsg("");
-    Promise.all([listTenants(), listContracts?.().catch(() => [])])
-      .then(([t, c]) => {
-        setTenants(Array.isArray(t) ? t : []);
-        setContracts(Array.isArray(c) ? c : []);
-      })
-      .catch((e) => {
-        setErrMsg(
-          e?.response?.data?.message ||
-            e?.message ||
-            "Không tải được danh sách người thuê."
+  // lấy rooms (room_id + room_number); nếu lỗi -> fallback dựng từ tenants
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const apiRooms = await listRoomsLite(); // trả [{id,label}] : id=room_id, label=room_number
+      if (mounted && apiRooms.length > 0) {
+        setRooms(
+          apiRooms.map((r) => ({ id: String(r.id), label: String(r.label) }))
         );
-      })
-      .finally(() => setLoading(false));
-  };
+        return;
+      }
+      // fallback: tự build từ tenants
+      const fromTenants = Array.from(
+        new Map(
+          items
+            .filter((t) => t.room_id != null)
+            .map((t) => [
+              t.room_id,
+              {
+                id: t.room_id,
+                label:
+                  t.room && !t.room.startsWith("Phòng ") ? t.room : t.room_id,
+              },
+            ])
+        ).values()
+      );
+      if (mounted) setRooms(fromTenants);
+    })();
+    return () => (mounted = false);
+  }, [items]);
 
-  const cell = { padding: "12px 16px", color: "#0F172A" };
-  const linkBtn = {
-    background: "none",
-    border: "none",
-    color: "#0F3D8A",
-    fontWeight: 700,
-    marginRight: 12,
-    cursor: "pointer",
-  };
-  const outlineBtn = {
-    border: "1px solid #CBD5E1",
-    background: "#fff",
-    color: "#111827",
-    padding: "6px 12px",
-    borderRadius: 8,
-    marginRight: 8,
-    cursor: "pointer",
-    fontWeight: 700,
-  };
-  const dangerBtn = {
-    border: "none",
-    background: "#DC2626",
-    color: "#fff",
-    padding: "6px 12px",
-    borderRadius: 8,
-    cursor: "pointer",
-    fontWeight: 700,
-  };
+  const roomOptions = useMemo(
+    () => [{ id: "all", label: "Tất cả" }, ...rooms],
+    [rooms]
+  );
+
+  const rows = useMemo(() => {
+    const k = searchKey.trim().toLowerCase();
+    return items.filter((x) => {
+      const okRoom = roomFilter === "all" || x.room_id === String(roomFilter);
+      if (!okRoom) return false;
+      if (!k) return true;
+      return (
+        x.name.toLowerCase().includes(k) ||
+        x.email.toLowerCase().includes(k) ||
+        x.phone.toLowerCase().includes(k) ||
+        String(x.room || "")
+          .toLowerCase()
+          .includes(k)
+      );
+    });
+  }, [items, roomFilter, searchKey]);
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Header cố định */}
-      <div
-        style={{
-          marginBottom: 10,
-          borderRadius: "10px",
-          flexShrink: 0,
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
-        }}
-      >
+    <div className="tenants-page">
+      <style>{`
+        .tenants-page{display:flex;min-height:100vh;background:#F8FAFC;color:#0f172a}
+        .tenants-content{flex:1;display:flex;flex-direction:column;min-width:0}
+        .tenants-container{width:100%;padding:20px 24px 36px;box-sizing:border-box}
+        .tenants-title{font-size:28px;line-height:1.2;font-weight:700;margin:12px 0 16px;text-align:left}
+        .card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:16px}
+        .toolbar{display:grid;grid-template-columns:260px 1fr 100px;gap:12px;align-items:center;margin-bottom:8px}
+        @media (max-width:920px){.toolbar{grid-template-columns:1fr}}
+        .label{font-size:13px;color:#475569;display:block;margin-bottom:6px}
+        select,input[type="text"]{height:38px;border:1px solid #CBD5E1;border-radius:8px;padding:0 10px;outline:0;font-size:14px;width:100%;box-sizing:border-box}
+        select:focus,input[type="text"]:focus{border-color:#0EA5E9;box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+        .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:8px;border:0;font-weight:600;cursor:pointer;transition:background .15s,opacity .15s}
+        .btn-primary{background:#0EA5E9;color:#fff}.btn-primary:hover{background:#0284C7}
+        .table-wrap{overflow-x:auto}table{min-width:100%;border-collapse:collapse;font-size:14px;background:#fff}
+        thead tr{background:#F1F5F9}th,td{padding:12px 16px;text-align:left;white-space:nowrap}
+        tbody tr{border-top:1px solid #E5E7EB}tbody tr:hover{background:#F8FAFC}
+        .avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid #E5E7EB}
+        .actions{display:flex;gap:10px}.link{background:transparent;border:0;color:#0EA5E9;cursor:pointer;font-weight:600}.link.gray{color:#475569}.link.red{color:#E11D48}
+        .footerActions{display:flex;justify-content:flex-end;padding:12px 0 4px}
+      `}</style>
+
+      <Sidebar />
+      <div className="tenants-content">
         <Header />
-      </div>
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Sidebar trái */}
-        <div
-          style={{
-            width: "220px",
-            backgroundColor: colors.brand,
-            color: "white",
-            height: "100%",
-            position: "sticky",
-            top: 0,
-            borderRadius: "10px",
-          }}
-        >
-          <Sidebar />
-        </div>
+        <div className="tenants-container">
+          <h1 className="tenants-title">Danh Sách Người Thuê</h1>
 
-        {/* Nội dung */}
-        <div
-          style={{
-            flex: 1,
-            background: colors.background,
-            padding: "24px",
-            overflowY: "auto",
-          }}
-        >
-          {/* Tiêu đề */}
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <h2 style={{ fontWeight: 700, marginBottom: 16 }}>
-              Danh Sách Người Thuê
-            </h2>
-            <div>
-              <button
-                onClick={refresh}
-                style={{
-                  background: "#0F3D8A",
-                  color: "#fff",
-                  border: "none",
-                  padding: "8px 16px",
-                  borderRadius: 8,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                Làm mới
-              </button>
-            </div>
-          </div>
-
-          {/* Thông báo lỗi / loading */}
-          {errMsg && (
-            <div
-              style={{
-                background: "#FEF2F2",
-                border: "1px solid #FEE2E2",
-                color: "#991B1B",
-                padding: "10px 12px",
-                borderRadius: 8,
-                marginBottom: 12,
-              }}
-            >
-              {errMsg}
-            </div>
-          )}
-          {loading && (
-            <div
-              style={{
-                background: "#EFF6FF",
-                border: "1px solid #DBEAFE",
-                color: "#1E3A8A",
-                padding: "10px 12px",
-                borderRadius: 8,
-                marginBottom: 12,
-              }}
-            >
-              Đang tải dữ liệu…
-            </div>
-          )}
-
-          {/* Hàng filter */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              background: "#fff",
-              borderRadius: 10,
-              padding: "12px 16px",
-              boxShadow: "0 2px 8px rgba(0,0,0,.05)",
-              marginBottom: 14,
-            }}
-          >
-            {/* Lọc theo phòng */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ color: "#334155" }}>Số phòng</span>
-              <select
-                value={roomFilter}
-                onChange={(e) => setRoomFilter(e.target.value)}
-                style={{
-                  border: "1px solid #E5E7EB",
-                  borderRadius: 8,
-                  padding: "6px 10px",
-                  minWidth: 120,
-                  background: "#fff",
-                }}
-              >
-                {roomOptions.map((r) => (
-                  <option key={r} value={r}>
-                    {r === "all" ? "Tất cả" : r}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Ô tìm kiếm + nút hành động */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "#334155" }}>Tìm kiếm:</span>
-              <input
-                placeholder="Nhập tên / email / SĐT"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                style={{
-                  border: "1px solid #E5E7EB",
-                  borderRadius: 8,
-                  padding: "8px 10px",
-                  width: 300,
-                }}
-              />
-              <button
-                onClick={() => setKeyword(keyword.trim())}
-                style={{
-                  background: colors.brand,
-                  color: "#fff",
-                  border: "none",
-                  padding: "8px 16px",
-                  borderRadius: 8,
-                  fontWeight: 700,
-                }}
-              >
-                Tìm
-              </button>
-
-              {/* 👉 Nút Đăng ký người thuê trọ */}
-              <button
-                onClick={() => navigate("/tenants/create")}
-                style={{
-                  background: "#059669",
-                  color: "#fff",
-                  border: "none",
-                  padding: "8px 16px",
-                  borderRadius: 8,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                + Đăng ký người thuê trọ
-              </button>
-            </div>
-          </div>
-
-          {/* Bảng */}
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 10,
-              boxShadow: "0 2px 10px rgba(0,0,0,.06)",
-              overflow: "hidden",
-            }}
-          >
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "separate",
-                borderSpacing: 0,
-              }}
-            >
-              <thead style={{ background: "#F1F5F9" }}>
-                <tr>
-                  {[
-                    "ID",
-                    "Ảnh Đại Diện",
-                    "Tên",
-                    "Số phòng",
-                    "Email",
-                    "Số điện thoại",
-                    "Hành Động",
-                  ].map((h, i) => (
-                    <th
-                      key={h}
-                      style={{
-                        textAlign: i === 1 || i === 6 ? "center" : "left",
-                        padding: "12px 16px",
-                        color: "#334155",
-                        fontWeight: 700,
-                        borderBottom: "1px solid #E5E7EB",
-                      }}
-                    >
-                      {h}
-                    </th>
+          <div className="card">
+            <div className="toolbar">
+              <div>
+                <label className="label">Số phòng</label>
+                <select
+                  value={roomFilter}
+                  onChange={(e) => setRoomFilter(e.target.value)}
+                >
+                  {roomOptions.map((op) => (
+                    <option key={op.id} value={op.id}>
+                      {op.label}
+                    </option>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r) => (
-                  <tr key={r.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                    <td style={cell}> {r.id} </td>
-                    <td style={{ ...cell, textAlign: "center" }}>
-                      <img
-                        src={r.avatar || "https://i.pravatar.cc/60?img=12"}
-                        alt="avatar"
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: "50%",
-                          objectFit: "cover",
-                        }}
-                      />
-                    </td>
-                    <td style={cell}> {r.name} </td>
-                    <td style={cell}> {r.room} </td>
-                    <td style={cell}> {r.email} </td>
-                    <td style={cell}> {r.phone} </td>
-                    <td style={{ ...cell, textAlign: "center" }}>
-                      <button
-                        onClick={() => navigate(`/tenants/${r.id}`)}
-                        style={linkBtn}
-                      >
-                        Xem chi tiết
-                      </button>
-                      <button
-                        style={outlineBtn}
-                        onClick={() => navigate(`/tenants/${r.id}/edit`)}
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        style={dangerBtn}
-                        onClick={() => alert("Xóa (demo)")}
-                      >
-                        Xóa
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && !loading && (
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Tìm kiếm</label>
+                <input
+                  type="text"
+                  placeholder="Nhập tên / email / SĐT / số phòng..."
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && setSearchKey(q)}
+                />
+              </div>
+
+              <div style={{ display: "flex", alignItems: "end" }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setSearchKey(q)}
+                >
+                  Tìm
+                </button>
+              </div>
+            </div>
+
+            <div className="table-wrap">
+              <table>
+                <thead>
                   <tr>
-                    <td
-                      colSpan={7}
-                      style={{
-                        padding: 16,
-                        textAlign: "center",
-                        color: "#64748B",
-                      }}
-                    >
-                      Không có dữ liệu phù hợp
-                    </td>
+                    <th style={{ width: 90 }}>ID</th>
+                    <th style={{ width: 130 }}>Ảnh đại diện</th>
+                    <th>Tên</th>
+                    <th style={{ width: 140 }}>Số phòng</th>
+                    <th>Email</th>
+                    <th style={{ width: 180 }}>Số điện thoại</th>
+                    <th style={{ width: 220 }}>Hành động</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} style={{ color: "#64748B" }}>
+                        Đang tải...
+                      </td>
+                    </tr>
+                  ) : err ? (
+                    <tr>
+                      <td colSpan={7} style={{ color: "#E11D48" }}>
+                        {err}
+                      </td>
+                    </tr>
+                  ) : rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ color: "#64748B" }}>
+                        Không có người thuê nào.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((u) => (
+                      <tr key={u.id}>
+                        <td>{u.id || "—"}</td>
+                        <td>
+                          <img
+                            className="avatar"
+                            src={u.avatar || "https://placehold.co/72x72?text="}
+                            alt=""
+                          />
+                        </td>
+                        <td>{u.name}</td>
+                        <td>{u.room || "—"}</td>
+                        <td>{u.email || "—"}</td>
+                        <td>{u.phone || "—"}</td>
+                        <td>
+                          <div className="actions">
+                            <button
+                              className="link"
+                              onClick={() => nav(`/tenants/${u.id}`)}
+                              disabled={!u.id}
+                            >
+                              Xem chi tiết
+                            </button>
+                            <button
+                              className="link gray"
+                              onClick={() => nav(`/tenants/${u.id}/edit`)}
+                              disabled={!u.id}
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              className="link red"
+                              onClick={() => alert("Xóa sẽ nối API sau")}
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="footerActions">
+              <button
+                className="btn btn-primary"
+                onClick={() => nav("/tenants/create")}
+              >
+                + Thêm người thuê
+              </button>
+            </div>
           </div>
         </div>
       </div>

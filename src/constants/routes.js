@@ -37,4 +37,8 @@ export const ROUTES = {
 
   //maintaince
   maintainceRequests: "/maintaince-requests",
+
+  //buildings
+  buildings: "/buildings",
+  editBuilding: "/buildings/:id/edit",
 };

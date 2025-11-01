@@ -1,46 +1,48 @@
 // src/services/api/rooms.js
 import { http } from "../http";
 
-const un = (res) => res?.data?.data ?? res?.data ?? res;
+/**
+ * Gọi /api/room và chỉ map ra meta cần cho dropdown
+ * Trả về: [{ id, label }] trong đó label = số phòng.
+ * Không gửi status/limit để tránh backend validate sai.
+ */
+async function _callRoomsList() {
+  try {
+    const res = await http.get("/room", { validateStatus: () => true });
 
-// Thử nhiều endpoint để hợp với BE hiện có
-const ROOM_ENDPOINTS = [
-  { url: "/room/list", params: { status: "active", take: 200 } },
-  { url: "/room", params: { status: "active" } },
-  { url: "/rooms", params: { status: "active" } },
-];
+    if (res.status >= 200 && res.status < 300) {
+      const payload = res?.data?.data ?? res?.data ?? [];
+      const arr = Array.isArray(payload) ? payload : payload?.items ?? [];
 
-function normalizeRoom(r) {
-  const id = r?.room_id ?? r?.id ?? r?.roomId ?? r?.room?.id;
-  const label =
-    r?.room_number ??
-    r?.number ??
-    r?.name ??
-    r?.room?.room_number ??
-    (id != null ? `Phòng ${id}` : "Phòng");
-  const floor = r?.floor ?? r?.level ?? r?.room?.floor ?? null;
-  return id == null ? null : { id, label, floor };
+      return (Array.isArray(arr) ? arr : [])
+        .map((r) => {
+          const id =
+            r?.room_id ?? r?.id ?? r?.roomId ?? r?.room?.room_id ?? r?.room?.id;
+          const number =
+            r?.room_number ??
+            r?.number ??
+            r?.name ??
+            r?.room?.room_number ??
+            (id != null ? `${id}` : "");
+          return id == null || !number
+            ? null
+            : { id: String(id), label: String(number) };
+        })
+        .filter(Boolean);
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
 }
 
-/** Lấy danh sách phòng rút gọn cho dropdown */
+/** Tên cũ nhiều nơi đang dùng — giữ nguyên để tương thích */
 export async function listRoomsLite() {
-  for (const ep of ROOM_ENDPOINTS) {
-    try {
-      const res = await http.get(ep.url, {
-        params: ep.params,
-        validateStatus: () => true,
-      });
-      if (res.status >= 200 && res.status < 300) {
-        const raw = un(res);
-        const arr = raw?.items ?? raw?.data ?? raw;
-        const items = (Array.isArray(arr) ? arr : [])
-          .map(normalizeRoom)
-          .filter(Boolean);
-        return items; // trả về luôn mảng (có thể rỗng)
-      }
-    } catch {
-      // thử endpoint tiếp theo
-    }
-  }
-  return [];
+  return _callRoomsList();
+}
+
+/** Tên “safe” mới — bạn có thể dùng ở chỗ khác nếu muốn */
+export async function listRoomsLiteSafe() {
+  return _callRoomsList();
 }

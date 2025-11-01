@@ -29,7 +29,6 @@ export const ROUTES = {
 
   // Guests
   receiveGuestRegistration: "/receive-guest",
-  tenantCreate: "/tenants/create",
 
   // Notifications
   notifications: "/notifications",

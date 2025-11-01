@@ -1,7 +1,6 @@
 // src/pages/tenant/TenantDetailPage.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-
 import Headers from "../../components/Header";
 import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
@@ -87,7 +86,7 @@ export default function TenantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [user, setUser] = useState(null);
-
+  const goBackToTenantList = () => navigate("/tenants");
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -197,7 +196,7 @@ export default function TenantDetailPage() {
 
           <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
             <button
-              onClick={() => navigate(-1)}
+              onClick={goBackToTenantList}
               style={{
                 height: 42,
                 padding: "0 18px",

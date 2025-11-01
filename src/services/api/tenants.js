@@ -1,22 +1,76 @@
 // src/services/api/tenants.js
-import { http, unwrap } from "../http";
+import { http } from "../http";
 
-/** BE của bạn mount /api/user (singular). Lấy DS tenant — thử vài path phổ biến để tránh 404. */
+// unwrap: hỗ trợ các kiểu trả về phổ biến {data:{data}}, {data}, hoặc mảng
+const un = (res) => res?.data?.data ?? res?.data ?? res;
+
+/* =======================
+ *  LIST TENANTS
+ * ======================= */
+// Thử nhiều endpoint để hợp backend hiện tại
+const TENANT_LIST_ENDPOINTS = [
+  { url: "/user/list-users", params: { role: "tenant", take: 200 } },
+  { url: "/user", params: { role: "tenant", take: 200 } },
+  { url: "/user/tenants", params: { take: 200 } },
+  { url: "/tenants", params: {} },
+];
+
 export async function listTenants(params = {}) {
-  const CANDIDATES = ["/user", "/user/tenants"];
   let lastErr;
-  for (const p of CANDIDATES) {
+  for (const ep of TENANT_LIST_ENDPOINTS) {
     try {
-      const res = await http.get(p, { params: { role: "tenant", ...params } });
-      return unwrap(res);
+      const res = await http.get(ep.url, {
+        params: { ...ep.params, ...params },
+        validateStatus: () => true,
+      });
+      if (res.status >= 200 && res.status < 300) {
+        const raw = un(res);
+        const arr = raw?.items ?? raw?.data ?? raw;
+        return Array.isArray(arr) ? arr : [];
+      }
     } catch (e) {
       lastErr = e;
     }
   }
-  throw lastErr;
+  if (lastErr) throw lastErr;
+  return [];
 }
 
-/** Bước 1: Đăng ký user mới */
+/* =======================
+ *  LIST TENANTS BY ROOM
+ *  (chọn phòng -> lọc tenant)
+ * ======================= */
+export async function listTenantsByRoom(roomId) {
+  if (!roomId) return [];
+  // Ưu tiên nhờ BE filter; nếu không có thì FE tự filter
+  try {
+    // Thử gọi giống listTenants nhưng truyền room_id
+    const res = await listTenants({ room_id: roomId, status: "active" });
+    if (Array.isArray(res) && res.length) {
+      return res.filter((t) => {
+        const rid = t?.room_id ?? t?.roomId ?? t?.room?.id ?? t?.room?.room_id;
+        return String(rid) === String(roomId);
+      });
+    }
+  } catch {   
+    return [];
+  }
+  // Fallback: lấy tất cả rồi lọc FE
+  try {
+    const all = await listTenants({ status: "active", take: 500 });
+    return all.filter((t) => {
+      const rid = t?.room_id ?? t?.roomId ?? t?.room?.id ?? t?.room?.room_id;
+      return String(rid) === String(roomId);
+    });
+  } catch {
+    return [];
+  }
+}
+
+/* =======================
+ *  REGISTER TENANT QUICK
+ *  (đăng ký user -> change-to-tenant)
+ * ======================= */
 async function registerUser({
   email,
   password,
@@ -29,15 +83,13 @@ async function registerUser({
     email,
     password,
     phone,
-    full_name,
+    full_name, // BE dùng full_name (snake)
     gender,
     birthday,
   });
-  const data = unwrap(res); // { id, email, phone, full_name, status }
-  return data;
+  return un(res); // => { id, email, phone, full_name, ... }
 }
 
-/** Bước 2: Chuyển user vừa tạo thành TENANT (yêu cầu role owner/manager) */
 async function changeToTenant({
   userId,
   idNumber,
@@ -50,117 +102,29 @@ async function changeToTenant({
     emergencyContactPhone,
     note,
   });
-  return unwrap(res);
+  return un(res);
 }
 
-/** API “đăng ký tenant nhanh”: gộp 2 bước ở trên */
 export async function registerTenantQuick(form) {
-  // map từ form UI → payload backend
+  // 1) đăng ký user
   const reg = await registerUser({
     email: form.email,
     password: form.password,
     phone: form.phone,
-    full_name: form.full_name, // chú ý: BE dùng full_name (snake)
-    gender: form.gender, // "male"/"female"...
-    birthday: form.birthday, // yyyy-mm-dd
+    full_name: form.full_name,
+    gender: form.gender,
+    birthday: form.birthday,
   });
-
-  const userId = reg?.id; // auth.register() trả về 'id' = user_id
+  const userId = reg?.id ?? reg?.user_id;
   if (!userId) throw new Error("Không lấy được userId sau khi đăng ký.");
 
-  const tenantRes = await changeToTenant({
+  // 2) đổi sang tenant
+  const tenant = await changeToTenant({
     userId,
-    idNumber: form.idNumber, // CMND/CCCD
-    emergencyContactPhone: form.emergencyPhone, // SĐT người thân/liên hệ khẩn
+    idNumber: form.idNumber,
+    emergencyContactPhone: form.emergencyPhone,
     note: form.note || "",
   });
 
-  return { userId, user: reg, tenant: tenantRes };
-}
-
-/* ===========================
- *  BỔ SUNG CHO CREATE CONTRACT
- * =========================== */
-
-/** Thử nhiều endpoint phòng để tương thích nhiều BE khác nhau */
-const ROOM_ENDPOINTS = [
-  { url: "/room/list", params: { status: "active", take: 200 } },
-  { url: "/room", params: { status: "active" } },
-  { url: "/rooms", params: { status: "active" } },
-];
-
-function normalizeRoom(r) {
-  const id = r?.room_id ?? r?.id ?? r?.roomId ?? r?.room?.id;
-  const label =
-    r?.room_number ??
-    r?.number ??
-    r?.name ??
-    r?.room?.room_number ??
-    (id != null ? `Phòng ${id}` : "Phòng");
-  const floor = r?.floor ?? r?.level ?? r?.room?.floor ?? null;
-  return id == null ? null : { id, label, floor };
-}
-
-/** Lấy danh sách phòng rút gọn cho dropdown */
-export async function listRoomsLite() {
-  for (const ep of ROOM_ENDPOINTS) {
-    try {
-      const res = await http.get(ep.url, {
-        params: ep.params,
-        validateStatus: () => true,
-      });
-      if (res.status >= 200 && res.status < 300) {
-        const raw = unwrap(res);
-        const arr = raw?.items ?? raw?.data ?? raw;
-        const items = (Array.isArray(arr) ? arr : [])
-          .map(normalizeRoom)
-          .filter(Boolean);
-        if (items.length) return items;
-      }
-    } catch {
-      /* thử endpoint tiếp theo */
-    }
-  }
-  return [];
-}
-
-function normalizeTenant(t) {
-  const id = t?.tenant_user_id ?? t?.user_id ?? t?.id ?? t?.tenant?.id;
-  const name =
-    (t?.full_name && t.full_name.trim()) ||
-    [t?.first_name, t?.last_name].filter(Boolean).join(" ").trim() ||
-    t?.tenant?.full_name ||
-    "Người thuê";
-
-  const roomId = t?.room_id ?? t?.roomId ?? t?.room?.id ?? null;
-  const phone = t?.phone ?? t?.phone_number ?? t?.mobile ?? null;
-  return id == null ? null : { id, name, roomId, phone };
-}
-
-/** Lấy tenants theo phòng; nếu BE chưa filter, FE sẽ filter sau */
-export async function listTenantsByRoom(roomId) {
-  // cố gắng nhờ BE filter trước
-  try {
-    const res = await listTenants({
-      room_id: roomId,
-      status: "active",
-      take: 200,
-    });
-    const arr = res?.items ?? res?.data ?? res;
-    let items = (Array.isArray(arr) ? arr : [])
-      .map(normalizeTenant)
-      .filter(Boolean);
-    if (!items.length) {
-      // fallback: lấy tất cả tenant rồi tự filter
-      const resAll = await listTenants({ status: "active", take: 500 });
-      const arrAll = resAll?.items ?? resAll?.data ?? resAll;
-      items = (Array.isArray(arrAll) ? arrAll : [])
-        .map(normalizeTenant)
-        .filter(Boolean)
-        .filter((x) => String(x.roomId) === String(roomId));
-    }
-    return items;
-  } catch {
-    return [];
-  }
+  return { userId, user: reg, tenant };
 }

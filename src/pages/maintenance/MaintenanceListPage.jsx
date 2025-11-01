@@ -1,30 +1,84 @@
-import React, { useContext, useState, useEffect } from "react";
-import { MaintenanceContext } from "../../contexts/MaintainanceContext";
+import React, { useState, useEffect } from "react";
 import { Table, Form, Button, Row, Col } from "react-bootstrap";
 import Header from "../../components/Header";
 import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
-import { listMaintenance } from "../../services/api/maintainance";
+import {
+  listMaintenance,
+  listUser,
+  approveMaintenanceRequest,
+  rejectMaintenanceRequest,
+} from "../../services/api/maintainance";
 
 function MaintenanceListPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState([]);
-  console.log("maintenace : " + maintenanceRequests);
-
   const [statusFilter, setStatusFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [userData, setUserData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    async function fetchMaintenance() {
+    async function fetchData() {
       try {
-        const data = await listMaintenance();
-        console.log("Fetched maintenance:", data);
-        setMaintenanceRequests(data);
+        const [dataMaintenance, dataUsers] = await Promise.all([
+          listMaintenance(),
+          listUser(),
+        ]);
+        console.log("Fetched maintenance:", dataMaintenance);
+        console.log("Fetched users:", dataUsers);
+        setMaintenanceRequests(dataMaintenance);
+        setUserData(dataUsers);
       } catch (error) {
-        console.error("Error fetching maintenance:", error);
+        console.error("Error fetching data:", error);
       }
     }
-    fetchMaintenance();
-  }, []); // ✅ chỉ gọi 1 lần khi component mount
+    fetchData();
+  }, []);
+
+  const getUserFullName = (tenantUserId) => {
+    const user = userData.find((u) => u.user_id === tenantUserId);
+    return user ? user.full_name : "Không rõ";
+  };
+
+  // ✅ Phê duyệt yêu cầu
+  const handleApprove = async (id) => {
+    try {
+      setLoading(true);
+      await approveMaintenanceRequest(id);
+      setMaintenanceRequests((prev) =>
+        prev.map((req) =>
+          req.request_id === id ? { ...req, status: "in_progress" } : req
+        )
+      );
+      alert("✅ Đã phê duyệt yêu cầu bảo trì!");
+    } catch (error) {
+      console.error("Error approving request:", error);
+      alert("❌ Lỗi khi phê duyệt yêu cầu!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ❌ Từ chối yêu cầu
+  const handleReject = async (id) => {
+    const reason = prompt("Nhập lý do từ chối (bắt buộc):");
+    if (!reason) return alert("Bạn phải nhập lý do từ chối!");
+    try {
+      setLoading(true);
+      await rejectMaintenanceRequest(id, reason);
+      setMaintenanceRequests((prev) =>
+        prev.map((req) =>
+          req.request_id === id ? { ...req, status: "rejected" } : req
+        )
+      );
+      alert("🚫 Đã từ chối yêu cầu bảo trì!");
+    } catch (error) {
+      console.error("Error rejecting request:", error);
+      alert("❌ Lỗi khi từ chối yêu cầu!");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredRequests = maintenanceRequests.filter((req) => {
     const matchesStatus = statusFilter ? req.status === statusFilter : true;
@@ -41,7 +95,6 @@ function MaintenanceListPage() {
         <div style={{ width: 220, backgroundColor: colors.brand }}>
           <Sidebar />
         </div>
-
         <div
           style={{ flex: 1, padding: 30, backgroundColor: colors.background }}
         >
@@ -60,6 +113,7 @@ function MaintenanceListPage() {
                 <option value="pending">Chờ xử lý</option>
                 <option value="in_progress">Đang xử lý</option>
                 <option value="completed">Đã hoàn thành</option>
+                <option value="rejected">Từ chối</option>
               </Form.Select>
             </Col>
 
@@ -77,31 +131,57 @@ function MaintenanceListPage() {
           <Table bordered hover responsive>
             <thead style={{ backgroundColor: "#E6E8ED" }}>
               <tr>
-                <th>ID</th>
+                <th>#</th>
                 <th>Tiêu đề</th>
+                <th>Người gửi</th>
                 <th>Phòng</th>
                 <th>Trạng thái</th>
                 <th>Ưu tiên</th>
                 <th>Ngày tạo</th>
+                <th>Hành động</th>
               </tr>
             </thead>
             <tbody>
               {filteredRequests.length > 0 ? (
-                filteredRequests.map((req) => (
+                filteredRequests.map((req, index) => (
                   <tr key={req.request_id}>
-                    <td>{req.request_id}</td>
+                    <td>{index + 1}</td>
                     <td>{req.title}</td>
+                    <td>{getUserFullName(req.tenant_user_id)}</td>
                     <td>{req.room_id}</td>
                     <td>{req.status}</td>
                     <td>{req.priority}</td>
                     <td>
                       {new Date(req.created_at).toLocaleDateString("vi-VN")}
                     </td>
+                    <td>
+                      <Button
+                        variant="success"
+                        size="sm"
+                        className="me-2"
+                        disabled={
+                          loading ||
+                          req.status === "in_progress" ||
+                          req.status === "completed"
+                        }
+                        onClick={() => handleApprove(req.request_id)}
+                      >
+                        Chấp nhận
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={loading || req.status === "rejected"}
+                        onClick={() => handleReject(req.request_id)}
+                      >
+                        Từ chối
+                      </Button>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="text-center">
+                  <td colSpan="8" className="text-center">
                     Không có yêu cầu nào phù hợp
                   </td>
                 </tr>

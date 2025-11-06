@@ -46,3 +46,17 @@ export async function listRoomsLite() {
 export async function listRoomsLiteSafe() {
   return _callRoomsList();
 }
+
+/**
+ * Lấy danh sách tất cả các phòng
+ * Yêu cầu quyền: owner, manager
+ */
+export async function listRooms() {
+  try {
+    const response = await http.get("/room");
+    return unwrap(response);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách phòng:", error);
+    throw error;
+  }
+}

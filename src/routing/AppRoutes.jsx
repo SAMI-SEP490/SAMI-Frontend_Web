@@ -48,6 +48,9 @@ import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
 //Building
 import BuildingListPage from "../pages/building/BuildingListPage";
 import EditBuildingPage from "../pages/building/EditBuildingPage";
+
+// Dashboard
+import TenantAggregatesPage from "../pages/dashboard/TenantAggregatesPage";
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
   !!localStorage.getItem("accessToken");
@@ -247,6 +250,16 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <EditBuildingPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Dashboard */}
+      <Route
+        path={ROUTES.tenantAggregates}
+        element={
+          <ProtectedRoute>
+            <TenantAggregatesPage />
           </ProtectedRoute>
         }
       />

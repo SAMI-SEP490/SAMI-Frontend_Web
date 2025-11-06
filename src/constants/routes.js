@@ -41,4 +41,7 @@ export const ROUTES = {
   //buildings
   buildings: "/buildings",
   editBuilding: "/buildings/:id/edit",
+
+  // Dashboard
+  tenantAggregates: "/dashboard/tenant-aggregates",
 };

@@ -51,6 +51,7 @@ import EditBuildingPage from "../pages/building/EditBuildingPage";
 
 // Dashboard
 import TenantAggregatesPage from "../pages/dashboard/TenantAggregatesPage";
+import ViewTimeBasedReportsPage from "../pages/dashboard/ViewTimeBasedReportsPage";
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
   !!localStorage.getItem("accessToken");
@@ -260,6 +261,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <TenantAggregatesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTES.viewTimebaseReport}
+        element={
+          <ProtectedRoute>
+            <ViewTimeBasedReportsPage />
           </ProtectedRoute>
         }
       />

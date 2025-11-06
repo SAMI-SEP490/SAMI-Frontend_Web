@@ -55,6 +55,12 @@ const SideBar = () => {
         Thống kê tổng hợp người thuê
       </button>
 
+      <button
+        onClick={() => navigate("/dashboard/timebase-report")}
+        style={buttonStyle}
+      >
+        Thống kê tổng hợp tài chính
+      </button>
       {/* ✅ Chỉ hiện khi role là OWNER */}
       {role === "OWNER" && (
         <button onClick={() => navigate("/buildings")} style={buttonStyle}>

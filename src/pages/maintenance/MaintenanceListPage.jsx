@@ -28,6 +28,7 @@ function MaintenanceListPage() {
         console.log("Fetched users:", dataUsers);
         setMaintenanceRequests(dataMaintenance);
         setUserData(dataUsers);
+        console.log("Maintenance requests set: ", dataMaintenance);
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -38,6 +39,34 @@ function MaintenanceListPage() {
   const getUserFullName = (tenantUserId) => {
     const user = userData.find((u) => u.user_id === tenantUserId);
     return user ? user.full_name : "Không rõ";
+  };
+
+  // ✅ Dịch trạng thái sang tiếng Việt
+  const translateStatus = (status) => {
+    switch (status) {
+      case "pending":
+        return "Chờ xử lý";
+      case "completed":
+        return "Hoàn thành";
+      case "rejected":
+        return "Từ chối";
+      default:
+        return "Không xác định";
+    }
+  };
+
+  // ✅ Dịch mức độ ưu tiên sang tiếng Việt
+  const translatePriority = (priority) => {
+    switch (priority) {
+      case "low":
+        return "Thấp";
+      case "normal":
+        return "Trung bình";
+      case "high":
+        return "Cao";
+      default:
+        return "Không xác định";
+    }
   };
 
   // ✅ Phê duyệt yêu cầu
@@ -138,6 +167,7 @@ function MaintenanceListPage() {
                 <th>Trạng thái</th>
                 <th>Ưu tiên</th>
                 <th>Ngày tạo</th>
+                <th>Ghi chú</th>
                 <th>Hành động</th>
               </tr>
             </thead>
@@ -149,11 +179,12 @@ function MaintenanceListPage() {
                     <td>{req.title}</td>
                     <td>{getUserFullName(req.tenant_user_id)}</td>
                     <td>{req.room_id}</td>
-                    <td>{req.status}</td>
-                    <td>{req.priority}</td>
+                    <td>{translateStatus(req.status)}</td>
+                    <td>{translatePriority(req.priority)}</td>
                     <td>
                       {new Date(req.created_at).toLocaleDateString("vi-VN")}
                     </td>
+                    <td>{req.note || "—"}</td>
                     <td>
                       <Button
                         variant="success"
@@ -181,7 +212,7 @@ function MaintenanceListPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" className="text-center">
+                  <td colSpan="9" className="text-center">
                     Không có yêu cầu nào phù hợp
                   </td>
                 </tr>

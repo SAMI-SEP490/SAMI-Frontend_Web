@@ -1,5 +1,7 @@
 // src/routing/AppRoutes.jsx
 import React from "react";
+import { Suspense, lazy } from "react";
+import DashboardLayout from "@/layouts/DashboardLayout";
 
 // Định nghĩa các route trong ứng dụng
 import { ROUTES } from "../constants/routes";
@@ -48,6 +50,12 @@ import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
 //Building
 import BuildingListPage from "../pages/building/BuildingListPage";
 import EditBuildingPage from "../pages/building/EditBuildingPage";
+
+const CreateFloorPlan = lazy(() =>
+  import("@/pages/floorplan/CreateFloorPlan.jsx")
+);
+const ViewFloorPlan = lazy(() => import("@/pages/floorplan/ViewFloorPlan.jsx"));
+
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
   !!localStorage.getItem("accessToken");
@@ -247,6 +255,23 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <EditBuildingPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path={ROUTES.floorplanCreate}
+        element={
+          <ProtectedRoute>
+            <CreateFloorPlan />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTES.floorplanView}
+        element={
+          <ProtectedRoute>
+            <ViewFloorPlan />
           </ProtectedRoute>
         }
       />

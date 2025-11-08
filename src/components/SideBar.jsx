@@ -4,9 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 const SideBar = () => {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("sami:user")); // lấy user từ localStorage
-  console.log("Logged in user:", user);
-  const role = user?.role; // lấy role (nếu có)
+  const user = JSON.parse(localStorage.getItem("sami:user"));
+  const role = user?.role;
 
   return (
     <div
@@ -16,11 +15,16 @@ const SideBar = () => {
         backgroundColor: colors.brand,
         display: "flex",
         flexDirection: "column",
-        padding: "20px",
+        gap: 6,
+        padding: "16px 12px",
         color: "#fff",
-        borderRadius: "8px",
+        position: "sticky",
+        top: 0,
+        left: 0,
       }}
     >
+      <h3 style={{ margin: 0, marginBottom: 8, fontWeight: 800 }}>SAMI</h3>
+
       <button onClick={() => navigate("/contracts")} style={buttonStyle}>
         Danh sách hợp đồng
       </button>
@@ -48,6 +52,15 @@ const SideBar = () => {
         Danh sách bảo trì
       </button>
 
+      {/* ===== Floor plan (mới) ===== */}
+      <div style={{ marginTop: 6, opacity: 0.8, fontSize: 12 }}>Sơ đồ tầng</div>
+      <button onClick={() => navigate("/floorplan/view")} style={buttonStyle}>
+        Xem sơ đồ tầng
+      </button>
+      <button onClick={() => navigate("/floorplan/create")} style={buttonStyle}>
+        Tạo/Chỉnh sửa sơ đồ
+      </button>
+
       {/* ✅ Chỉ hiện khi role là OWNER */}
       {role === "OWNER" && (
         <button onClick={() => navigate("/buildings")} style={buttonStyle}>
@@ -59,7 +72,7 @@ const SideBar = () => {
 };
 
 const buttonStyle = {
-  margin: "10px 0",
+  margin: "6px 0",
   background: "none",
   border: "none",
   color: "#fff",

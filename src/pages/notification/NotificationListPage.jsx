@@ -199,7 +199,7 @@ export default function NotificationListPage() {
                     "Tòa nhà",
                     "Trạng thái",
                     "Hành động",
-                  ].map((h, i) => (
+                  ].map((h) => (
                     <th
                       key={h}
                       style={{

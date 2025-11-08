@@ -1,12 +1,7 @@
 // src/routing/AppRoutes.jsx
-import React from "react";
-import { Suspense, lazy } from "react";
-import DashboardLayout from "@/layouts/DashboardLayout";
-
-// Định nghĩa các route trong ứng dụng
-import { ROUTES } from "../constants/routes";
-
+import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { ROUTES } from "../constants/routes";
 import ProtectedRoute from "./ProtectedRoute";
 
 // ===== Auth (Public) =====
@@ -39,26 +34,26 @@ import BillDetailPage from "../pages/bill/BillDetailPage";
 
 // ===== Guests =====
 import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistrationPage";
-// Notification
+
+// ===== Notifications =====
 import NotificationListPage from "../pages/notification/NotificationListPage";
 import CreateNotificationPage from "../pages/notification/CreateNotificationPage";
 import EditNotificationPage from "../pages/notification/EditNotificationPage";
 
-// Maintenance
+// ===== Maintenance =====
 import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
 
-//Building
+// ===== Buildings =====
 import BuildingListPage from "../pages/building/BuildingListPage";
 import EditBuildingPage from "../pages/building/EditBuildingPage";
 
-
+// ===== Floorplan (lazy) =====
 const CreateFloorPlan = lazy(() =>
   import("@/pages/floorplan/CreateFloorPlan.jsx")
 );
 const ViewFloorPlan = lazy(() => import("@/pages/floorplan/ViewFloorPlan.jsx"));
 
-
-// Dashboard
+// ===== Dashboard =====
 import TenantAggregatesPage from "../pages/dashboard/TenantAggregatesPage";
 import ViewTimeBasedReportsPage from "../pages/dashboard/ViewTimeBasedReportsPage";
 
@@ -66,10 +61,11 @@ const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
   !!localStorage.getItem("accessToken");
 
-// Fallback thông minh
 const HomeRedirect = () => (
   <Navigate to={isAuthed() ? ROUTES.contracts : ROUTES.login} replace />
 );
+
+const LazyFallback = <div style={{ padding: 16 }}>Loading…</div>;
 
 export default function AppRoutes() {
   return (
@@ -81,7 +77,7 @@ export default function AppRoutes() {
       <Route path={ROUTES.newPassword} element={<NewPasswordPage />} />
       <Route path={ROUTES.verifyCode} element={<VerifyCodePage />} />
 
-      {/* ===== Private (bọc ProtectedRoute) ===== */}
+      {/* ===== Private ===== */}
       <Route
         path={ROUTES.profile}
         element={
@@ -107,6 +103,7 @@ export default function AppRoutes() {
         }
       />
 
+      {/* Contracts */}
       <Route
         path={ROUTES.contracts}
         element={
@@ -140,6 +137,7 @@ export default function AppRoutes() {
         }
       />
 
+      {/* Tenants */}
       <Route
         path={ROUTES.tenants}
         element={
@@ -173,6 +171,7 @@ export default function AppRoutes() {
         }
       />
 
+      {/* Bills */}
       <Route
         path={ROUTES.bills}
         element={
@@ -190,6 +189,7 @@ export default function AppRoutes() {
         }
       />
 
+      {/* Guests */}
       <Route
         path={ROUTES.receiveGuestRegistration}
         element={
@@ -199,15 +199,7 @@ export default function AppRoutes() {
         }
       />
 
-      <Route
-        path={ROUTES.createTenants}
-        element={
-          <ProtectedRoute>
-            <CreateTenantPage />
-          </ProtectedRoute>
-        }
-      />
-      {/* Notification */}
+      {/* Notifications */}
       <Route
         path={ROUTES.notifications}
         element={
@@ -233,11 +225,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* Fallback */}
-      <Route path="/" element={<HomeRedirect />} />
-      <Route path="*" element={<HomeRedirect />} />
-
-      {/* maintenance */}
+      {/* Maintenance */}
       <Route
         path={ROUTES.maintainceRequests}
         element={
@@ -246,7 +234,8 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      {/* buildings */}
+
+      {/* Buildings */}
       <Route
         path={ROUTES.buildings}
         element={
@@ -255,7 +244,6 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path={ROUTES.editBuilding}
         element={
@@ -265,12 +253,27 @@ export default function AppRoutes() {
         }
       />
 
-
+      {/* Floorplan (lazy with Suspense) */}
       <Route
         path={ROUTES.floorplanCreate}
         element={
           <ProtectedRoute>
-            <CreateFloorPlan />
+            <Suspense fallback={LazyFallback}>
+              <CreateFloorPlan />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTES.floorplanView}
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={LazyFallback}>
+              <ViewFloorPlan />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Dashboard */}
       <Route
@@ -278,25 +281,21 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <TenantAggregatesPage />
-
           </ProtectedRoute>
         }
       />
       <Route
-
-        path={ROUTES.floorplanView}
-        element={
-          <ProtectedRoute>
-            <ViewFloorPlan />
-
         path={ROUTES.viewTimebaseReport}
         element={
           <ProtectedRoute>
             <ViewTimeBasedReportsPage />
-
           </ProtectedRoute>
         }
       />
+
+      {/* Fallback */}
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path="*" element={<HomeRedirect />} />
     </Routes>
   );
 }

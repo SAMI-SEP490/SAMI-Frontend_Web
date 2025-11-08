@@ -15,17 +15,16 @@ export const ROUTES = {
   tenantDetail: "/tenants/:id",
   tenantEdit: "/tenants/:id/edit",
   tenantCreate: "/tenants/create",
-  createTenants: "/tenants/create", // (đang có cả 2 key giống path, giữ nguyên để tương thích)
-
-  // Bills
-  bills: "/bills",
-  billDetail: "/bills/:id",
 
   // Contracts
   contracts: "/contracts",
   contractDetail: "/contracts/:id",
   contractAddendum: "/contracts/:id/addendum",
-  createContract: "/contracts/create",
+  contractCreate: "/contracts/create",
+
+  // Bills
+  bills: "/bills",
+  billDetail: "/bills/:id",
 
   // Guests
   receiveGuestRegistration: "/receive-guest",
@@ -35,14 +34,20 @@ export const ROUTES = {
   createNotification: "/notifications/create",
   editNotification: "/notifications/:id/edit",
 
-  //maintaince
+  // maintaince
   maintainceRequests: "/maintaince-requests",
 
-  //buildings
+  // buildings
   buildings: "/buildings",
   editBuilding: "/buildings/:id/edit",
+
+
+  // ===== Floor plan (mới) =====
+  floorplanCreate: "/floorplan/create",
+  floorplanView: "/floorplan/view",
 
   // Dashboard
   tenantAggregates: "/dashboard/tenant-aggregates",
   viewTimebaseReport: "/dashboard/timebase-report",
+
 };

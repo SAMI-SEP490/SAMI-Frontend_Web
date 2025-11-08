@@ -8,7 +8,7 @@ export default function DashboardLayout() {
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {/* Sidebar bên trái */}
       <div style={{ width: 220 }}>
-        <Sidebar />
+        <SideBar /> {/* ✅ sửa tên đúng */}
       </div>
 
       {/* Phần nội dung: Header + Outlet */}

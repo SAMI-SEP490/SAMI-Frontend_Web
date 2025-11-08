@@ -77,7 +77,8 @@ export default function CreateTenantPage() {
       alert("Vui lòng nhập đầy đủ thông tin đăng nhập!");
       return;
     }
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
     if (!passwordRegex.test(formData.password)) {
       alert(
         "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ hoa, 1 chữ thường và 1 ký tự đặc biệt!"
@@ -113,8 +114,11 @@ export default function CreateTenantPage() {
       alert("Tạo tài khoản thành công!");
       navigate("/tenants", { replace: true });
     } catch (err) {
+      const d = err?.response?.data;
       const msg =
-        err?.response?.data?.message ||
+        d?.message ||
+        d?.error ||
+        (Array.isArray(d?.errors) && d.errors[0]?.message) ||
         err?.message ||
         "Tạo tenant thất bại. Vui lòng thử lại.";
       alert(msg);

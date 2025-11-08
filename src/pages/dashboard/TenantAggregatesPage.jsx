@@ -31,6 +31,7 @@ export default function TenantAggregatesPage() {
     const fetchData = async () => {
       try {
         const res = await listUsers();
+        console.log("✅ Danh sách người dùng:", res);
         setUsers(res);
 
         // --- Thống kê giới tính ---

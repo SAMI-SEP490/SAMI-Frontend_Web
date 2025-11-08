@@ -278,5 +278,6 @@ export const changeTenantToManager = async (payload) => {
 // 🧭 Lấy danh sách tất cả users (chỉ owner và manager được phép)
 export const listUsers = async () => {
   const res = await http.get("/user/list-users");
+  console.log("🌐 BASE URL:", http.defaults.baseURL);
   return unwrap(res);
 };

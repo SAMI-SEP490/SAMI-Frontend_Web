@@ -1,15 +1,12 @@
 // src/services/http.js
 import axios from "axios";
 
-
 const RAW_BASE =
-   import.meta.env.VITE_API_BASE ??
-   import.meta.env.VITE_API_BASE_URL ??
-   "/api";
- const API_BASE = String(RAW_BASE).replace(/\/$/, ""); // bỏ slash cuối
+  import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_BASE_URL ?? "/api";
+const API_BASE = String(RAW_BASE).replace(/\/$/, ""); // bỏ slash cuối
 
 export const http = axios.create({
-  baseURL: API_BASE, // ví dụ '/api' hoặc 'http://localhost:3000/api'
+  baseURL: API_BASE, // ví dụ '/api' hoặc 'http://localhost:3000/api  '
   withCredentials: false,
   timeout: 20000,
 });
@@ -118,6 +115,6 @@ http.interceptors.response.use(
     throw err;
   }
 );
- export function unwrap(res) {
-   return res?.data?.data ?? res?.data ?? res;
- }
+export function unwrap(res) {
+  return res?.data?.data ?? res?.data ?? res;
+}

@@ -265,3 +265,18 @@ export async function updateUser(id, form = {}) {
   }
   throw lastErr;
 }
+
+// ✅ Đổi role
+export const changeManagerToTenant = async (payload) => {
+  return unwrap(http.post("/user/change-to-tenant", payload));
+};
+
+export const changeTenantToManager = async (payload) => {
+  return unwrap(http.post("/user/change-to-manager", payload));
+};
+
+// 🧭 Lấy danh sách tất cả users (chỉ owner và manager được phép)
+export const listUsers = async () => {
+  const res = await http.get("/user/list-users");
+  return unwrap(res);
+};

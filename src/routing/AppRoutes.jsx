@@ -51,10 +51,16 @@ import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
 import BuildingListPage from "../pages/building/BuildingListPage";
 import EditBuildingPage from "../pages/building/EditBuildingPage";
 
+
 const CreateFloorPlan = lazy(() =>
   import("@/pages/floorplan/CreateFloorPlan.jsx")
 );
 const ViewFloorPlan = lazy(() => import("@/pages/floorplan/ViewFloorPlan.jsx"));
+
+
+// Dashboard
+import TenantAggregatesPage from "../pages/dashboard/TenantAggregatesPage";
+import ViewTimeBasedReportsPage from "../pages/dashboard/ViewTimeBasedReportsPage";
 
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
@@ -259,19 +265,35 @@ export default function AppRoutes() {
         }
       />
 
+
       <Route
         path={ROUTES.floorplanCreate}
         element={
           <ProtectedRoute>
             <CreateFloorPlan />
+
+      {/* Dashboard */}
+      <Route
+        path={ROUTES.tenantAggregates}
+        element={
+          <ProtectedRoute>
+            <TenantAggregatesPage />
+
           </ProtectedRoute>
         }
       />
       <Route
+
         path={ROUTES.floorplanView}
         element={
           <ProtectedRoute>
             <ViewFloorPlan />
+
+        path={ROUTES.viewTimebaseReport}
+        element={
+          <ProtectedRoute>
+            <ViewTimeBasedReportsPage />
+
           </ProtectedRoute>
         }
       />

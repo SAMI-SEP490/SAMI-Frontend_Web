@@ -52,6 +52,7 @@ const SideBar = () => {
         Danh sách bảo trì
       </button>
 
+
       {/* ===== Floor plan (mới) ===== */}
       <div style={{ marginTop: 6, opacity: 0.8, fontSize: 12 }}>Sơ đồ tầng</div>
       <button onClick={() => navigate("/floorplan/view")} style={buttonStyle}>
@@ -59,6 +60,21 @@ const SideBar = () => {
       </button>
       <button onClick={() => navigate("/floorplan/create")} style={buttonStyle}>
         Tạo/Chỉnh sửa sơ đồ
+      </button>
+
+
+      <button
+        onClick={() => navigate("/dashboard/tenant-aggregates")}
+        style={buttonStyle}
+      >
+        Thống kê tổng hợp người thuê
+      </button>
+
+      <button
+        onClick={() => navigate("/dashboard/timebase-report")}
+        style={buttonStyle}
+      >
+        Thống kê tổng hợp tài chính
       </button>
 
       {/* ✅ Chỉ hiện khi role là OWNER */}

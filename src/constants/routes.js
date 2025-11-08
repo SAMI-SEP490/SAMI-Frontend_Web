@@ -41,7 +41,13 @@ export const ROUTES = {
   buildings: "/buildings",
   editBuilding: "/buildings/:id/edit",
 
+
   // ===== Floor plan (mới) =====
   floorplanCreate: "/floorplan/create",
   floorplanView: "/floorplan/view",
+
+  // Dashboard
+  tenantAggregates: "/dashboard/tenant-aggregates",
+  viewTimebaseReport: "/dashboard/timebase-report",
+
 };

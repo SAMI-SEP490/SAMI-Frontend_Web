@@ -149,180 +149,168 @@ export default function CreateTenantPage() {
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <Header />
-      <div style={{ display: "flex", flex: 1 }}>
-        <Sidebar />
-        <div
-          style={{ flex: 1, background: colors.background, padding: "24px" }}
-        >
-          <div style={sectionStyle}>
-            <h2 style={{ textAlign: "center", marginBottom: 20 }}>
-              Tạo tài khoản
-            </h2>
+    <div style={{ flex: 1, background: colors.background, padding: "24px" }}>
+      <div style={sectionStyle}>
+        <h2 style={{ textAlign: "center", marginBottom: 20 }}>Tạo tài khoản</h2>
 
-            {step === 1 && (
-              <>
-                <h4 style={{ color: "#2563EB" }}>Thông tin cơ bản</h4>
+        {step === 1 && (
+          <>
+            <h4 style={{ color: "#2563EB" }}>Thông tin cơ bản</h4>
 
-                <label>Họ và tên:</label>
-                <input
-                  style={inputStyle}
-                  value={formData.name}
-                  onChange={(e) => handleChange("name", e.target.value)}
-                />
+            <label>Họ và tên:</label>
+            <input
+              style={inputStyle}
+              value={formData.name}
+              onChange={(e) => handleChange("name", e.target.value)}
+            />
 
-                <label>Ngày sinh:</label>
-                <input
-                  type="date"
-                  style={inputStyle}
-                  value={formData.dob}
-                  onChange={(e) => handleChange("dob", e.target.value)}
-                />
+            <label>Ngày sinh:</label>
+            <input
+              type="date"
+              style={inputStyle}
+              value={formData.dob}
+              onChange={(e) => handleChange("dob", e.target.value)}
+            />
 
-                <label>Giới tính:</label>
-                <div style={{ marginBottom: 10 }}>
-                  {["Nam", "Nữ", "Khác"].map((g) => (
-                    <label key={g} style={{ marginRight: 12 }}>
-                      <input
-                        type="radio"
-                        name="gender"
-                        value={g}
-                        checked={formData.gender === g}
-                        onChange={(e) => handleChange("gender", e.target.value)}
-                      />{" "}
-                      {g}
-                    </label>
-                  ))}
-                </div>
-
-                <h4 style={{ color: "#2563EB" }}>Liên hệ & Phòng</h4>
-
-                <label>Số điện thoại:</label>
-                <input
-                  style={inputStyle}
-                  value={formData.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
-                />
-
-                <label>Phòng:</label>
-                <select
-                  style={inputStyle}
-                  value={formData.room}
-                  onChange={(e) => handleChange("room", e.target.value)}
-                >
-                  <option value="">-- Chọn phòng --</option>
-                  <option value="101">101</option>
-                  <option value="102">102</option>
-                  <option value="201">201</option>
-                  <option value="202">202</option>
-                </select>
-
-                <label>CCCD/CMND (ID Number):</label>
-                <input
-                  placeholder="Nhập 9–12 chữ số"
-                  style={inputStyle}
-                  value={formData.idNumber}
-                  onChange={(e) => handleChange("idNumber", e.target.value)}
-                />
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <h4 style={{ color: "#2563EB" }}>Thông tin đăng nhập</h4>
-
-                <label>Email:</label>
-                <input
-                  placeholder="example@gmail.com"
-                  style={inputStyle}
-                  value={formData.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                />
-
-                <label>Mật khẩu:</label>
-                <input
-                  type="password"
-                  style={inputStyle}
-                  value={formData.password}
-                  onChange={(e) => handleChange("password", e.target.value)}
-                />
-
-                <label>Nhập lại mật khẩu:</label>
-                <input
-                  type="password"
-                  style={inputStyle}
-                  value={formData.confirmPassword}
-                  onChange={(e) =>
-                    handleChange("confirmPassword", e.target.value)
-                  }
-                />
-              </>
-            )}
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: 10,
-                marginTop: 20,
-              }}
-            >
-              {step !== 1 && (
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  style={{
-                    background: "#1E3A8A",
-                    color: "#fff",
-                    padding: "8px 16px",
-                    borderRadius: 6,
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                  disabled={saving}
-                >
-                  Quay lại
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={handleNext}
-                style={{
-                  background: "#1E3A8A",
-                  color: "#fff",
-                  padding: "8px 16px",
-                  borderRadius: 6,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-                disabled={saving}
-              >
-                {step === 2
-                  ? saving
-                    ? "Đang tạo..."
-                    : "Tạo tài khoản"
-                  : "Tiếp tục"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCancel}
-                style={{
-                  background: "#1E3A8A",
-                  color: "#fff",
-                  padding: "8px 16px",
-                  borderRadius: 6,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-                disabled={saving}
-              >
-                Hủy bỏ
-              </button>
+            <label>Giới tính:</label>
+            <div style={{ marginBottom: 10 }}>
+              {["Nam", "Nữ", "Khác"].map((g) => (
+                <label key={g} style={{ marginRight: 12 }}>
+                  <input
+                    type="radio"
+                    name="gender"
+                    value={g}
+                    checked={formData.gender === g}
+                    onChange={(e) => handleChange("gender", e.target.value)}
+                  />{" "}
+                  {g}
+                </label>
+              ))}
             </div>
-          </div>
+
+            <h4 style={{ color: "#2563EB" }}>Liên hệ & Phòng</h4>
+
+            <label>Số điện thoại:</label>
+            <input
+              style={inputStyle}
+              value={formData.phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
+            />
+
+            <label>Phòng:</label>
+            <select
+              style={inputStyle}
+              value={formData.room}
+              onChange={(e) => handleChange("room", e.target.value)}
+            >
+              <option value="">-- Chọn phòng --</option>
+              <option value="101">101</option>
+              <option value="102">102</option>
+              <option value="201">201</option>
+              <option value="202">202</option>
+            </select>
+
+            <label>CCCD/CMND (ID Number):</label>
+            <input
+              placeholder="Nhập 9–12 chữ số"
+              style={inputStyle}
+              value={formData.idNumber}
+              onChange={(e) => handleChange("idNumber", e.target.value)}
+            />
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <h4 style={{ color: "#2563EB" }}>Thông tin đăng nhập</h4>
+
+            <label>Email:</label>
+            <input
+              placeholder="example@gmail.com"
+              style={inputStyle}
+              value={formData.email}
+              onChange={(e) => handleChange("email", e.target.value)}
+            />
+
+            <label>Mật khẩu:</label>
+            <input
+              type="password"
+              style={inputStyle}
+              value={formData.password}
+              onChange={(e) => handleChange("password", e.target.value)}
+            />
+
+            <label>Nhập lại mật khẩu:</label>
+            <input
+              type="password"
+              style={inputStyle}
+              value={formData.confirmPassword}
+              onChange={(e) => handleChange("confirmPassword", e.target.value)}
+            />
+          </>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 10,
+            marginTop: 20,
+          }}
+        >
+          {step !== 1 && (
+            <button
+              type="button"
+              onClick={handleBack}
+              style={{
+                background: "#1E3A8A",
+                color: "#fff",
+                padding: "8px 16px",
+                borderRadius: 6,
+                border: "none",
+                cursor: "pointer",
+              }}
+              disabled={saving}
+            >
+              Quay lại
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleNext}
+            style={{
+              background: "#1E3A8A",
+              color: "#fff",
+              padding: "8px 16px",
+              borderRadius: 6,
+              border: "none",
+              cursor: "pointer",
+            }}
+            disabled={saving}
+          >
+            {step === 2
+              ? saving
+                ? "Đang tạo..."
+                : "Tạo tài khoản"
+              : "Tiếp tục"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCancel}
+            style={{
+              background: "#1E3A8A",
+              color: "#fff",
+              padding: "8px 16px",
+              borderRadius: 6,
+              border: "none",
+              cursor: "pointer",
+            }}
+            disabled={saving}
+          >
+            Hủy bỏ
+          </button>
         </div>
       </div>
     </div>

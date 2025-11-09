@@ -1,17 +1,18 @@
 import React, { useContext } from "react";
-import { RegulationContext } from "@/contexts/RegulationContext";
+import { RegulationContext } from "../../contexts/RegulationContext";
 import { useParams, useNavigate } from "react-router-dom";
 
 export default function ViewRegulationPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getRegulationById, deleteRegulation } =
-    useContext(RegulationContext);
+  const { getRegulationById, deleteRegulation } = useContext(RegulationContext);
 
   const reg = getRegulationById(parseInt(id));
 
   if (!reg)
-    return <p className="p-6 text-center text-gray-500">Không tìm thấy quy định.</p>;
+    return (
+      <p className="p-6 text-center text-gray-500">Không tìm thấy quy định.</p>
+    );
 
   return (
     <div className="max-w-3xl mx-auto p-8 bg-white rounded-2xl shadow-md">

@@ -61,6 +61,10 @@ const ViewFloorPlan = lazy(() => import("@/pages/floorplan/ViewFloorPlan.jsx"));
 import TenantAggregatesPage from "../pages/dashboard/TenantAggregatesPage";
 import ViewTimeBasedReportsPage from "../pages/dashboard/ViewTimeBasedReportsPage";
 
+// regulations
+import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
+import CreateRegulationPage from "../pages/regulation/CreateRegulationPage";
+import EditRegulationPage from "../pages/regulation/EditRegulationPage";
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
   !!localStorage.getItem("accessToken");
@@ -227,6 +231,31 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <EditNotificationPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* regulation  */}
+        <Route
+          path={ROUTES.regulations}
+          element={
+            <ProtectedRoute>
+              <ViewRegulationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.createRegutalion}
+          element={
+            <ProtectedRoute>
+              <CreateRegulationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.editRegulation}
+          element={
+            <ProtectedRoute>
+              <EditRegulationPage />
             </ProtectedRoute>
           }
         />

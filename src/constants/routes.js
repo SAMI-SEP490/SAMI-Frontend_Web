@@ -34,13 +34,17 @@ export const ROUTES = {
   createNotification: "/notifications/create",
   editNotification: "/notifications/:id/edit",
 
+  //regulations
+  regulations: "/regulations",
+  editRegulation: "/regulations/:id/edit",
+  createRegulation: "/regulations/create",
+
   // maintaince
   maintainceRequests: "/maintaince-requests",
 
   // buildings
   buildings: "/buildings",
   editBuilding: "/buildings/:id/edit",
-
 
   // ===== Floor plan (mới) =====
   floorplanCreate: "/floorplan/create",
@@ -49,5 +53,4 @@ export const ROUTES = {
   // Dashboard
   tenantAggregates: "/dashboard/tenant-aggregates",
   viewTimebaseReport: "/dashboard/timebase-report",
-
 };

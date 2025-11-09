@@ -65,6 +65,10 @@ import ViewTimeBasedReportsPage from "../pages/dashboard/ViewTimeBasedReportsPag
 import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
 import CreateRegulationPage from "../pages/regulation/CreateRegulationPage";
 import EditRegulationPage from "../pages/regulation/EditRegulationPage";
+
+// vehicle registrations
+import VehicleRegistrationListPage from "../pages/vehicle/VehicleRegistrationListPage";
+
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
   !!localStorage.getItem("accessToken");
@@ -324,6 +328,15 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <ViewTimeBasedReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Vehicle Registrations  */}
+        <Route
+          path={ROUTES.vehicleRegistrations}
+          element={
+            <ProtectedRoute>
+              <VehicleRegistrationListPage />
             </ProtectedRoute>
           }
         />

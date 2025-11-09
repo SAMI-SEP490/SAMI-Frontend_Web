@@ -73,6 +73,12 @@ const SideBar = () => {
       >
         Thống kê tổng hợp tài chính
       </button>
+      <button
+        onClick={() => navigate("/vehicle-registrations")}
+        style={buttonStyle}
+      >
+        Danh sách đăng ký xe
+      </button>
 
       {/* ✅ Chỉ hiện khi role là OWNER */}
       {role === "OWNER" && (

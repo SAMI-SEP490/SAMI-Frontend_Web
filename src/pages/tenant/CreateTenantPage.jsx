@@ -3,7 +3,7 @@ import Header from "../../components/Header";
 import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { useNavigate } from "react-router-dom";
-import { registerTenantQuick } from "../../services/api/tenants"; // ✅ Đúng file
+import { registerUser } from "@/services/api/tenants";
 
 export default function CreateTenantPage() {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export default function CreateTenantPage() {
     dob: "",
     gender: "",
     phone: "",
-    address: "", // làm TUỲ CHỌN
+    address: "", // tuỳ chọn
     room: "",
     idNumber: "",
     emergencyPhone: "",
@@ -35,7 +35,7 @@ export default function CreateTenantPage() {
 
   const handleNext = async () => {
     if (step === 1) {
-      // ✅ BỎ address khỏi validation bắt buộc
+      // address/emergencyPhone là tuỳ chọn
       if (
         !formData.name ||
         !formData.dob ||
@@ -44,7 +44,7 @@ export default function CreateTenantPage() {
         !formData.room ||
         !formData.idNumber
       ) {
-        alert("Vui lòng nhập đầy đủ thông tin cơ bản (bao gồm Phòng & CCCD)!");
+        alert("Vui lòng nhập đủ Thông tin cơ bản (bao gồm Phòng & CCCD)!");
         return;
       }
 
@@ -72,7 +72,7 @@ export default function CreateTenantPage() {
       return;
     }
 
-    // Bước 2
+    // Bước 2: đăng ký bằng /auth/register (KHÔNG gán role ở body)
     if (!formData.email || !formData.password || !formData.confirmPassword) {
       alert("Vui lòng nhập đầy đủ thông tin đăng nhập!");
       return;
@@ -81,7 +81,7 @@ export default function CreateTenantPage() {
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
     if (!passwordRegex.test(formData.password)) {
       alert(
-        "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ hoa, 1 chữ thường và 1 ký tự đặc biệt!"
+        "Mật khẩu phải ≥8 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt."
       );
       return;
     }
@@ -91,27 +91,22 @@ export default function CreateTenantPage() {
     }
 
     if (saving) return;
+
     try {
       setSaving(true);
 
-      await registerTenantQuick({
-        // map sang BE (hàm nằm trong services/api/tenants.js)
+      // Gọi API đăng ký user chuẩn
+      await registerUser({
         full_name: formData.name.trim(),
         email: formData.email.trim(),
         password: formData.password,
         phone: formData.phone.trim(),
-        gender: formData.gender, // "Nam"|"Nữ"|"Khác" -> service sẽ map nếu cần
-        birthday: formData.dob, // yyyy-mm-dd
-
-        idNumber: formData.idNumber,
-        emergencyPhone: formData.emergencyPhone || "",
-
-        // tuỳ chọn, không bắt buộc
-        address: formData.address || "",
-        room: formData.room,
+        gender: formData.gender, // "Nam" | "Nữ" | "Khác" (service sẽ map nếu cần)
+        birthday: formData.dob, // yyyy-mm-dd (service chuẩn hoá)
       });
 
       alert("Tạo tài khoản thành công!");
+      // Sau khi BE xử lý role ở phía server, danh sách sẽ lọc TENANT ở trang list
       navigate("/tenants", { replace: true });
     } catch (err) {
       const d = err?.response?.data;
@@ -120,7 +115,7 @@ export default function CreateTenantPage() {
         d?.error ||
         (Array.isArray(d?.errors) && d.errors[0]?.message) ||
         err?.message ||
-        "Tạo tenant thất bại. Vui lòng thử lại.";
+        "Tạo tài khoản thất bại. Vui lòng thử lại.";
       alert(msg);
     } finally {
       setSaving(false);
@@ -229,16 +224,6 @@ export default function CreateTenantPage() {
                   style={inputStyle}
                   value={formData.idNumber}
                   onChange={(e) => handleChange("idNumber", e.target.value)}
-                />
-
-                <label>Số liên hệ khẩn cấp (tuỳ chọn):</label>
-                <input
-                  placeholder="10–11 chữ số, mặc định dùng SĐT chính"
-                  style={inputStyle}
-                  value={formData.emergencyPhone}
-                  onChange={(e) =>
-                    handleChange("emergencyPhone", e.target.value)
-                  }
                 />
               </>
             )}

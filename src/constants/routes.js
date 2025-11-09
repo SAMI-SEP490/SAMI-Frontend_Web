@@ -53,4 +53,7 @@ export const ROUTES = {
   // Dashboard
   tenantAggregates: "/dashboard/tenant-aggregates",
   viewTimebaseReport: "/dashboard/timebase-report",
+
+  //vehicle registrations
+  vehicleRegistrations: "/vehicle-registrations",
 };

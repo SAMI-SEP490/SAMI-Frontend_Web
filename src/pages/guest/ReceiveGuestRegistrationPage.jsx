@@ -1,7 +1,5 @@
 import React, { useContext, useState } from "react";
 import { GuestRegistrationContext } from "../../contexts/GuestRegistrationContext";
-import Header from "../../components/Header";
-import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 
 function ReceiveGuestRegistrationPage() {
@@ -13,14 +11,12 @@ function ReceiveGuestRegistrationPage() {
   const [selectedGuest, setSelectedGuest] = useState(null);
   const [actionType, setActionType] = useState("");
 
-  // ✅ Mở popup xác nhận
   const openPopup = (guest, type) => {
     setSelectedGuest(guest);
     setActionType(type);
     setShowPopup(true);
   };
 
-  // ✅ Xử lý xác nhận hành động
   const confirmAction = () => {
     const newStatus = actionType === "approve" ? "Approved" : "Rejected";
     const updatedData = guestRegistrationData.map((guest) =>
@@ -33,7 +29,6 @@ function ReceiveGuestRegistrationPage() {
     setSelectedGuest(null);
   };
 
-  // ✅ Hiển thị trạng thái tiếng Việt
   const getStatusLabel = (status) => {
     switch (status) {
       case "Pending":
@@ -48,120 +43,86 @@ function ReceiveGuestRegistrationPage() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      {/* Header */}
-      <div
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: colors.background,
+        padding: "30px",
+        overflowY: "auto",
+      }}
+    >
+      <h2 style={{ marginBottom: "20px", color: colors.brand }}>
+        Danh sách khách tạm trú
+      </h2>
+
+      <table
         style={{
-          marginBottom: 10,
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
-          flexShrink: 0,
+          width: "100%",
+          borderCollapse: "collapse",
+          textAlign: "left",
+          backgroundColor: "#fff",
+          borderRadius: "10px",
+          boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+          overflow: "hidden",
         }}
       >
-        <Header />
-      </div>
+        <thead>
+          <tr style={{ backgroundColor: "#f2f2f2" }}>
+            <th style={thStyle}>#</th>
+            <th style={thStyle}>Phòng</th>
+            <th style={thStyle}>Tên khách</th>
+            <th style={thStyle}>Số điện thoại</th>
+            <th style={thStyle}>Ngày bắt đầu</th>
+            <th style={thStyle}>Ngày kết thúc</th>
+            <th style={thStyle}>Lí do</th>
+            <th style={thStyle}>Thông tin thêm</th>
+            <th style={thStyle}>Trạng thái</th>
+            <th style={thStyle}>Hành động</th>
+          </tr>
+        </thead>
+        <tbody>
+          {guestRegistrationData.map((guest, index) => (
+            <tr key={guest.id} style={{ borderBottom: "1px solid #ddd" }}>
+              <td style={tdStyle}>{index + 1}</td>
+              <td style={tdStyle}>{guest.room}</td>
+              <td style={tdStyle}>{guest.name}</td>
+              <td style={tdStyle}>{guest.phone}</td>
+              <td style={tdStyle}>{guest.startDate}</td>
+              <td style={tdStyle}>{guest.endDate}</td>
+              <td style={tdStyle}>{guest.reason}</td>
+              <td style={tdStyle}>{guest.additionalInfo}</td>
+              <td
+                style={{
+                  ...tdStyle,
+                  fontWeight: "bold",
+                  color: getStatusColor(guest.status),
+                }}
+              >
+                {getStatusLabel(guest.status)}
+              </td>
+              <td style={tdStyle}>
+                {guest.status === "Pending" && !guest.actionDone && (
+                  <>
+                    <button
+                      style={acceptButtonStyle}
+                      onClick={() => openPopup(guest, "approve")}
+                    >
+                      Phê duyệt
+                    </button>
+                    <button
+                      style={rejectButtonStyle}
+                      onClick={() => openPopup(guest, "reject")}
+                    >
+                      Từ chối
+                    </button>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-      {/* Main content */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Sidebar */}
-        <div
-          style={{
-            width: "220px",
-            backgroundColor: colors.brand,
-            color: "white",
-            height: "100%",
-            borderRadius: "0 10px 10px 0",
-            flexShrink: 0,
-          }}
-        >
-          <Sidebar />
-        </div>
-
-        {/* Table content */}
-        <div
-          style={{
-            flex: 1,
-            padding: "30px",
-            backgroundColor: colors.background,
-            overflowY: "auto",
-          }}
-        >
-          <h2 style={{ marginBottom: "20px", color: colors.brand }}>
-            Danh sách khách tạm trú
-          </h2>
-
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              textAlign: "left",
-              backgroundColor: "#fff",
-              borderRadius: "10px",
-              boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-              overflow: "hidden",
-            }}
-          >
-            <thead>
-              <tr style={{ backgroundColor: "#f2f2f2" }}>
-                <th style={thStyle}>#</th>
-                <th style={thStyle}>Phòng</th>
-                <th style={thStyle}>Tên khách</th>
-                <th style={thStyle}>Số điện thoại</th>
-                <th style={thStyle}>Ngày bắt đầu</th>
-                <th style={thStyle}>Ngày kết thúc</th>
-                <th style={thStyle}>Lí do</th>
-                <th style={thStyle}>Thông tin thêm</th>
-                <th style={thStyle}>Trạng thái</th>
-                <th style={thStyle}>Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {guestRegistrationData.map((guest, index) => (
-                <tr key={guest.id} style={{ borderBottom: "1px solid #ddd" }}>
-                  <td style={tdStyle}>{index + 1}</td>
-                  <td style={tdStyle}>{guest.room}</td>
-                  <td style={tdStyle}>{guest.name}</td>
-                  <td style={tdStyle}>{guest.phone}</td>
-                  <td style={tdStyle}>{guest.startDate}</td>
-                  <td style={tdStyle}>{guest.endDate}</td>
-                  <td style={tdStyle}>{guest.reason}</td>
-                  <td style={tdStyle}>{guest.additionalInfo}</td>
-                  <td
-                    style={{
-                      ...tdStyle,
-                      fontWeight: "bold",
-                      color: getStatusColor(guest.status),
-                    }}
-                  >
-                    {getStatusLabel(guest.status)}
-                  </td>
-                  <td style={tdStyle}>
-                    {guest.status === "Pending" && !guest.actionDone && (
-                      <>
-                        <button
-                          style={acceptButtonStyle}
-                          onClick={() => openPopup(guest, "approve")}
-                        >
-                          Phê duyệt
-                        </button>
-                        <button
-                          style={rejectButtonStyle}
-                          onClick={() => openPopup(guest, "reject")}
-                        >
-                          Từ chối
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Popup xác nhận */}
       {showPopup && (
         <div style={popupOverlayStyle}>
           <div style={popupStyle}>
@@ -188,7 +149,7 @@ function ReceiveGuestRegistrationPage() {
   );
 }
 
-// ✅ Màu trạng thái
+// Màu trạng thái
 const getStatusColor = (status) => {
   switch (status) {
     case "Pending":
@@ -202,7 +163,7 @@ const getStatusColor = (status) => {
   }
 };
 
-// ✅ Style chung
+// Style
 const thStyle = {
   borderBottom: "2px solid #ccc",
   padding: "10px",

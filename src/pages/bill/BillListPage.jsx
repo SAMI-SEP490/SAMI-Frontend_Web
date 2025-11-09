@@ -1,7 +1,5 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "../../components/Header";
-import SideBar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { useBillContext } from "../../contexts/BillContext";
 
@@ -15,12 +13,20 @@ export default function BillListPage() {
   const [keyword, setKeyword] = useState("");
   const [selected, setSelected] = useState(new Set());
 
-  // --- NEW: state cho modal Tạo ---
   const [openCreate, setOpenCreate] = useState(false);
   const [createForm, setCreateForm] = useState({
     name: "",
     category: CATEGORY_OPTS[0],
     period: PERIOD_OPTS[0],
+  });
+
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    id: "",
+    name: "",
+    category: CATEGORY_OPTS[0],
+    period: PERIOD_OPTS[0],
+    createdAt: "",
   });
 
   const filtered = useMemo(() => {
@@ -41,6 +47,7 @@ export default function BillListPage() {
       n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
+
   const toggleAll = (checked) =>
     setSelected(checked ? new Set(filtered.map((b) => b.id)) : new Set());
 
@@ -69,7 +76,6 @@ export default function BillListPage() {
     URL.revokeObjectURL(url);
   };
 
-  // --- NEW: tạo hóa đơn ---
   const handleCreate = () => {
     if (!createForm.name.trim()) {
       alert("Vui lòng nhập tên hóa đơn");
@@ -80,7 +86,6 @@ export default function BillListPage() {
       .filter((n) => !isNaN(n))
       .reduce((a, b) => Math.max(a, b), 0);
     const newId = `BL-${String(maxNum + 1).padStart(3, "0")}`;
-
     const nowISO = new Date().toISOString();
     const newBill = {
       id: newId,
@@ -89,7 +94,7 @@ export default function BillListPage() {
       period: createForm.period,
       createdAt: nowISO,
     };
-    setBills((prev) => [newBill, ...prev]); // thêm đầu danh sách
+    setBills((prev) => [newBill, ...prev]);
     setOpenCreate(false);
     setCreateForm({
       name: "",
@@ -97,17 +102,7 @@ export default function BillListPage() {
       period: PERIOD_OPTS[0],
     });
   };
-  // --- EDIT MODAL state ---
-  const [openEdit, setOpenEdit] = useState(false);
-  const [editForm, setEditForm] = useState({
-    id: "",
-    name: "",
-    category: CATEGORY_OPTS[0],
-    period: PERIOD_OPTS[0],
-    createdAt: "", // hiển thị readonly
-  });
 
-  // mở modal sửa với dữ liệu đang chọn
   const openEditBill = (bill) => {
     setEditForm({
       id: bill.id,
@@ -119,7 +114,6 @@ export default function BillListPage() {
     setOpenEdit(true);
   };
 
-  // cập nhật bill vào context
   const handleUpdate = () => {
     if (!editForm.name.trim()) {
       alert("Vui lòng nhập tên hóa đơn");
@@ -133,7 +127,6 @@ export default function BillListPage() {
               name: editForm.name.trim(),
               category: editForm.category,
               period: editForm.period,
-              // createdAt giữ nguyên (đang readonly)
             }
           : b
       )
@@ -141,7 +134,6 @@ export default function BillListPage() {
     setOpenEdit(false);
   };
 
-  // util format ngày giờ kiểu VN
   const formatVNDateTime = (iso) => {
     if (!iso) return "—";
     const d = new Date(iso);
@@ -151,395 +143,248 @@ export default function BillListPage() {
       d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
     );
   };
+
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Header cố định ở trên */}
+    <div
+      style={{ padding: 24, background: colors.background, minHeight: "100vh" }}
+    >
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+        <button onClick={() => navigate("/tenants")} style={tab(false)}>
+          Người Thuê
+        </button>
+        <button style={tab(true)}>Hóa Đơn</button>
+      </div>
+
+      {/* Search + Buttons */}
       <div
         style={{
-          marginBottom: 10,
-          borderRadius: "10px",
-          flexShrink: 0,
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
+          background: "#fff",
+          borderRadius: 10,
+          padding: "12px 16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+          marginBottom: 12,
         }}
       >
-        <Header />
-      </div>
-
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         <div
-          style={{
-            width: "220px",
-            backgroundColor: colors.brand,
-            color: "white",
-            height: "100%",
-            position: "sticky",
-            top: 0,
-            borderRadius: "10px",
-          }}
+          style={{ display: "flex", alignItems: "center", gap: 12, width: 380 }}
         >
-          <SideBar />
+          <span style={{ color: "#64748B" }}>🔎</span>
+          <input
+            placeholder="Tìm kiếm…"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            style={{
+              flex: 1,
+              height: 38,
+              padding: "0 12px",
+              borderRadius: 10,
+              border: "1px solid #E5E7EB",
+              background: "#F8FAFC",
+            }}
+          />
         </div>
-
-        <div
-          style={{
-            flex: 1,
-            background: colors.background,
-            padding: 24,
-            overflow: "auto",
-          }}
-        >
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-            <button onClick={() => navigate("/tenants")} style={tab(false)}>
-              Người Thuê
-            </button>
-            <button style={tab(true)}>Hóa Đơn</button>
-          </div>
-
-          {/* Search + Buttons */}
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 10,
-              padding: "12px 16px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              boxShadow: "0 2px 8px rgba(0,0,0,.06)",
-              marginBottom: 12,
-            }}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            style={pill("#374151", "#fff")}
+            onClick={() => alert("Lọc (demo)")}
           >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                width: 380,
-              }}
-            >
-              <span style={{ color: "#64748B" }}>🔎</span>
-              <input
-                placeholder="Tìm kiếm…"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                style={{
-                  flex: 1,
-                  height: 38,
-                  padding: "0 12px",
-                  borderRadius: 10,
-                  border: "1px solid #E5E7EB",
-                  background: "#F8FAFC",
-                }}
-              />
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                style={pill("#374151", "#fff")}
-                onClick={() => alert("Lọc (demo)")}
-              >
-                Lọc
-              </button>
-              {/* Nút TẠO mở modal */}
-              <button
-                style={pill("#16A34A", "#fff")}
-                onClick={() => setOpenCreate(true)}
-              >
-                Tạo
-              </button>
-              <button style={pill("#F97316", "#fff")} onClick={onExport}>
-                Xuất
-              </button>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 10,
-              boxShadow: "0 2px 10px rgba(0,0,0,.06)",
-            }}
+            Lọc
+          </button>
+          <button
+            style={pill("#16A34A", "#fff")}
+            onClick={() => setOpenCreate(true)}
           >
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "separate",
-                borderSpacing: 0,
-              }}
-            >
-              <thead style={{ background: "#F1F5F9" }}>
-                <tr>
-                  <th style={th(60)}>
-                    <input
-                      type="checkbox"
-                      checked={
-                        selected.size > 0 && selected.size === filtered.length
-                      }
-                      onChange={(e) => toggleAll(e.target.checked)}
-                    />
-                  </th>
-                  <th style={th()}>Tên</th>
-                  <th style={th(260)}>Loại</th>
-                  <th style={th(160)}>Thời Gian</th>
-                  <th style={{ ...th(270), textAlign: "center" }}>Hành Động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((b) => (
-                  <tr key={b.id} style={{ borderBottom: "1px solid #EEF2F7" }}>
-                    <td style={td(60)}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(b.id)}
-                        onChange={() => toggleOne(b.id)}
-                      />
-                    </td>
-                    <td style={td()}>{b.name}</td>
-                    <td style={td(260)}>{b.category}</td>
-                    <td style={td(160)}>{b.period}</td>
-                    <td style={{ ...td(220), textAlign: "right" }}>
-                      <button
-                        style={chip("#6B7280", "#fff")}
-                        onClick={() => navigate(`/bills/${b.id}`)}
-                      >
-                        Chi Tiết
-                      </button>
-                      <button
-                        style={chip(colors.brand, "#fff")}
-                        onClick={() => openEditBill(b)} // 👈 mở modal sửa
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        style={chip("#DC2626", "#fff")}
-                        onClick={() => onDelete(b.id)}
-                      >
-                        Xóa
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      style={{
-                        padding: 16,
-                        textAlign: "center",
-                        color: "#64748B",
-                      }}
-                    >
-                      Không có dữ liệu
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ====== NEW: Modal TẠO HÓA ĐƠN ====== */}
-          {openCreate && (
-            <div style={backdrop} onClick={() => setOpenCreate(false)}>
-              <div style={modal} onClick={(e) => e.stopPropagation()}>
-                {/* Header */}
-                <div style={modalHeader}>
-                  <div style={{ fontWeight: 700 }}>Tạo Hóa Đơn</div>
-                  <button style={closeX} onClick={() => setOpenCreate(false)}>
-                    ×
-                  </button>
-                </div>
-
-                {/* Body */}
-                <div style={{ padding: "18px 20px", display: "grid", gap: 14 }}>
-                  <Field label="Tên:">
-                    <input
-                      placeholder="VD: Tiền nước"
-                      value={createForm.name}
-                      onChange={(e) =>
-                        setCreateForm((f) => ({ ...f, name: e.target.value }))
-                      }
-                      style={input}
-                    />
-                  </Field>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 16,
-                    }}
-                  >
-                    <Field label="Loại:">
-                      <select
-                        value={createForm.category}
-                        onChange={(e) =>
-                          setCreateForm((f) => ({
-                            ...f,
-                            category: e.target.value,
-                          }))
-                        }
-                        style={select}
-                      >
-                        {CATEGORY_OPTS.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    <Field label="Thời gian:">
-                      <select
-                        value={createForm.period}
-                        onChange={(e) =>
-                          setCreateForm((f) => ({
-                            ...f,
-                            period: e.target.value,
-                          }))
-                        }
-                        style={select}
-                      >
-                        {PERIOD_OPTS.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div style={modalFooter}>
-                  <button
-                    style={pill("#9CA3AF", "#fff")}
-                    onClick={() => setOpenCreate(false)}
-                  >
-                    Đóng
-                  </button>
-                  <button
-                    style={pill("#1E40AF", "#fff")}
-                    onClick={handleCreate}
-                  >
-                    Tạo
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          {/* ====== /Modal ====== */}
-
-          {/* ====== Modal CẬP NHẬT HÓA ĐƠN ====== */}
-          {openEdit && (
-            <div style={backdrop} onClick={() => setOpenEdit(false)}>
-              <div style={modal} onClick={(e) => e.stopPropagation()}>
-                {/* Header */}
-                <div style={modalHeader}>
-                  <div style={{ fontWeight: 700 }}>Cập Nhật Hóa Đơn</div>
-                  <button style={closeX} onClick={() => setOpenEdit(false)}>
-                    ×
-                  </button>
-                </div>
-
-                {/* Body */}
-                <div style={{ padding: "18px 20px", display: "grid", gap: 14 }}>
-                  <Field label="Tên:">
-                    <input
-                      value={editForm.name}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, name: e.target.value }))
-                      }
-                      style={input}
-                    />
-                  </Field>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 16,
-                    }}
-                  >
-                    <Field label="Ngày tạo:">
-                      <input
-                        value={formatVNDateTime(editForm.createdAt)}
-                        style={input}
-                        disabled
-                      />
-                    </Field>
-                    <span /> {/* filler để canh lưới cho đẹp */}
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 16,
-                    }}
-                  >
-                    <Field label="Loại:">
-                      <select
-                        value={editForm.category}
-                        onChange={(e) =>
-                          setEditForm((f) => ({
-                            ...f,
-                            category: e.target.value,
-                          }))
-                        }
-                        style={select}
-                      >
-                        {CATEGORY_OPTS.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    <Field label="Thời gian:">
-                      <select
-                        value={editForm.period}
-                        onChange={(e) =>
-                          setEditForm((f) => ({ ...f, period: e.target.value }))
-                        }
-                        style={select}
-                      >
-                        {PERIOD_OPTS.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div style={modalFooter}>
-                  <button
-                    style={pill("#9CA3AF", "#fff")}
-                    onClick={() => setOpenEdit(false)}
-                  >
-                    Đóng
-                  </button>
-                  <button
-                    style={pill("#1E40AF", "#fff")}
-                    onClick={handleUpdate}
-                  >
-                    Cập Nhật
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          {/* ====== /Modal CẬP NHẬT ====== */}
+            Tạo
+          </button>
+          <button style={pill("#F97316", "#fff")} onClick={onExport}>
+            Xuất
+          </button>
         </div>
       </div>
+
+      {/* Table */}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 10,
+          boxShadow: "0 2px 10px rgba(0,0,0,.06)",
+        }}
+      >
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "separate",
+            borderSpacing: 0,
+          }}
+        >
+          <thead style={{ background: "#F1F5F9" }}>
+            <tr>
+              <th style={th(60)}>
+                <input
+                  type="checkbox"
+                  checked={
+                    selected.size > 0 && selected.size === filtered.length
+                  }
+                  onChange={(e) => toggleAll(e.target.checked)}
+                />
+              </th>
+              <th style={th()}>Tên</th>
+              <th style={th(260)}>Loại</th>
+              <th style={th(160)}>Thời Gian</th>
+              <th style={{ ...th(270), textAlign: "center" }}>Hành Động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((b) => (
+              <tr key={b.id} style={{ borderBottom: "1px solid #EEF2F7" }}>
+                <td style={td(60)}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(b.id)}
+                    onChange={() => toggleOne(b.id)}
+                  />
+                </td>
+                <td style={td()}>{b.name}</td>
+                <td style={td(260)}>{b.category}</td>
+                <td style={td(160)}>{b.period}</td>
+                <td style={{ ...td(220), textAlign: "right" }}>
+                  <button
+                    style={chip("#6B7280", "#fff")}
+                    onClick={() => navigate(`/bills/${b.id}`)}
+                  >
+                    Chi Tiết
+                  </button>
+                  <button
+                    style={chip(colors.brand, "#fff")}
+                    onClick={() => openEditBill(b)}
+                  >
+                    Sửa
+                  </button>
+                  <button
+                    style={chip("#DC2626", "#fff")}
+                    onClick={() => onDelete(b.id)}
+                  >
+                    Xóa
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td
+                  colSpan={5}
+                  style={{ padding: 16, textAlign: "center", color: "#64748B" }}
+                >
+                  Không có dữ liệu
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modals */}
+      {openCreate && (
+        <Modal
+          title="Tạo Hóa Đơn"
+          onClose={() => setOpenCreate(false)}
+          form={createForm}
+          setForm={setCreateForm}
+          onSubmit={handleCreate}
+        />
+      )}
+      {openEdit && (
+        <Modal
+          title="Cập Nhật Hóa Đơn"
+          onClose={() => setOpenEdit(false)}
+          form={editForm}
+          setForm={setEditForm}
+          onSubmit={handleUpdate}
+          readonlyDate={formatVNDateTime(editForm.createdAt)}
+        />
+      )}
     </div>
   );
 }
+
+/* ---------- reusable Modal component ---------- */
+const Modal = ({ title, onClose, form, setForm, onSubmit, readonlyDate }) => (
+  <div style={backdrop} onClick={onClose}>
+    <div style={modal} onClick={(e) => e.stopPropagation()}>
+      <div style={modalHeader}>
+        <div style={{ fontWeight: 700 }}>{title}</div>
+        <button style={closeX} onClick={onClose}>
+          ×
+        </button>
+      </div>
+
+      <div style={{ padding: "18px 20px", display: "grid", gap: 14 }}>
+        <Field label="Tên:">
+          <input
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            style={input}
+          />
+        </Field>
+
+        {readonlyDate && (
+          <Field label="Ngày tạo:">
+            <input value={readonlyDate} style={input} disabled />
+          </Field>
+        )}
+
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+        >
+          <Field label="Loại:">
+            <select
+              value={form.category}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, category: e.target.value }))
+              }
+              style={select}
+            >
+              {CATEGORY_OPTS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Thời gian:">
+            <select
+              value={form.period}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, period: e.target.value }))
+              }
+              style={select}
+            >
+              {PERIOD_OPTS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </div>
+
+      <div style={modalFooter}>
+        <button style={pill("#9CA3AF", "#fff")} onClick={onClose}>
+          Đóng
+        </button>
+        <button style={pill("#1E40AF", "#fff")} onClick={onSubmit}>
+          {title.includes("Tạo") ? "Tạo" : "Cập Nhật"}
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 /* ---------- styles ---------- */
 const tab = (active) => ({
@@ -579,8 +424,6 @@ const chip = (bg, fg) => ({
   cursor: "pointer",
   fontWeight: 700,
 });
-
-// Modal styles
 const backdrop = {
   position: "fixed",
   inset: 0,

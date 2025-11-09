@@ -35,15 +35,20 @@ export default function Header() {
   const displayName = user?.full_name || user?.name || user?.email || "bạn";
 
   const handleLogout = async () => {
-   try {
-  await apiLogout();
-} catch (err) {
-  console.warn("Logout API failed:", err);
-} finally {
-  ["sami:access", "sami:refresh", "sami:user", "accessToken", "refreshToken"]
-    .forEach((k) => localStorage.removeItem(k));
-  navigate("/login", { replace: true });
-} 
+    try {
+      await apiLogout();
+    } catch (err) {
+      console.warn("Logout API failed:", err);
+    } finally {
+      [
+        "sami:access",
+        "sami:refresh",
+        "sami:user",
+        "accessToken",
+        "refreshToken",
+      ].forEach((k) => localStorage.removeItem(k));
+      navigate("/login", { replace: true });
+    }
   };
 
   return (

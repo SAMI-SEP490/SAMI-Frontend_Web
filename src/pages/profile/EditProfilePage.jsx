@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Headers from "../../components/Header";
-import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { Form, Button, Alert, Image } from "react-bootstrap";
 import { getProfile, updateProfile } from "../../services/api/auth";
@@ -24,7 +22,7 @@ export default function EditProfilePage() {
     id: "",
     full_name: "",
     birthday: "",
-    gender: "Nam", // UI: Nam|Nữ|Khác
+    gender: "Nam",
     email: "",
     phone: "",
     avatar_url: "",
@@ -68,7 +66,7 @@ export default function EditProfilePage() {
     try {
       setSaving(true);
       setMessage("");
-      await updateProfile(form); // form.gender sẽ được map -> 'Male|Female|Other' ở service
+      await updateProfile(form);
       setVariant("success");
       setMessage("Cập nhật hồ sơ thành công!");
       setTimeout(() => navigate("/profile"), 800);
@@ -86,142 +84,118 @@ export default function EditProfilePage() {
 
   return (
     <div
-      style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+      style={{
+        minHeight: "100vh",
+        padding: "40px 20px",
+        background: colors.background,
+        display: "flex",
+        justifyContent: "center",
+      }}
     >
       <div
-        style={{ marginBottom: 10, position: "sticky", top: 0, zIndex: 1000 }}
+        style={{
+          width: "60%",
+          background: "#fff",
+          borderRadius: 10,
+          padding: 30,
+          boxShadow: "0 2px 6px rgba(0,0,0,.1)",
+        }}
       >
-        <Headers />
-      </div>
-      <div style={{ flex: 1, display: "flex", overflow: "auto" }}>
-        <div
-          style={{
-            width: 220,
-            backgroundColor: colors.brand,
-            color: "#fff",
-            borderRadius: 10,
-          }}
-        >
-          <Sidebar />
-        </div>
+        <h4 style={{ textAlign: "center", color: colors.brand }}>
+          Chỉnh sửa hồ sơ
+        </h4>
 
-        <div
-          style={{
-            flex: 1,
-            background: colors.background,
-            display: "flex",
-            justifyContent: "center",
-            padding: "40px 20px",
-          }}
-        >
+        {message && <Alert variant={variant}>{message}</Alert>}
+
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
           <div
             style={{
-              width: "60%",
+              width: 120,
+              height: 120,
+              margin: "0 auto",
+              borderRadius: "50%",
               background: "#fff",
-              borderRadius: 10,
-              padding: 30,
-              boxShadow: "0 2px 6px rgba(0,0,0,.1)",
+              border: "1px solid #E5E7EB",
+              overflow: "hidden",
             }}
           >
-            <h4 style={{ textAlign: "center", color: colors.brand }}>
-              Chỉnh sửa hồ sơ
-            </h4>
-
-            {message && <Alert variant={variant}>{message}</Alert>}
-
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <div
-                style={{
-                  width: 120,
-                  height: 120,
-                  margin: "0 auto",
-                  borderRadius: "50%",
-                  background: "#fff",
-                  border: "1px solid #E5E7EB",
-                  overflow: "hidden",
-                }}
-              >
-                {form.avatar_url ? (
-                  <Image
-                    src={form.avatar_url}
-                    roundedCircle
-                    style={{ width: 120, height: 120, objectFit: "cover" }}
-                  />
-                ) : null}
-              </div>
-              <div>
-                <Button
-                  variant="link"
-                  onClick={() => alert("Upload avatar sẽ thêm sau.")}
-                >
-                  <i className="bi bi-camera"></i> Đổi ảnh
-                </Button>
-              </div>
-            </div>
-
-            <Section title="Thông tin cơ bản">
-              <Form.Group className="mb-3">
-                <Form.Label>Tên</Form.Label>
-                <Form.Control
-                  value={form.full_name}
-                  onChange={onChange("full_name")}
-                />
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Ngày sinh</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={form.birthday}
-                  onChange={onChange("birthday")}
-                />
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Giới tính</Form.Label>
-                <Gender
-                  value={form.gender}
-                  onChange={(v) => setForm((f) => ({ ...f, gender: v }))}
-                />
-              </Form.Group>
-            </Section>
-
-            <div style={{ height: 20 }} />
-
-            <Section title="Thông tin liên hệ">
-              <Form.Group className="mb-3">
-                <Form.Label>Email</Form.Label>
-                <Form.Control
-                  type="email"
-                  value={form.email}
-                  onChange={onChange("email")}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Số điện thoại</Form.Label>
-                <Form.Control value={form.phone} onChange={onChange("phone")} />
-              </Form.Group>
-            </Section>
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: 20,
-                marginTop: 25,
-              }}
-            >
-              <Button
-                variant="outline-secondary"
-                onClick={() => navigate("/profile")}
-              >
-                Quay lại
-              </Button>
-              <Button variant="primary" onClick={onSave} disabled={saving}>
-                {saving ? "Đang lưu..." : "Lưu"}
-              </Button>
-            </div>
+            {form.avatar_url ? (
+              <Image
+                src={form.avatar_url}
+                roundedCircle
+                style={{ width: 120, height: 120, objectFit: "cover" }}
+              />
+            ) : null}
           </div>
+          <div>
+            <Button
+              variant="link"
+              onClick={() => alert("Upload avatar sẽ thêm sau.")}
+            >
+              <i className="bi bi-camera"></i> Đổi ảnh
+            </Button>
+          </div>
+        </div>
+
+        <Section title="Thông tin cơ bản">
+          <Form.Group className="mb-3">
+            <Form.Label>Tên</Form.Label>
+            <Form.Control
+              value={form.full_name}
+              onChange={onChange("full_name")}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Ngày sinh</Form.Label>
+            <Form.Control
+              type="date"
+              value={form.birthday}
+              onChange={onChange("birthday")}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Giới tính</Form.Label>
+            <Gender
+              value={form.gender}
+              onChange={(v) => setForm((f) => ({ ...f, gender: v }))}
+            />
+          </Form.Group>
+        </Section>
+
+        <Section title="Thông tin liên hệ">
+          <Form.Group className="mb-3">
+            <Form.Label>Email</Form.Label>
+            <Form.Control
+              type="email"
+              value={form.email}
+              onChange={onChange("email")}
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Số điện thoại</Form.Label>
+            <Form.Control value={form.phone} onChange={onChange("phone")} />
+          </Form.Group>
+        </Section>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 20,
+            marginTop: 25,
+          }}
+        >
+          <Button
+            variant="outline-secondary"
+            onClick={() => navigate("/profile")}
+          >
+            Quay lại
+          </Button>
+          <Button variant="primary" onClick={onSave} disabled={saving}>
+            {saving ? "Đang lưu..." : "Lưu"}
+          </Button>
         </div>
       </div>
     </div>

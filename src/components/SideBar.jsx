@@ -23,7 +23,7 @@ const SideBar = () => {
         left: 0,
       }}
     >
-      <h3 style={{ margin: 0, marginBottom: 8, fontWeight: 800 }}>SAMI</h3>
+      {/* <h3 style={{ margin: 0, marginBottom: 8, fontWeight: 800 }}>SAMI</h3> */}
 
       <button onClick={() => navigate("/contracts")} style={buttonStyle}>
         Danh sách hợp đồng
@@ -52,7 +52,6 @@ const SideBar = () => {
         Danh sách bảo trì
       </button>
 
-
       {/* ===== Floor plan (mới) ===== */}
       <div style={{ marginTop: 6, opacity: 0.8, fontSize: 12 }}>Sơ đồ tầng</div>
       <button onClick={() => navigate("/floorplan/view")} style={buttonStyle}>
@@ -61,7 +60,6 @@ const SideBar = () => {
       <button onClick={() => navigate("/floorplan/create")} style={buttonStyle}>
         Tạo/Chỉnh sửa sơ đồ
       </button>
-
 
       <button
         onClick={() => navigate("/dashboard/tenant-aggregates")}

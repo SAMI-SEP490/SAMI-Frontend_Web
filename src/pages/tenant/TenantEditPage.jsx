@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Header from "../../components/Header";
-import SideBar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { getUserById, updateUser } from "../../services/api/users";
 
@@ -9,7 +7,6 @@ import { getUserById, updateUser } from "../../services/api/users";
 function toInputDate(v) {
   if (!v) return "";
   const s = String(v);
-  // '2003-05-07T00:00:00.000Z' -> '2003-05-07'
   const base = s.includes("T") ? s.split("T")[0] : s;
   if (/^\d{4}-\d{2}-\d{2}$/.test(base)) return base;
   const d = new Date(s);
@@ -42,20 +39,18 @@ export default function TenantEditPage() {
       try {
         setLoading(true);
         setErr(null);
-        const data = await getUserById(id);
+        const u = await getUserById(id);
         if (!mounted) return;
-        const u = data;
-        setForm((f) => ({
-          ...f,
+        setForm({
           id: u?.user_id ?? u?.id ?? id,
           full_name: u?.full_name ?? u?.fullName ?? "",
           phone: u?.phone ?? "",
           email: u?.email ?? "",
-          birthday: toInputDate(u?.birthday), // ✅ chuẩn hoá vào input date
+          birthday: toInputDate(u?.birthday),
           gender: u?.gender ?? "Nam",
           avatar_url: u?.avatar_url ?? "",
           avatar_preview: u?.avatar_url ?? "",
-        }));
+        });
       } catch (e) {
         setErr(e?.response?.data?.message || e?.message || "Load failed");
       } finally {
@@ -79,7 +74,6 @@ export default function TenantEditPage() {
         full_name: form.full_name,
         phone: form.phone,
         email: form.email,
-        // Gửi đúng định dạng 'YYYY-MM-DD' (BE sẽ tự parse, không có giờ)
         birthday: form.birthday,
         gender: form.gender,
       });
@@ -95,149 +89,126 @@ export default function TenantEditPage() {
   if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <Header />
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        background: colors.background,
+        padding: "36px 20px 56px",
+      }}
+    >
+      <form
+        onSubmit={onSubmit}
+        style={{
+          width: 760,
+          background: "#fff",
+          borderRadius: 10,
+          boxShadow: "0 6px 16px rgba(0,0,0,.08)",
+          overflow: "hidden",
+        }}
+      >
         <div
           style={{
-            width: 220,
             background: colors.brand,
             color: "#fff",
-            borderRadius: 10,
+            padding: "10px 16px",
+            fontWeight: 700,
           }}
         >
-          <SideBar />
+          Thông tin người dùng
+        </div>
+
+        <div style={{ padding: 20 }}>
+          <Field label="ID">
+            <input value={form.id} disabled style={input} />
+          </Field>
+
+          <Field label="Tên người dùng">
+            <input
+              value={form.full_name}
+              onChange={onChange("full_name")}
+              style={input}
+            />
+          </Field>
+
+          <Field label="SDT">
+            <input
+              value={form.phone}
+              onChange={onChange("phone")}
+              style={input}
+            />
+          </Field>
+
+          <Field label="Email">
+            <input
+              value={form.email}
+              onChange={onChange("email")}
+              style={input}
+            />
+          </Field>
+
+          <Field label="Ngày sinh">
+            <input
+              type="date"
+              value={form.birthday}
+              onChange={onChange("birthday")}
+              style={input}
+            />
+          </Field>
+
+          <Field label="Giới tính">
+            <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+              {["Nam", "Nữ", "Khác"].map((g) => (
+                <label
+                  key={g}
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <input
+                    type="radio"
+                    name="gender"
+                    value={g}
+                    checked={form.gender === g}
+                    onChange={onChange("gender")}
+                  />
+                  {g}
+                </label>
+              ))}
+            </div>
+          </Field>
         </div>
 
         <div
           style={{
-            flex: 1,
-            background: colors.background,
             display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            padding: "28px 16px 56px",
-            overflowY: "auto",
+            justifyContent: "space-between",
+            padding: 16,
           }}
         >
-          <form
-            onSubmit={onSubmit}
-            style={{
-              width: 760,
-              background: "#fff",
-              borderRadius: 10,
-              boxShadow: "0 6px 16px rgba(0,0,0,.08)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                background: colors.brand,
-                color: "#fff",
-                padding: "10px 16px",
-                fontWeight: 700,
-              }}
-            >
-              Thông tin người dùng
-            </div>
-
-            <div style={{ padding: 20 }}>
-              <Field label="ID">
-                <input value={form.id} disabled style={input} />
-              </Field>
-
-              <Field label="Tên người dùng">
-                <input
-                  value={form.full_name}
-                  onChange={onChange("full_name")}
-                  style={input}
-                />
-              </Field>
-
-              <Field label="SDT">
-                <input
-                  value={form.phone}
-                  onChange={onChange("phone")}
-                  style={input}
-                />
-              </Field>
-
-              <Field label="Email">
-                <input
-                  value={form.email}
-                  onChange={onChange("email")}
-                  style={input}
-                />
-              </Field>
-
-              {/* ✅ input date (không giờ) */}
-              <Field label="Ngày sinh">
-                <input
-                  type="date"
-                  value={form.birthday}
-                  onChange={onChange("birthday")}
-                  style={input}
-                />
-              </Field>
-
-              <Field label="Giới tính">
-                <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
-                  {["Nam", "Nữ", "Khác"].map((g) => (
-                    <label
-                      key={g}
-                      style={{ display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                      <input
-                        type="radio"
-                        name="gender"
-                        value={g}
-                        checked={form.gender === g}
-                        onChange={onChange("gender")}
-                      />
-                      {g}
-                    </label>
-                  ))}
-                </div>
-              </Field>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: 16,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                style={btnGhost}
-              >
-                Quay lại
-              </button>
-              <button type="submit" disabled={saving} style={btnPrimary}>
-                {saving ? "Đang lưu..." : "Xác nhận"}
-              </button>
-            </div>
-          </form>
-
-          {err ? (
-            <div
-              style={{
-                width: 760,
-                marginTop: 12,
-                border: "1px solid #fecaca",
-                background: "#fee2e2",
-                color: "#b91c1c",
-                borderRadius: 10,
-                padding: 12,
-              }}
-            >
-              {String(err)}
-            </div>
-          ) : null}
+          <button type="button" onClick={() => navigate(-1)} style={btnGhost}>
+            Quay lại
+          </button>
+          <button type="submit" disabled={saving} style={btnPrimary}>
+            {saving ? "Đang lưu..." : "Xác nhận"}
+          </button>
         </div>
-      </div>
+      </form>
+
+      {err && (
+        <div
+          style={{
+            width: 760,
+            marginTop: 12,
+            border: "1px solid #fecaca",
+            background: "#fee2e2",
+            color: "#b91c1c",
+            borderRadius: 10,
+            padding: 12,
+          }}
+        >
+          {String(err)}
+        </div>
+      )}
     </div>
   );
 }
@@ -276,6 +247,7 @@ const btnPrimary = {
   fontWeight: 700,
   cursor: "pointer",
 };
+
 const btnGhost = {
   background: "transparent",
   border: "none",

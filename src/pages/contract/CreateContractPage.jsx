@@ -1,7 +1,5 @@
 // src/pages/contract/CreateContractPage.jsx
 import React, { useEffect, useState } from "react";
-import Sidebar from "../../components/SideBar";
-import Header from "../../components/Header";
 import { useNavigate } from "react-router-dom";
 import { createContract } from "../../services/api/contracts";
 import { listRoomsLite } from "../../services/api/rooms";
@@ -10,7 +8,6 @@ import { listTenantsByRoom } from "../../services/api/tenants";
 export default function CreateContractPage() {
   const nav = useNavigate();
   const [saving, setSaving] = useState(false);
-
   const [form, setForm] = useState({
     roomId: "",
     tenantUserId: "",
@@ -23,13 +20,11 @@ export default function CreateContractPage() {
     file: null,
   });
 
-  // dữ liệu cho dropdown
   const [rooms, setRooms] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [loadingTenants, setLoadingTenants] = useState(false);
 
-  // load phòng khi mở trang
   useEffect(() => {
     (async () => {
       setLoadingRooms(true);
@@ -42,7 +37,6 @@ export default function CreateContractPage() {
     })();
   }, []);
 
-  // đổi phòng -> xoá chọn tenant + fetch tenants theo phòng
   const onRoomChange = async (e) => {
     const roomId = e.target.value;
     setForm((f) => ({ ...f, roomId, tenantUserId: "" }));
@@ -98,24 +92,16 @@ export default function CreateContractPage() {
   return (
     <div className="create-contract-page">
       <style>{`
-        .create-contract-page {
-          display: flex;
-          min-height: 100vh;
-          background: #F8FAFC;
-          color: #0f172a;
-        }
-        .content-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-        .container { width: 100%; padding: 20px 24px 40px; box-sizing: border-box; }
-        .page-title { font-size: 28px; line-height: 1.2; font-weight: 700; margin: 12px 0 16px; text-align: center; }
-        .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
+        .create-contract-page { padding: 24px 32px; background: #F8FAFC; min-height: calc(100vh - 80px); color: #0f172a; box-sizing: border-box; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .page-title { font-size: 28px; font-weight: 700; text-align: center; margin-bottom: 20px; }
+        .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
         .form-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
         @media (min-width: 1100px) { .form-grid { grid-template-columns: 1fr 1fr; } }
         .field { display: flex; flex-direction: column; gap: 6px; }
         .field.full { grid-column: 1 / -1; }
         .label { font-size: 13px; color: #475569; }
-        input[type="text"], input[type="date"], input[type="number"], select, textarea {
-          width: 100%; height: 38px; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 10px; outline: none; font-size: 14px; box-sizing: border-box; background: #fff;
-        }
+        input, select, textarea { width: 100%; height: 38px; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 10px; outline: none; font-size: 14px; box-sizing: border-box; background: #fff; }
         textarea { min-height: 92px; padding: 10px; }
         input:focus, select:focus, textarea:focus { border-color: #0EA5E9; box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
         .actions { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
@@ -128,163 +114,149 @@ export default function CreateContractPage() {
         .hint { font-size: 12px; color: #64748B; }
       `}</style>
 
-      <Sidebar />
+      <div className="container">
+        <h1 className="page-title">Tạo hợp đồng mới</h1>
 
-      <div className="content-col">
-        <Header />
-
-        <div className="container">
-          <h1 className="page-title">Tạo hợp đồng mới</h1>
-
-          <form className="card" onSubmit={onSubmit}>
-            <div className="form-grid">
-              {/* PHÒNG */}
-              <div className="field">
-                <label className="label">Phòng *</label>
-                <select
-                  name="roomId"
-                  value={form.roomId}
-                  onChange={onRoomChange}
-                  disabled={loadingRooms}
-                  required
-                >
-                  <option value="">
-                    {loadingRooms
-                      ? "Đang tải danh sách phòng..."
-                      : "Chọn phòng"}
+        <form className="card" onSubmit={onSubmit}>
+          <div className="form-grid">
+            <div className="field">
+              <label className="label">Phòng *</label>
+              <select
+                name="roomId"
+                value={form.roomId}
+                onChange={onRoomChange}
+                disabled={loadingRooms}
+                required
+              >
+                <option value="">
+                  {loadingRooms ? "Đang tải danh sách phòng..." : "Chọn phòng"}
+                </option>
+                {rooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label}
+                    {r.floor != null ? ` (Tầng ${r.floor})` : ""}
                   </option>
-                  {rooms.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.label}
-                      {r.floor != null ? ` (Tầng ${r.floor})` : ""}
-                    </option>
-                  ))}
-                </select>
-                {!loadingRooms && rooms.length === 0 && (
-                  <div className="hint">Không có phòng nào khả dụng.</div>
+                ))}
+              </select>
+              {!loadingRooms && rooms.length === 0 && (
+                <div className="hint">Không có phòng nào khả dụng.</div>
+              )}
+            </div>
+
+            <div className="field">
+              <label className="label">Người thuê *</label>
+              <select
+                name="tenantUserId"
+                value={form.tenantUserId}
+                onChange={onChange}
+                disabled={!form.roomId || loadingTenants}
+                required
+              >
+                {!form.roomId ? (
+                  <option value="">Chọn phòng trước</option>
+                ) : loadingTenants ? (
+                  <option value="">Đang tải người thuê...</option>
+                ) : tenants.length ? (
+                  <>
+                    <option value="">Chọn người thuê</option>
+                    {tenants.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                        {t.phone ? ` (${t.phone})` : ""}
+                      </option>
+                    ))}
+                  </>
+                ) : (
+                  <option value="">Phòng chưa có người thuê</option>
                 )}
-              </div>
+              </select>
+            </div>
 
-              {/* NGƯỜI THUÊ (phụ thuộc PHÒNG) */}
-              <div className="field">
-                <label className="label">Người thuê *</label>
-                <select
-                  name="tenantUserId"
-                  value={form.tenantUserId}
-                  onChange={onChange}
-                  disabled={!form.roomId || loadingTenants}
-                  required
-                >
-                  {!form.roomId ? (
-                    <option value="">Chọn phòng trước</option>
-                  ) : loadingTenants ? (
-                    <option value="">Đang tải người thuê...</option>
-                  ) : tenants.length ? (
-                    <>
-                      <option value="">Chọn người thuê</option>
-                      {tenants.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                          {t.phone ? ` (${t.phone})` : ""}
-                        </option>
-                      ))}
-                    </>
-                  ) : (
-                    <option value="">Phòng chưa có người thuê</option>
-                  )}
-                </select>
-              </div>
+            <div className="field">
+              <label className="label">Ngày bắt đầu *</label>
+              <input
+                name="startDate"
+                type="date"
+                value={form.startDate}
+                onChange={onChange}
+                required
+              />
+            </div>
 
-              <div className="field">
-                <label className="label">Ngày bắt đầu *</label>
-                <input
-                  name="startDate"
-                  type="date"
-                  value={form.startDate}
-                  onChange={onChange}
-                  required
-                />
-              </div>
+            <div className="field">
+              <label className="label">Ngày kết thúc *</label>
+              <input
+                name="endDate"
+                type="date"
+                value={form.endDate}
+                onChange={onChange}
+                required
+              />
+            </div>
 
-              <div className="field">
-                <label className="label">Ngày kết thúc *</label>
-                <input
-                  name="endDate"
-                  type="date"
-                  value={form.endDate}
-                  onChange={onChange}
-                  required
-                />
-              </div>
+            <div className="field">
+              <label className="label">Tiền thuê</label>
+              <input
+                name="rentAmount"
+                type="number"
+                min="0"
+                value={form.rentAmount}
+                onChange={onChange}
+              />
+            </div>
 
-              <div className="field">
-                <label className="label">Tiền thuê</label>
-                <input
-                  name="rentAmount"
-                  type="number"
-                  min="0"
-                  value={form.rentAmount}
-                  onChange={onChange}
-                />
-              </div>
+            <div className="field">
+              <label className="label">Tiền cọc</label>
+              <input
+                name="depositAmount"
+                type="number"
+                min="0"
+                value={form.depositAmount}
+                onChange={onChange}
+              />
+            </div>
 
-              <div className="field">
-                <label className="label">Tiền cọc</label>
-                <input
-                  name="depositAmount"
-                  type="number"
-                  min="0"
-                  value={form.depositAmount}
-                  onChange={onChange}
-                />
-              </div>
-
-              <div className="field">
-                <label className="label">Trạng thái</label>
-                <select name="status" value={form.status} onChange={onChange}>
-                  <option value="pending">pending</option>
-                  <option value="active">active</option>
-                  <option value="terminated">terminated</option>
-                </select>
-                <div className="hint">
-                  Mặc định “pending” để đúng luồng duyệt trước khi kích hoạt.
-                </div>
-              </div>
-
-              <div className="field full">
-                <label className="label">Ghi chú</label>
-                <textarea name="note" value={form.note} onChange={onChange} />
-              </div>
-
-              <div className="field full">
-                <label className="label">File hợp đồng (PDF)</label>
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  name="file"
-                  onChange={onChange}
-                />
+            <div className="field">
+              <label className="label">Trạng thái</label>
+              <select name="status" value={form.status} onChange={onChange}>
+                <option value="pending">pending</option>
+                <option value="active">active</option>
+                <option value="terminated">terminated</option>
+              </select>
+              <div className="hint">
+                Mặc định “pending” để đúng luồng duyệt trước khi kích hoạt.
               </div>
             </div>
 
-            <div className="actions">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => nav("/contracts")}
-              >
-                Huỷ
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={saving}
-              >
-                {saving ? "Đang lưu..." : "Tạo hợp đồng"}
-              </button>
+            <div className="field full">
+              <label className="label">Ghi chú</label>
+              <textarea name="note" value={form.note} onChange={onChange} />
             </div>
-          </form>
-        </div>
+
+            <div className="field full">
+              <label className="label">File hợp đồng (PDF)</label>
+              <input
+                type="file"
+                accept="application/pdf"
+                name="file"
+                onChange={onChange}
+              />
+            </div>
+          </div>
+
+          <div className="actions">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => nav("/contracts")}
+            >
+              Huỷ
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Đang lưu..." : "Tạo hợp đồng"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

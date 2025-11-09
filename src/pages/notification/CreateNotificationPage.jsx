@@ -1,7 +1,5 @@
 import React, { useContext, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Header from "../../components/Header";
-import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { NotificationContext } from "../../contexts/NotificationContext";
 
@@ -90,233 +88,199 @@ export default function EditNotificationPage() {
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Header */}
-      <div
-        style={{
-          marginBottom: 10,
-          borderRadius: "10px",
-          flexShrink: 0,
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
-        }}
-      >
-        <Header />
-      </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: colors.background,
+        padding: "24px",
+        overflowY: "auto",
+      }}
+    >
+      <h2 style={{ fontWeight: 700, marginBottom: 16 }}>
+        Chỉnh sửa quy định / Thông báo
+      </h2>
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Sidebar */}
-        <div
-          style={{
-            width: "220px",
-            backgroundColor: colors.brand,
-            color: "white",
-            height: "100%",
-            position: "sticky",
-            top: 0,
-            borderRadius: "10px",
-          }}
-        >
-          <Sidebar />
+      <form
+        style={{
+          background: "#fff",
+          padding: 20,
+          borderRadius: 10,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        }}
+        onSubmit={(e) => e.preventDefault()}
+      >
+        {/* Code + Title */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+          <div style={{ flex: 1 }}>
+            <label>Mã quy định</label>
+            <input
+              name="code"
+              value={formData.code}
+              onChange={handleChange}
+              type="text"
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ flex: 3 }}>
+            <label>Tiêu đề quy định</label>
+            <input
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              type="text"
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        {/* Category + Dates */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+          <div style={{ flex: 1 }}>
+            <label>Danh mục</label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              style={inputStyle}
+            >
+              <option value="">-- Chọn danh mục --</option>
+              <option value="Thông báo chung">Thông báo chung</option>
+              <option value="Quy định">Quy định</option>
+              <option value="Bảo trì">Bảo trì</option>
+            </select>
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <label>Ngày hiệu lực</label>
+            <input
+              name="effectiveDate"
+              value={formData.effectiveDate}
+              onChange={handleChange}
+              type="date"
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <label>Ngày hết hạn</label>
+            <input
+              name="expiryDate"
+              value={formData.expiryDate}
+              onChange={handleChange}
+              type="date"
+              style={inputStyle}
+            />
+          </div>
         </div>
 
         {/* Content */}
+        <div style={{ marginBottom: 12 }}>
+          <label>Nội dung quy định</label>
+          <textarea
+            name="content"
+            value={formData.content}
+            onChange={handleChange}
+            rows="8"
+            style={{ ...inputStyle, resize: "vertical" }}
+          />
+        </div>
+
+        {/* Building + Attachment */}
         <div
           style={{
-            flex: 1,
-            background: colors.background,
-            padding: "24px",
-            overflowY: "auto",
+            display: "flex",
+            gap: 16,
+            alignItems: "flex-end",
+            marginBottom: 12,
           }}
         >
-          <h2 style={{ fontWeight: 700, marginBottom: 16 }}>
-            Chỉnh sửa quy định / Thông báo
-          </h2>
-
-          <form
-            style={{
-              background: "#fff",
-              padding: 20,
-              borderRadius: 10,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-            }}
-            onSubmit={(e) => e.preventDefault()}
-          >
-            {/* Code + Title */}
-            <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
-              <div style={{ flex: 1 }}>
-                <label>Mã quy định</label>
-                <input
-                  name="code"
-                  value={formData.code}
-                  onChange={handleChange}
-                  type="text"
-                  style={inputStyle}
-                />
-              </div>
-
-              <div style={{ flex: 3 }}>
-                <label>Tiêu đề quy định</label>
-                <input
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  type="text"
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-
-            {/* Category + Dates */}
-            <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
-              <div style={{ flex: 1 }}>
-                <label>Danh mục</label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  style={inputStyle}
-                >
-                  <option value="">-- Chọn danh mục --</option>
-                  <option value="Thông báo chung">Thông báo chung</option>
-                  <option value="Quy định">Quy định</option>
-                  <option value="Bảo trì">Bảo trì</option>
-                </select>
-              </div>
-
-              <div style={{ flex: 1 }}>
-                <label>Ngày hiệu lực</label>
-                <input
-                  name="effectiveDate"
-                  value={formData.effectiveDate}
-                  onChange={handleChange}
-                  type="date"
-                  style={inputStyle}
-                />
-              </div>
-
-              <div style={{ flex: 1 }}>
-                <label>Ngày hết hạn</label>
-                <input
-                  name="expiryDate"
-                  value={formData.expiryDate}
-                  onChange={handleChange}
-                  type="date"
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-
-            {/* Content */}
-            <div style={{ marginBottom: 12 }}>
-              <label>Nội dung quy định</label>
-              <textarea
-                name="content"
-                value={formData.content}
-                onChange={handleChange}
-                rows="8"
-                style={{ ...inputStyle, resize: "vertical" }}
-              />
-            </div>
-
-            {/* Building + Attachment */}
-            <div
-              style={{
-                display: "flex",
-                gap: 16,
-                alignItems: "flex-end",
-                marginBottom: 12,
-              }}
+          <div style={{ flex: 1 }}>
+            <label>Tòa nhà</label>
+            <select
+              name="building"
+              value={formData.building}
+              onChange={handleChange}
+              style={inputStyle}
             >
-              <div style={{ flex: 1 }}>
-                <label>Tòa nhà</label>
-                <select
-                  name="building"
-                  value={formData.building}
-                  onChange={handleChange}
-                  style={inputStyle}
-                >
-                  <option value="">-- Chọn tòa nhà --</option>
-                  <option value="Tòa A">Tòa A</option>
-                  <option value="Tòa B">Tòa B</option>
-                  <option value="Tòa C">Tòa C</option>
-                </select>
+              <option value="">-- Chọn tòa nhà --</option>
+              <option value="Tòa A">Tòa A</option>
+              <option value="Tòa B">Tòa B</option>
+              <option value="Tòa C">Tòa C</option>
+            </select>
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <label>Đính kèm</label>
+            <input
+              name="attachment"
+              type="file"
+              onChange={handleChange}
+              style={{ marginTop: 6 }}
+            />
+            {formData.attachmentName && (
+              <div style={{ marginTop: 8, color: "#374151" }}>
+                Tệp đã chọn: {formData.attachmentName}
               </div>
-
-              <div style={{ flex: 1 }}>
-                <label>Đính kèm</label>
-                <input
-                  name="attachment"
-                  type="file"
-                  onChange={handleChange}
-                  style={{ marginTop: 6 }}
-                />
-                {formData.attachmentName && (
-                  <div style={{ marginTop: 8, color: "#374151" }}>
-                    Tệp đã chọn: {formData.attachmentName}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 12,
-                marginTop: 16,
-              }}
-            >
-              <button
-                onClick={handleSaveDraft}
-                style={{
-                  background: "#0F172A",
-                  color: "#fff",
-                  padding: "8px 18px",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
-              >
-                Lưu bản nháp
-              </button>
-
-              <button
-                onClick={handleSend}
-                style={{
-                  background: "#0F3D8A",
-                  color: "#fff",
-                  padding: "8px 18px",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
-              >
-                Gửi
-              </button>
-
-              <button
-                onClick={handleCancel}
-                style={{
-                  background: "#E5E7EB",
-                  color: "#111827",
-                  padding: "8px 18px",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
-              >
-                Hủy
-              </button>
-            </div>
-          </form>
+            )}
+          </div>
         </div>
-      </div>
+
+        {/* Buttons */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 12,
+            marginTop: 16,
+          }}
+        >
+          <button
+            onClick={handleSaveDraft}
+            style={{
+              background: "#0F172A",
+              color: "#fff",
+              padding: "8px 18px",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Lưu bản nháp
+          </button>
+
+          <button
+            onClick={handleSend}
+            style={{
+              background: "#0F3D8A",
+              color: "#fff",
+              padding: "8px 18px",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Gửi
+          </button>
+
+          <button
+            onClick={handleCancel}
+            style={{
+              background: "#E5E7EB",
+              color: "#111827",
+              padding: "8px 18px",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Hủy
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

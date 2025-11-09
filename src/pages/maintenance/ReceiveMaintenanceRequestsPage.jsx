@@ -21,7 +21,8 @@ export default function ReceiveMaintenanceRequestsPage() {
             >
               <div>
                 <p>
-                  <b>Người thuê ID {req.tenant_user_id}</b> gửi thông báo bảo trì!
+                  <b>Người thuê ID {req.tenant_user_id}</b> gửi thông báo bảo
+                  trì!
                 </p>
                 <p>🕒 {new Date(req.created_at).toLocaleString()}</p>
                 <p>🏠 Phòng: {req.room_id}</p>

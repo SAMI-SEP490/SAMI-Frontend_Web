@@ -1,7 +1,5 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Header from "../../components/Header";
-import SideBar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import { useBillContext } from "../../contexts/BillContext";
 import { ROUTES } from "../../constants/routes";
@@ -27,7 +25,7 @@ export default function BillDetailPage() {
     );
   }
 
-  const createdAt = bill.createdAt ? new Date(bill.createdAt) : null; // có thể chưa có trong mock
+  const createdAt = bill.createdAt ? new Date(bill.createdAt) : null;
 
   const createdText = createdAt
     ? createdAt.toLocaleDateString("vi-VN") +
@@ -39,71 +37,45 @@ export default function BillDetailPage() {
     : "—";
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Header giữ nguyên */}
-      <Header />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: colors.background,
+        padding: 24,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "flex-start",
+      }}
+    >
+      {/* Card trung tâm */}
+      <div style={cardWrap}>
+        <div style={cardTitle}>Thông tin hóa đơn</div>
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {/* Sidebar trái */}
-        <div
-          style={{
-            width: 220,
-            background: colors.brand,
-            color: "#fff",
-            borderRadius: 10,
-          }}
-        >
-          <SideBar />
+        <div style={cardBody}>
+          <div style={row}>
+            <div style={cellLeft}>Tên:</div>
+            <div style={cellRight}>{bill.name}</div>
+
+            <div style={cellLeft}>Ngày tạo:</div>
+            <div style={cellRight}>{createdText}</div>
+          </div>
+
+          <div style={row}>
+            <div style={cellLeft}>Loại:</div>
+            <div style={cellRight}>{bill.category}</div>
+
+            <div style={cellLeft}>Thời gian:</div>
+            <div style={cellRight}>{bill.period}</div>
+          </div>
         </div>
 
-        {/* Nội dung */}
-        <div
-          style={{
-            flex: 1,
-            background: colors.background,
-            padding: 24,
-            overflow: "auto",
-          }}
-        >
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
-            <button onClick={() => navigate(ROUTES.tenants)} style={tab(false)}>
-              Người Thuê
-            </button>
-            <button style={tab(true)}>Hóa Đơn</button>
-          </div>
-
-          {/* Card trung tâm */}
-          <div style={cardWrap}>
-            <div style={cardTitle}>Thông tin hóa đơn</div>
-
-            <div style={cardBody}>
-              <div style={row}>
-                <div style={cellLeft}>Tên:</div>
-                <div style={cellRight}>{bill.name}</div>
-
-                <div style={cellLeft}>Ngày tạo:</div>
-                <div style={cellRight}>{createdText}</div>
-              </div>
-
-              <div style={row}>
-                <div style={cellLeft}>Loại:</div>
-                <div style={cellRight}>{bill.category}</div>
-
-                <div style={cellLeft}>Thời gian:</div>
-                <div style={cellRight}>{bill.period}</div>
-              </div>
-            </div>
-
-            <div style={{ textAlign: "right", padding: "12px 18px" }}>
-              <button
-                onClick={() => navigate(ROUTES.bills)}
-                style={chip("#6B7280", "#fff")}
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
+        <div style={{ textAlign: "right", padding: "12px 18px" }}>
+          <button
+            onClick={() => navigate(ROUTES.bills)}
+            style={chip("#6B7280", "#fff")}
+          >
+            Đóng
+          </button>
         </div>
       </div>
     </div>
@@ -111,19 +83,8 @@ export default function BillDetailPage() {
 }
 
 /* ------- styles ------- */
-const tab = (active) => ({
-  background: active ? "#1E40AF" : "#fff",
-  color: active ? "#fff" : "#111827",
-  padding: "8px 14px",
-  borderRadius: 10,
-  border: active ? "none" : "1px solid #E5E7EB",
-  fontWeight: 700,
-  cursor: active ? "default" : "pointer",
-});
-
 const cardWrap = {
   width: 720,
-  margin: "0 auto",
   background: "#fff",
   borderRadius: 16,
   boxShadow: "0 6px 18px rgba(0,0,0,.08)",

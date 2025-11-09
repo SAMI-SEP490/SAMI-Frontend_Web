@@ -23,7 +23,12 @@ const SideBar = () => {
         left: 0,
       }}
     >
-      <h3 style={{ margin: 0, marginBottom: 8, fontWeight: 800 }}>SAMI</h3>
+      {/* <h3 style={{ margin: 0, marginBottom: 8, fontWeight: 800 }}>SAMI</h3> */}
+      <div
+        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
+      >
+        Thống kê & Quản lý
+      </div>
 
       <button onClick={() => navigate("/contracts")} style={buttonStyle}>
         Danh sách hợp đồng
@@ -45,19 +50,16 @@ const SideBar = () => {
         Danh sách thông báo
       </button>
 
+      <button onClick={() => navigate("/regulations")} style={buttonStyle}>
+        Danh sách quy định
+      </button>
+
       <button
         onClick={() => navigate("/maintaince-requests")}
         style={buttonStyle}
       >
         Danh sách bảo trì
       </button>
-
-      {/* ===== Floor plan (mới) ===== */}
-      <div style={{ marginTop: 6, opacity: 0.8, fontSize: 12 }}>Sơ đồ tầng</div>
-      <button onClick={() => navigate("/floorplan/view")} style={buttonStyle}>
-        Xem sơ đồ tầng
-      </button>
-
       <button
         onClick={() => navigate("/dashboard/tenant-aggregates")}
         style={buttonStyle}
@@ -71,6 +73,12 @@ const SideBar = () => {
       >
         Thống kê tổng hợp tài chính
       </button>
+      <button
+        onClick={() => navigate("/vehicle-registrations")}
+        style={buttonStyle}
+      >
+        Danh sách đăng ký xe
+      </button>
 
       {/* ✅ Chỉ hiện khi role là OWNER */}
       {role === "OWNER" && (
@@ -78,6 +86,19 @@ const SideBar = () => {
           Danh sách tòa nhà
         </button>
       )}
+
+      {/* ===== Floor plan (mới) ===== */}
+      <div
+        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
+      >
+        Sơ đồ tòa nhà
+      </div>
+      <button onClick={() => navigate("/floorplan/view")} style={buttonStyle}>
+        Xem sơ đồ tầng
+      </button>
+      <button onClick={() => navigate("/floorplan/create")} style={buttonStyle}>
+        Tạo/Chỉnh sửa sơ đồ
+      </button>
     </div>
   );
 };

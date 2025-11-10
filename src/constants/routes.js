@@ -25,6 +25,7 @@ export const ROUTES = {
   // Bills
   bills: "/bills",
   billDetail: "/bills/:id",
+  createBill: "/bills/create",
 
   // Guests
   receiveGuestRegistration: "/receive-guest",

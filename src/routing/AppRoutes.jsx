@@ -35,6 +35,7 @@ import CreateContractPage from "../pages/contract/CreateContractPage";
 // ===== Bills =====
 import BillListPage from "../pages/bill/BillListPage";
 import BillDetailPage from "../pages/bill/BillDetailPage";
+import CreateBillPage from "../pages/bill/CreateBillPage";
 
 // ===== Guests =====
 import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistrationPage";
@@ -191,6 +192,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <BillListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.createBill} 
+          element={
+            <ProtectedRoute>
+              <CreateBillPage />
             </ProtectedRoute>
           }
         />

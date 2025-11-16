@@ -39,6 +39,7 @@ export const ROUTES = {
   regulations: "/regulations",
   editRegulation: "/regulations/:id/edit",
   createRegulation: "/regulations/create",
+  viewRegulation: "/regulations/:id/",
 
   // maintaince
   maintainceRequests: "/maintaince-requests",

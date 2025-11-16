@@ -1,85 +1,256 @@
-import React, { useContext, useState, useEffect } from "react";
-import { RegulationContext } from "@/contexts/RegulationContext";
-import { useParams, useNavigate } from "react-router-dom";
+// src/screens/regulation/EditRegulationPage.jsx
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  getRegulationById,
+  updateRegulation,
+} from "../../services/api/regulation";
+import { listBuildings } from "../../services/api/building";
+import { Button, Form, Alert, Spinner } from "react-bootstrap";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 export default function EditRegulationPage() {
-  const { id } = useParams();
   const navigate = useNavigate();
-  const { getRegulationById, updateRegulation } =
-    useContext(RegulationContext);
+  const { id } = useParams();
 
-  const [formData, setFormData] = useState(null);
+  // Form state
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [buildingId, setBuildingId] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState(null);
+  const [status, setStatus] = useState("draft");
+  const [target, setTarget] = useState("all");
+  const [note, setNote] = useState("");
 
+  // UI state
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [buildings, setBuildings] = useState([]);
+  const [loadingBuildings, setLoadingBuildings] = useState(false);
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // ===============================
+  // 📌 Load buildings
+  // ===============================
   useEffect(() => {
-    const reg = getRegulationById(parseInt(id));
-    if (reg) setFormData(reg);
-    else alert("Không tìm thấy quy định!");
+    async function fetchBuildings() {
+      try {
+        setLoadingBuildings(true);
+        const res = await listBuildings();
+        setBuildings(res || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingBuildings(false);
+      }
+    }
+    fetchBuildings();
+  }, []);
+
+  // ===============================
+  // 📌 Load regulation by ID
+  // ===============================
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const res = await getRegulationById(id);
+
+        setTitle(res.title || "");
+        setContent(res.content || "");
+        setBuildingId(res.building_id || "");
+        setEffectiveDate(
+          res.effective_date ? new Date(res.effective_date) : null
+        );
+        setStatus(res.status || "draft");
+        setTarget(res.target || "all");
+        setNote(res.note || "");
+      } catch (err) {
+        console.error(err);
+        setError("Không thể tải dữ liệu quy định.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
   }, [id]);
 
-  if (!formData) return <p className="p-6">Đang tải...</p>;
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = (e) => {
+  // ===============================
+  // 📌 Submit
+  // ===============================
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    updateRegulation(formData.regulation_id, formData);
-    alert("✅ Cập nhật thành công!");
-    navigate("/regulations");
+    setError("");
+    setSuccess("");
+
+    if (!title.trim()) {
+      setError("Tiêu đề không được để trống!");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateRegulation(id, {
+        title,
+        content,
+        building_id: buildingId ? Number(buildingId) : null,
+        effective_date: effectiveDate ? effectiveDate.toISOString() : null,
+        status,
+        target,
+        note,
+      });
+
+      setSuccess("Cập nhật quy định thành công!");
+      setTimeout(() => navigate("/regulations"), 1000);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err.response?.data?.message || "Có lỗi xảy ra khi cập nhật quy định."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
+  if (loading)
+    return (
+      <p className="p-6 text-center text-gray-500 text-lg">
+        Đang tải dữ liệu...
+      </p>
+    );
+
+  // ===============================
+  // 📌 UI Rendering
+  // ===============================
   return (
-    <div className="max-w-3xl mx-auto p-8 bg-white rounded-2xl shadow-md">
-      <h2 className="text-2xl font-bold text-blue-700 mb-6">✏️ Chỉnh sửa quy định</h2>
-      <form onSubmit={handleSave} className="space-y-5">
-        <div>
-          <label className="block font-medium mb-2">Tiêu đề *</label>
-          <input
+    <div className="max-w-3xl mx-auto mt-8 p-6 bg-white shadow-md rounded-lg">
+      <h2 className="text-2xl font-semibold mb-6">Chỉnh sửa Quy Định</h2>
+
+      {error && <Alert variant="danger">{error}</Alert>}
+      {success && <Alert variant="success">{success}</Alert>}
+
+      <Form onSubmit={handleSubmit}>
+        {/* Title */}
+        <Form.Group className="mb-4" controlId="formTitle">
+          <Form.Label>Tiêu đề *</Form.Label>
+          <Form.Control
             type="text"
-            name="title"
-            value={formData.title}
-            onChange={handleChange}
-            className="w-full border rounded-lg p-2"
+            placeholder="Nhập tiêu đề..."
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
           />
-        </div>
-        <div>
-          <label className="block font-medium mb-2">Nội dung *</label>
-          <textarea
-            name="content"
-            rows="4"
-            value={formData.content}
-            onChange={handleChange}
-            className="w-full border rounded-lg p-2"
+        </Form.Group>
+
+        {/* Content */}
+        <Form.Group className="mb-4" controlId="formContent">
+          <Form.Label>Nội dung</Form.Label>
+          <Form.Control
+            as="textarea"
+            rows={5}
+            placeholder="Nhập nội dung quy định..."
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
           />
-        </div>
-        <div>
-          <label className="block font-medium mb-2">Ngày hiệu lực *</label>
-          <input
-            type="date"
-            name="effective_date"
-            value={formData.effective_date}
-            onChange={handleChange}
-            className="border rounded-lg p-2 w-full"
-          />
-        </div>
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="px-5 py-2 bg-gray-300 rounded-lg"
+        </Form.Group>
+
+        {/* Building */}
+        <Form.Group className="mb-4" controlId="formBuilding">
+          <Form.Label>Tòa nhà áp dụng</Form.Label>
+          <Form.Select
+            value={buildingId}
+            onChange={(e) => setBuildingId(e.target.value)}
           >
-            Hủy
-          </button>
-          <button
+            <option value="">-- Không áp dụng tòa nhà --</option>
+
+            {loadingBuildings ? (
+              <option>Đang tải...</option>
+            ) : (
+              buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name || `Tòa nhà #${b.id}`}
+                </option>
+              ))
+            )}
+          </Form.Select>
+        </Form.Group>
+
+        {/* Effective Date */}
+        <Form.Group className="mb-4" controlId="formEffectiveDate">
+          <Form.Label>Ngày hiệu lực</Form.Label>
+          <DatePicker
+            selected={effectiveDate}
+            onChange={(date) => setEffectiveDate(date)}
+            dateFormat="yyyy-MM-dd"
+            className="form-control"
+            placeholderText="Chọn ngày hiệu lực..."
+          />
+        </Form.Group>
+
+        {/* Status */}
+        <Form.Group className="mb-4" controlId="formStatus">
+          <Form.Label>Trạng thái</Form.Label>
+          <Form.Select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="draft">Nháp</option>
+            <option value="archived">Lưu trữ</option>
+          </Form.Select>
+        </Form.Group>
+
+        {/* Target */}
+        <Form.Group className="mb-4" controlId="formTarget">
+          <Form.Label>Đối tượng áp dụng</Form.Label>
+          <Form.Select
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+          >
+            <option value="all">Tất cả</option>
+            <option value="management">Quản lý</option>
+            <option value="tenants">Khách thuê</option>
+          </Form.Select>
+        </Form.Group>
+
+        {/* Note */}
+        <Form.Group className="mb-4" controlId="formNote">
+          <Form.Label>Ghi chú</Form.Label>
+          <Form.Control
+            as="textarea"
+            rows={2}
+            placeholder="Nhập ghi chú (nếu có)..."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </Form.Group>
+
+        <div className="flex justify-between items-center mt-4">
+          {/* Back Button */}
+          <Button
+            variant="secondary"
+            className="px-5 py-2 rounded-lg"
+            onClick={() => navigate("/regulations")}
+          >
+            ← Trở về
+          </Button>
+
+          {/* Save Button */}
+          <Button
             type="submit"
-            className="px-5 py-2 bg-blue-600 text-white rounded-lg"
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-lg shadow-md transition"
+            disabled={saving}
           >
-            Lưu thay đổi
-          </button>
+            {saving ? (
+              <Spinner animation="border" size="sm" />
+            ) : (
+              "💾 Lưu thay đổi"
+            )}
+          </Button>
         </div>
-      </form>
+      </Form>
     </div>
   );
 }

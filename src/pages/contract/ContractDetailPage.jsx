@@ -1,21 +1,84 @@
-import React, { useContext } from "react";
+// src/pages/contract/ContractDetailPage.jsx
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ContractContext } from "../../contexts/ContractContext";
-import { UserContext } from "../../contexts/UserContext";
 import { Table, Button, Card } from "react-bootstrap";
 import { colors } from "../../constants/colors";
+
+import { getContract } from "../../services/api/contracts";
+import { listUsers } from "../../services/api/users";
+import { listAppendices } from "../../services/api/appendix"; // nếu bạn có API riêng
 
 export default function ContractDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { contractData, appendices } = useContext(ContractContext);
-  const { userData } = useContext(UserContext);
 
-  const contract = contractData.find((item) => String(item.id) === String(id));
-  const relatedAppendices = appendices.filter(
-    (a) => String(a.contractId) === String(id)
-  );
-  const tenant = userData.find((u) => u.id === contract?.tenantId);
+  const [contract, setContract] = useState(null);
+  const [tenant, setTenant] = useState(null);
+  const [appendices, setAppendices] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+
+  /** ===== FETCH DATA ===== */
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+
+        // 1. Lấy hợp đồng
+        const c = await getContract(id);
+        if (!c) {
+          setLoading(false);
+          return;
+        }
+
+        // Chuẩn hóa object (mapping API -> FE)
+        const mapped = {
+          id: c.contract_id,
+          room: c.room_number,
+          roomId: c.room_id,
+          tenantUserId: c.tenant_user_id,
+          tenantName: c.tenant_name,
+          tenantEmail: c.tenant_email,
+          startDate: c.start_date,
+          endDate: c.end_date,
+          rentAmount: c.rent_amount,
+          depositAmount: c.deposit_amount,
+          status: c.status,
+          hasFile: c.has_file,
+          note: c.note,
+        };
+
+        setContract(mapped);
+
+        // 2. Lấy thông tin tenant
+        const userList = await listUsers();
+        const foundTenant = userList?.items?.find(
+          (u) => Number(u.id) === Number(mapped.tenantUserId)
+        );
+        setTenant(foundTenant || null);
+
+        // 3. Lấy phụ lục
+        const apx = await listAppendices();
+        const filtered = apx.items.filter(
+          (a) => Number(a.contract_id) === Number(id)
+        );
+        setAppendices(filtered);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40 }}>
+        <h4>Đang tải...</h4>
+      </div>
+    );
+  }
 
   if (!contract) {
     return (
@@ -49,14 +112,12 @@ export default function ContractDetailPage() {
         overflowY: "auto",
       }}
     >
-      <h4 style={{ fontWeight: "600", marginBottom: "20px" }}>
-        Chi Tiết Hợp Đồng
-      </h4>
+      <h4 style={{ fontWeight: 600, marginBottom: 20 }}>Chi Tiết Hợp Đồng</h4>
 
-      {/* Thông tin hợp đồng */}
+      {/* ===== Thông tin hợp đồng ===== */}
       <Card
         style={{
-          marginBottom: "25px",
+          marginBottom: 25,
           border: "none",
           boxShadow: "0 0 5px rgba(0,0,0,0.1)",
         }}
@@ -65,7 +126,7 @@ export default function ContractDetailPage() {
           style={{
             backgroundColor: colors.brand,
             color: "white",
-            fontWeight: "500",
+            fontWeight: 500,
           }}
         >
           Thông tin hợp đồng
@@ -76,7 +137,7 @@ export default function ContractDetailPage() {
               <strong>Hợp đồng số:</strong> {contract.id}
             </div>
             <div className="col-md-6">
-              <strong>Tiền thuê tháng:</strong> {contract.monthlyRent} vnd
+              <strong>Tiền thuê tháng:</strong> {contract.rentAmount} vnd
             </div>
           </div>
 
@@ -85,13 +146,14 @@ export default function ContractDetailPage() {
               <strong>Tên người thuê:</strong>{" "}
               <span
                 style={{ color: colors.brand, cursor: "pointer" }}
-                onClick={() => navigate(`/tenants/${tenant?.id}`)}
+                onClick={() => navigate(`/tenants/${contract.tenantUserId}`)}
               >
-                {tenant?.full_name || "N/A"}
+                {contract.tenantName}
               </span>
             </div>
+
             <div className="col-md-6">
-              <strong>Tiền cọc:</strong> {contract.deposit} vnd
+              <strong>Tiền cọc:</strong> {contract.depositAmount ?? "0"} vnd
             </div>
           </div>
 
@@ -117,10 +179,10 @@ export default function ContractDetailPage() {
         </Card.Body>
       </Card>
 
-      {/* Phụ lục hợp đồng */}
+      {/* ===== Phụ lục hợp đồng ===== */}
       <Card
         style={{
-          marginBottom: "25px",
+          marginBottom: 25,
           border: "none",
           boxShadow: "0 0 5px rgba(0,0,0,0.1)",
         }}
@@ -129,13 +191,13 @@ export default function ContractDetailPage() {
           style={{
             backgroundColor: colors.brand,
             color: "white",
-            fontWeight: "500",
+            fontWeight: 500,
           }}
         >
           Phụ lục hợp đồng
         </Card.Header>
         <Card.Body>
-          {relatedAppendices.length > 0 ? (
+          {appendices.length > 0 ? (
             <Table bordered hover>
               <thead>
                 <tr>
@@ -147,13 +209,15 @@ export default function ContractDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {relatedAppendices.map((item) => (
+                {appendices.map((item) => (
                   <tr key={item.id}>
                     <td>{item.id}</td>
                     <td>{item.type}</td>
                     <td>{item.content}</td>
                     <td>
-                      {new Date(item.effectiveDate).toLocaleDateString("vi-VN")}
+                      {new Date(item.effective_date).toLocaleDateString(
+                        "vi-VN"
+                      )}
                     </td>
                     <td>{item.status}</td>
                   </tr>
@@ -166,10 +230,7 @@ export default function ContractDetailPage() {
 
           <div className="d-flex justify-content-end">
             <Button
-              style={{
-                backgroundColor: colors.brand,
-                border: "none",
-              }}
+              style={{ backgroundColor: colors.brand, border: "none" }}
               onClick={() => navigate(`/contracts/${id}/addendum`)}
             >
               Thêm phụ lục
@@ -178,7 +239,7 @@ export default function ContractDetailPage() {
         </Card.Body>
       </Card>
 
-      {/* Nút điều hướng */}
+      {/* ===== Buttons ===== */}
       <div className="d-flex justify-content-between mt-4">
         <Button
           variant="secondary"

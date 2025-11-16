@@ -20,7 +20,7 @@ export const ROUTES = {
   contracts: "/contracts",
   contractDetail: "/contracts/:id",
   contractAddendum: "/contracts/:id/addendum",
-  contractCreate: "/contracts/create",
+  createContract: "/contracts/create",
 
   // Bills
   bills: "/bills",

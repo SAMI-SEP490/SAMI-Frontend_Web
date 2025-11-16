@@ -63,12 +63,13 @@ import TenantAggregatesPage from "../pages/dashboard/TenantAggregatesPage";
 import ViewTimeBasedReportsPage from "../pages/dashboard/ViewTimeBasedReportsPage";
 
 // regulations
-import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
+import RegulationListPage from "../pages/regulation/RegulationListPage";
 import CreateRegulationPage from "../pages/regulation/CreateRegulationPage";
 import EditRegulationPage from "../pages/regulation/EditRegulationPage";
 
 // vehicle registrations
 import VehicleRegistrationListPage from "../pages/vehicle/VehicleRegistrationListPage";
+import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
 
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
@@ -196,7 +197,7 @@ export default function AppRoutes() {
           }
         />
         <Route
-          path={ROUTES.createBill} 
+          path={ROUTES.createBill}
           element={
             <ProtectedRoute>
               <CreateBillPage />
@@ -252,12 +253,12 @@ export default function AppRoutes() {
           path={ROUTES.regulations}
           element={
             <ProtectedRoute>
-              <ViewRegulationPage />
+              <RegulationListPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path={ROUTES.createRegutalion}
+          path={ROUTES.createRegulation}
           element={
             <ProtectedRoute>
               <CreateRegulationPage />
@@ -269,6 +270,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <EditRegulationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.viewRegulation}
+          element={
+            <ProtectedRoute>
+              <ViewRegulationPage />
             </ProtectedRoute>
           }
         />

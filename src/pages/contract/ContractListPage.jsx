@@ -8,6 +8,9 @@ import {
   downloadContractDirect,
 } from "../../services/api/contracts";
 
+import { listUsers } from "../../services/api/users";
+import { getAllTenants } from "../../services/api/tenants";
+
 export default function ContractListPage() {
   const nav = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -18,13 +21,21 @@ export default function ContractListPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [q, setQ] = useState("");
-
+  const [users, setUsers] = useState([]);
+  const [tenants, setTenants] = useState([]);
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
         const data = await listContracts();
         setRows(Array.isArray(data?.items) ? data.items : []);
+        console.log("Contracts:", data);
+        const users = await listUsers();
+        console.log("Users:", users);
+        const tenants = await getAllTenants();
+        console.log("Tenants:", tenants);
+        setUsers(Array.isArray(users?.items) ? users.items : []);
+        setTenants(Array.isArray(tenants?.items) ? tenants.items : []);
       } finally {
         setLoading(false);
       }
@@ -43,6 +54,16 @@ export default function ContractListPage() {
         e?.response?.data?.message || e?.message || "Xoá hợp đồng thất bại"
       );
     }
+  };
+
+  const getFullNameByTenantId = (tenantId) => {
+    if (!tenantId) return "-";
+
+    const tenant = tenants.find((t) => t.id == tenantId);
+    if (!tenant) return "-";
+
+    const user = users.find((u) => u.id == tenant.user_id);
+    return user?.full_name || "-";
   };
 
   const onDownload = async (id) => {
@@ -196,7 +217,7 @@ export default function ContractListPage() {
         <table>
           <thead>
             <tr>
-              <th>ID Hợp Đồng</th>
+              <th>ID</th>
               <th>Tên Người Thuê</th>
               <th>Số Phòng</th>
               <th>Ngày Bắt Đầu</th>
@@ -216,24 +237,24 @@ export default function ContractListPage() {
               </tr>
             ) : (
               rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.id}</td>
-                  <td>{r.tenant?.full_name || "-"}</td>
-                  <td>{r.room?.room_number || "-"}</td>
+                <tr key={r.contract_id}>
+                  <td>{r.contract_id}</td>
+                  <td>{r.tenant_name}</td>
+                  <td>{r.room_number || "-"}</td>
                   <td>{r.start_date || "-"}</td>
                   <td>{r.end_date || "-"}</td>
                   <td>{r.status || "-"}</td>
                   <td>
                     <button
                       className="btn btn-link"
-                      onClick={() => nav(`/contracts/${r.id}`)}
+                      onClick={() => nav(`/contracts/${r.contract_id}`)}
                     >
                       Xem
                     </button>{" "}
                     |{" "}
                     <button
                       className="btn btn-link"
-                      onClick={() => onDownload(r.id)}
+                      onClick={() => onDownload(r.contract_id)}
                     >
                       Tải
                     </button>{" "}
@@ -241,7 +262,7 @@ export default function ContractListPage() {
                     <button
                       className="btn btn-link"
                       style={{ color: "#E11D48" }}
-                      onClick={() => onDelete(r.id)}
+                      onClick={() => onDelete(r.contract_id)}
                     >
                       Xoá
                     </button>

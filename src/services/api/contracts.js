@@ -7,7 +7,7 @@ const FILE_FIELD = "contract_file"; // <-- khớp Multer ở BE
 /** ===== LIST: không phân trang (tạm) ===== */
 export async function listContracts() {
   try {
-    const res = await http.get("/contract/list", {
+    const res = await http.get("/contract/", {
       validateStatus: () => true,
     });
     if (res.status >= 200 && res.status < 300) {

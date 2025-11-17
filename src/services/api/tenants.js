@@ -1,5 +1,5 @@
 // src/services/api/tenants.js
-import { http } from "../http";
+import { http, unwrap } from "../http";
 
 // unwrap các kiểu response {data:{data}} | {data} | data
 const un = (res) => res?.data?.data ?? res?.data ?? res;
@@ -158,4 +158,10 @@ export async function getUserById(userId) {
     throw new Error(msg);
   }
   return un(res);
+}
+
+// Lấy tất cả tenants (KHÔNG phân trang)
+export async function getAllTenants() {
+  const { data } = await http.get("/tenant/all");
+  return unwrap(data);
 }

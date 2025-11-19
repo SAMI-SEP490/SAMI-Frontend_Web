@@ -1,8 +1,5 @@
-// src/pages/tenant/TenantListPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Sidebar from "../../components/SideBar";
-import Header from "../../components/Header";
 import { listTenants } from "../../services/api/tenants";
 import { listRoomsLite } from "../../services/api/rooms"; // đã export từ rooms.js
 
@@ -14,8 +11,7 @@ const pick = (...vals) => {
 
 // Chuẩn hoá item tenant về 1 shape thống nhất
 function normalize(item) {
-  const user = pick(item?.user, item); // có nơi trả { user: {...} }, có nơi trả trực tiếp
-
+  const user = pick(item?.user, item);
   const id = pick(
     user?.user_id,
     user?.id,
@@ -23,19 +19,15 @@ function normalize(item) {
     item?.userId,
     item?._id
   );
-
   const name = pick(
     user?.full_name,
     user?.name,
     [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim(),
     "Người thuê"
   );
-
   const email = pick(user?.email, "");
   const phone = pick(user?.phone, user?.phone_number, "");
   const avatar = pick(user?.avatar_url, "");
-
-  // room_id có thể nằm ở nhiều vị trí
   const room_id = pick(
     item?.room_id,
     item?.roomId,
@@ -43,12 +35,9 @@ function normalize(item) {
     item?.room?.id,
     item?.tenant?.room_id,
     item?.tenant?.room?.room_id,
-    item?.tenants?.room_id,
     Array.isArray(item?.tenants) ? item?.tenants?.[0]?.room_id : undefined,
     Array.isArray(item?.tenants) ? item?.tenants?.[0]?.room?.room_id : undefined
   );
-
-  // room_number để hiển thị cột “Số phòng”
   const room = pick(
     item?.room?.room_number,
     item?.room_number,
@@ -56,16 +45,15 @@ function normalize(item) {
     Array.isArray(item?.tenants)
       ? item?.tenants?.[0]?.room?.room_number
       : undefined,
-    room_id != null ? `Phòng ${room_id}` : "" // fallback nhẹ
+    room_id != null ? `Phòng ${room_id}` : ""
   );
-
   return {
     id,
     name,
     email,
     phone,
     avatar,
-    room_id: room_id != null ? String(room_id) : undefined, // ép string để so sánh
+    room_id: room_id != null ? String(room_id) : undefined,
     room: room != null ? String(room) : "",
   };
 }
@@ -73,27 +61,20 @@ function normalize(item) {
 export default function TenantListPage() {
   const nav = useNavigate();
 
-  // tenants
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [items, setItems] = useState([]);
-
-  // rooms dropdown
-  const [rooms, setRooms] = useState([]); // [{ id: room_id(string), label: room_number(string) }]
+  const [rooms, setRooms] = useState([]);
   const [roomFilter, setRoomFilter] = useState("all");
-
-  // search
   const [q, setQ] = useState("");
   const [searchKey, setSearchKey] = useState("");
 
-  // lấy tenants
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoading(true);
         setErr("");
-        // BE có thể đã lọc role=tenant rồi; nếu không thì vẫn OK
         const data = await listTenants({ take: 500 });
         if (!mounted) return;
         const raw = Array.isArray(data) ? data : data?.items ?? [];
@@ -111,18 +92,16 @@ export default function TenantListPage() {
     return () => (mounted = false);
   }, []);
 
-  // lấy rooms (room_id + room_number); nếu lỗi -> fallback dựng từ tenants
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const apiRooms = await listRoomsLite(); // trả [{id,label}] : id=room_id, label=room_number
+      const apiRooms = await listRoomsLite();
       if (mounted && apiRooms.length > 0) {
         setRooms(
           apiRooms.map((r) => ({ id: String(r.id), label: String(r.label) }))
         );
         return;
       }
-      // fallback: tự build từ tenants
       const fromTenants = Array.from(
         new Map(
           items
@@ -168,8 +147,7 @@ export default function TenantListPage() {
     <div className="tenants-page">
       <style>{`
         .tenants-page{display:flex;min-height:100vh;background:#F8FAFC;color:#0f172a}
-        .tenants-content{flex:1;display:flex;flex-direction:column;min-width:0}
-        .tenants-container{width:100%;padding:20px 24px 36px;box-sizing:border-box}
+        .tenants-content{flex:1;display:flex;flex-direction:column;min-width:0;padding:20px 24px 36px}
         .tenants-title{font-size:28px;line-height:1.2;font-weight:700;margin:12px 0 16px;text-align:left}
         .card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:16px}
         .toolbar{display:grid;grid-template-columns:260px 1fr 100px;gap:12px;align-items:center;margin-bottom:8px}
@@ -187,136 +165,131 @@ export default function TenantListPage() {
         .footerActions{display:flex;justify-content:flex-end;padding:12px 0 4px}
       `}</style>
 
-      <Sidebar />
       <div className="tenants-content">
-        <Header />
+        <h1 className="tenants-title">Danh Sách Người Thuê</h1>
 
-        <div className="tenants-container">
-          <h1 className="tenants-title">Danh Sách Người Thuê</h1>
-
-          <div className="card">
-            <div className="toolbar">
-              <div>
-                <label className="label">Số phòng</label>
-                <select
-                  value={roomFilter}
-                  onChange={(e) => setRoomFilter(e.target.value)}
-                >
-                  {roomOptions.map((op) => (
-                    <option key={op.id} value={op.id}>
-                      {op.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label">Tìm kiếm</label>
-                <input
-                  type="text"
-                  placeholder="Nhập tên / email / SĐT / số phòng..."
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && setSearchKey(q)}
-                />
-              </div>
-
-              <div style={{ display: "flex", alignItems: "end" }}>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setSearchKey(q)}
-                >
-                  Tìm
-                </button>
-              </div>
+        <div className="card">
+          <div className="toolbar">
+            <div>
+              <label className="label">Số phòng</label>
+              <select
+                value={roomFilter}
+                onChange={(e) => setRoomFilter(e.target.value)}
+              >
+                {roomOptions.map((op) => (
+                  <option key={op.id} value={op.id}>
+                    {op.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ width: 90 }}>ID</th>
-                    <th style={{ width: 130 }}>Ảnh đại diện</th>
-                    <th>Tên</th>
-                    <th style={{ width: 140 }}>Số phòng</th>
-                    <th>Email</th>
-                    <th style={{ width: 180 }}>Số điện thoại</th>
-                    <th style={{ width: 220 }}>Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={7} style={{ color: "#64748B" }}>
-                        Đang tải...
-                      </td>
-                    </tr>
-                  ) : err ? (
-                    <tr>
-                      <td colSpan={7} style={{ color: "#E11D48" }}>
-                        {err}
-                      </td>
-                    </tr>
-                  ) : rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} style={{ color: "#64748B" }}>
-                        Không có người thuê nào.
-                      </td>
-                    </tr>
-                  ) : (
-                    rows.map((u) => (
-                      <tr key={u.id}>
-                        <td>{u.id || "—"}</td>
-                        <td>
-                          <img
-                            className="avatar"
-                            src={u.avatar || "https://placehold.co/72x72?text="}
-                            alt=""
-                          />
-                        </td>
-                        <td>{u.name}</td>
-                        <td>{u.room || "—"}</td>
-                        <td>{u.email || "—"}</td>
-                        <td>{u.phone || "—"}</td>
-                        <td>
-                          <div className="actions">
-                            <button
-                              className="link"
-                              onClick={() => nav(`/tenants/${u.id}`)}
-                              disabled={!u.id}
-                            >
-                              Xem chi tiết
-                            </button>
-                            <button
-                              className="link gray"
-                              onClick={() => nav(`/tenants/${u.id}/edit`)}
-                              disabled={!u.id}
-                            >
-                              Sửa
-                            </button>
-                            <button
-                              className="link red"
-                              onClick={() => alert("Xóa sẽ nối API sau")}
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div>
+              <label className="label">Tìm kiếm</label>
+              <input
+                type="text"
+                placeholder="Nhập tên / email / SĐT / số phòng..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && setSearchKey(q)}
+              />
             </div>
 
-            <div className="footerActions">
+            <div style={{ display: "flex", alignItems: "end" }}>
               <button
                 className="btn btn-primary"
-                onClick={() => nav("/tenants/create")}
+                onClick={() => setSearchKey(q)}
               >
-                + Thêm người thuê
+                Tìm
               </button>
             </div>
+          </div>
+
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: 90 }}>ID</th>
+                  <th style={{ width: 130 }}>Ảnh đại diện</th>
+                  <th>Tên</th>
+                  <th style={{ width: 140 }}>Số phòng</th>
+                  <th>Email</th>
+                  <th style={{ width: 180 }}>Số điện thoại</th>
+                  <th style={{ width: 220 }}>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} style={{ color: "#64748B" }}>
+                      Đang tải...
+                    </td>
+                  </tr>
+                ) : err ? (
+                  <tr>
+                    <td colSpan={7} style={{ color: "#E11D48" }}>
+                      {err}
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ color: "#64748B" }}>
+                      Không có người thuê nào.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((u) => (
+                    <tr key={u.id}>
+                      <td>{u.id || "—"}</td>
+                      <td>
+                        <img
+                          className="avatar"
+                          src={u.avatar || "https://placehold.co/72x72?text="}
+                          alt=""
+                        />
+                      </td>
+                      <td>{u.name}</td>
+                      <td>{u.room || "—"}</td>
+                      <td>{u.email || "—"}</td>
+                      <td>{u.phone || "—"}</td>
+                      <td>
+                        <div className="actions">
+                          <button
+                            className="link"
+                            onClick={() => nav(`/tenants/${u.id}`)}
+                            disabled={!u.id}
+                          >
+                            Xem chi tiết
+                          </button>
+                          <button
+                            className="link gray"
+                            onClick={() => nav(`/tenants/${u.id}/edit`)}
+                            disabled={!u.id}
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            className="link red"
+                            onClick={() => alert("Xóa sẽ nối API sau")}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="footerActions">
+            <button
+              className="btn btn-primary"
+              onClick={() => nav("/tenants/create")}
+            >
+              + Thêm người thuê
+            </button>
           </div>
         </div>
       </div>

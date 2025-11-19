@@ -40,7 +40,10 @@ export async function login({ email, password, phone } = {}) {
 
   // Lưu token để ProtectedRoute nhận ra đã đăng nhập
   const access =
-    data?.accessToken || data?.access_token || data?.token || data?.data?.accessToken;
+    data?.accessToken ||
+    data?.access_token ||
+    data?.token ||
+    data?.data?.accessToken;
   const refresh =
     data?.refreshToken || data?.refresh_token || data?.data?.refreshToken;
 
@@ -81,8 +84,23 @@ export async function getProfile() {
 
 /** Chuẩn hoá dữ liệu hồ sơ về dạng phẳng để UI destructure */
 function normalizeProfile(raw) {
-  // chấp nhận: {data:{user}}, {user}, {data}, {...}
+  // Nếu backend trả HTML (bắt đầu bằng <!DOCTYPE hoặc <html>), bỏ qua
+  if (
+    typeof raw === "string" &&
+    (raw.trim().startsWith("<!DOCTYPE") || raw.trim().startsWith("<html"))
+  ) {
+    console.warn("⚠️ Dữ liệu profile trả về HTML — bỏ qua cập nhật user");
+    return JSON.parse(localStorage.getItem("sami:user")) || {};
+  }
+
+  // Nếu dữ liệu không có key user / id — cũng bỏ qua
   const u = raw?.data?.user ?? raw?.user ?? raw?.data ?? raw ?? {};
+  if (!u || Object.keys(u).length === 0) {
+    console.warn("⚠️ Profile rỗng — giữ nguyên user cũ");
+    return JSON.parse(localStorage.getItem("sami:user")) || {};
+  }
+
+  // Trả về dữ liệu user đã chuẩn hóa
   return {
     id: u.user_id ?? u.id ?? u.uid ?? u._id ?? null,
     full_name: u.full_name ?? u.fullName ?? u.name ?? "",

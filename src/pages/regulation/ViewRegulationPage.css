@@ -1,0 +1,127 @@
+/* Container tổng */
+.container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px 30px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    font-family: Arial, sans-serif;
+}
+
+/* Tiêu đề */
+.title {
+    font-size: 28px;
+    color: #1e3a8a;
+    font-weight: bold;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #1e90ff;
+    padding-bottom: 8px;
+}
+
+/* Grid thông tin */
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.full-width {
+    grid-column: span 2;
+}
+
+.label {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.value {
+    background: #f9fafb;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #111;
+    min-height: 36px;
+}
+
+.value.content {
+    padding: 12px;
+    line-height: 1.6;
+}
+
+/* Buttons */
+.button-group {
+    margin-top: 25px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: 0.2s all;
+}
+
+.btn.publish {
+    background-color: #1e90ff;
+    color: white;
+    border-color: #1e90ff;
+}
+
+.btn.publish:hover {
+    background-color: #1c86ee;
+    border-color: #1c86ee;
+}
+
+.btn.archive {
+    background-color: #f0f0f0;
+    color: #333;
+    border-color: #ccc;
+}
+
+.btn.archive:hover {
+    background-color: #e0e0e0;
+}
+
+.btn.back {
+    background-color: #fff;
+    color: #333;
+    border-color: #ccc;
+}
+
+.btn.back:hover {
+    background-color: #f5f5f5;
+}
+
+/* Disabled button */
+.btn.disabled {
+    background-color: #ccc !important;
+    color: #888 !important;
+    cursor: not-allowed;
+}
+
+/* Loading / error text */
+.loading-text,
+.error-text {
+    text-align: center;
+    font-size: 18px;
+    padding: 40px 0;
+}
+
+.loading-text {
+    color: #555;
+}
+
+.error-text {
+    color: #c00;
+}

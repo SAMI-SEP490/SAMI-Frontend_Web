@@ -2,8 +2,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Form, Button, Spinner, Row, Col, Badge } from "react-bootstrap";
-import Header from "../../components/Header";
-import Sidebar from "../../components/SideBar";
 import { colors } from "../../constants/colors";
 import {
   updateBuilding,
@@ -13,7 +11,7 @@ import {
 } from "../../services/api/building";
 
 function EditBuildingPage() {
-  const { id } = useParams(); // building_id từ URL
+  const { id } = useParams();
   const navigate = useNavigate();
 
   const [building, setBuilding] = useState(null);
@@ -23,7 +21,6 @@ function EditBuildingPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Lấy thông tin tòa nhà + danh sách managers
   useEffect(() => {
     async function fetchBuilding() {
       try {
@@ -39,7 +36,6 @@ function EditBuildingPage() {
         setName(b.name);
         setAddress(b.address);
 
-        // Lấy danh sách managers
         const mgrs = await getBuildingManagers(b.building_id);
         setManagers(mgrs);
       } catch (error) {
@@ -91,88 +87,81 @@ function EditBuildingPage() {
   }
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <Header />
-      <div style={{ flex: 1, display: "flex" }}>
-        <div style={{ width: 220, backgroundColor: colors.brand }}>
-          <Sidebar />
-        </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        padding: 30,
+        backgroundColor: colors.background,
+      }}
+    >
+      <h4 style={{ fontWeight: "600", marginBottom: 20 }}>Chỉnh sửa tòa nhà</h4>
 
-        <div
-          style={{ flex: 1, padding: 30, backgroundColor: colors.background }}
+      <Form>
+        <Row className="mb-3">
+          <Col md={6}>
+            <Form.Label>Tên tòa nhà</Form.Label>
+            <Form.Control
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Col>
+        </Row>
+
+        <Row className="mb-3">
+          <Col md={6}>
+            <Form.Label>Địa chỉ</Form.Label>
+            <Form.Control
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </Col>
+        </Row>
+
+        <Row className="mb-3">
+          <Col md={6}>
+            <Form.Label>Quản lý tòa nhà</Form.Label>
+            <div>
+              {managers.length > 0 ? (
+                managers.map((m) => (
+                  <Badge
+                    bg="secondary"
+                    key={m.user_id}
+                    className="me-2 mb-2"
+                    style={{ padding: "0.5em 0.7em" }}
+                  >
+                    {m.full_name}{" "}
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() =>
+                        handleRemoveManager(m.user_id, m.full_name)
+                      }
+                    >
+                      Xóa
+                    </Button>
+                  </Badge>
+                ))
+              ) : (
+                <div>-</div>
+              )}
+            </div>
+          </Col>
+        </Row>
+
+        <Button variant="primary" onClick={handleSave} disabled={saving}>
+          {saving ? "Đang lưu..." : "Lưu"}
+        </Button>
+        <Button
+          variant="secondary"
+          className="ms-2"
+          onClick={() => navigate("/buildings")}
+          disabled={saving}
         >
-          <h4 style={{ fontWeight: "600", marginBottom: 20 }}>
-            Chỉnh sửa tòa nhà
-          </h4>
-
-          <Form>
-            <Row className="mb-3">
-              <Col md={6}>
-                <Form.Label>Tên tòa nhà</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </Col>
-            </Row>
-
-            <Row className="mb-3">
-              <Col md={6}>
-                <Form.Label>Địa chỉ</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                />
-              </Col>
-            </Row>
-
-            <Row className="mb-3">
-              <Col md={6}>
-                <Form.Label>Quản lý tòa nhà</Form.Label>
-                <div>
-                  {managers.length > 0 ? (
-                    managers.map((m) => (
-                      <Badge
-                        bg="secondary"
-                        key={m.user_id}
-                        className="me-2 mb-2"
-                        style={{ padding: "0.5em 0.7em" }}
-                      >
-                        {m.full_name}{" "}
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() =>
-                            handleRemoveManager(m.user_id, m.full_name)
-                          }
-                        >
-                          Xóa
-                        </Button>
-                      </Badge>
-                    ))
-                  ) : (
-                    <div>-</div>
-                  )}
-                </div>
-              </Col>
-            </Row>
-
-            <Button variant="primary" onClick={handleSave} disabled={saving}>
-              {saving ? "Đang lưu..." : "Lưu"}
-            </Button>
-            <Button
-              variant="secondary"
-              className="ms-2"
-              onClick={() => navigate("/buildings")}
-              disabled={saving}
-            >
-              Hủy
-            </Button>
-          </Form>
-        </div>
-      </div>
+          Hủy
+        </Button>
+      </Form>
     </div>
   );
 }

@@ -1,11 +1,12 @@
 // src/routing/AppRoutes.jsx
-import React from "react";
-
-// Định nghĩa các route trong ứng dụng
-import { ROUTES } from "../constants/routes";
-
+import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { ROUTES } from "../constants/routes";
 import ProtectedRoute from "./ProtectedRoute";
+
+// layouts
+import PrivateLayout from "../layouts/PrivateLayout";
+import PublicLayout from "../layouts/PublicLayout";
 
 // ===== Auth (Public) =====
 import LoginPage from "../pages/auth/LoginPage";
@@ -34,244 +35,333 @@ import CreateContractPage from "../pages/contract/CreateContractPage";
 // ===== Bills =====
 import BillListPage from "../pages/bill/BillListPage";
 import BillDetailPage from "../pages/bill/BillDetailPage";
+import CreateBillPage from "../pages/bill/CreateBillPage";
 
 // ===== Guests =====
 import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistrationPage";
-// Notification
+
+// ===== Notifications =====
 import NotificationListPage from "../pages/notification/NotificationListPage";
 import CreateNotificationPage from "../pages/notification/CreateNotificationPage";
 import EditNotificationPage from "../pages/notification/EditNotificationPage";
 
-// Maintenance
+// ===== Maintenance =====
 import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
 
-//Building
+// ===== Buildings =====
 import BuildingListPage from "../pages/building/BuildingListPage";
 import EditBuildingPage from "../pages/building/EditBuildingPage";
 
-// Dashboard
+// ===== Floorplan (lazy) =====
+const CreateFloorPlan = lazy(() =>
+  import("@/pages/floorplan/CreateFloorPlan.jsx")
+);
+const ViewFloorPlan = lazy(() => import("@/pages/floorplan/ViewFloorPlan.jsx"));
+
+// ===== Dashboard =====
 import TenantAggregatesPage from "../pages/dashboard/TenantAggregatesPage";
 import ViewTimeBasedReportsPage from "../pages/dashboard/ViewTimeBasedReportsPage";
+
+// regulations
+import RegulationListPage from "../pages/regulation/RegulationListPage";
+import CreateRegulationPage from "../pages/regulation/CreateRegulationPage";
+import EditRegulationPage from "../pages/regulation/EditRegulationPage";
+
+// vehicle registrations
+import VehicleRegistrationListPage from "../pages/vehicle/VehicleRegistrationListPage";
+import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
+
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
   !!localStorage.getItem("accessToken");
 
-// Fallback thông minh
 const HomeRedirect = () => (
   <Navigate to={isAuthed() ? ROUTES.contracts : ROUTES.login} replace />
 );
+
+const LazyFallback = <div style={{ padding: 16 }}>Loading…</div>;
 
 export default function AppRoutes() {
   return (
     <Routes>
       {/* ===== Public ===== */}
-      <Route path={ROUTES.login} element={<LoginPage />} />
-      <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
-      <Route path={ROUTES.verifyResetOtp} element={<VerifyResetOtpPage />} />
-      <Route path={ROUTES.newPassword} element={<NewPasswordPage />} />
-      <Route path={ROUTES.verifyCode} element={<VerifyCodePage />} />
+      <Route element={<PublicLayout />}>
+        <Route path={ROUTES.login} element={<LoginPage />} />
+        <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
+        <Route path={ROUTES.verifyResetOtp} element={<VerifyResetOtpPage />} />
+        <Route path={ROUTES.newPassword} element={<NewPasswordPage />} />
+        <Route path={ROUTES.verifyCode} element={<VerifyCodePage />} />
+      </Route>
+      {/* ===== Private ===== */}
+      <Route element={<PrivateLayout />}>
+        <Route
+          path={ROUTES.profile}
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.changePassword}
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.editProfile}
+          element={
+            <ProtectedRoute>
+              <EditProfilePage />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* ===== Private (bọc ProtectedRoute) ===== */}
-      <Route
-        path={ROUTES.profile}
-        element={
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.changePassword}
-        element={
-          <ProtectedRoute>
-            <ChangePasswordPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.editProfile}
-        element={
-          <ProtectedRoute>
-            <EditProfilePage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Contracts */}
+        <Route
+          path={ROUTES.contracts}
+          element={
+            <ProtectedRoute>
+              <ContractListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.contractDetail}
+          element={
+            <ProtectedRoute>
+              <ContractDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.contractAddendum}
+          element={
+            <ProtectedRoute>
+              <ContractAddendumPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.createContract}
+          element={
+            <ProtectedRoute>
+              <CreateContractPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path={ROUTES.contracts}
-        element={
-          <ProtectedRoute>
-            <ContractListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.contractDetail}
-        element={
-          <ProtectedRoute>
-            <ContractDetailPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.contractAddendum}
-        element={
-          <ProtectedRoute>
-            <ContractAddendumPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.createContract}
-        element={
-          <ProtectedRoute>
-            <CreateContractPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Tenants */}
+        <Route
+          path={ROUTES.tenants}
+          element={
+            <ProtectedRoute>
+              <TenantListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.tenantDetail}
+          element={
+            <ProtectedRoute>
+              <TenantDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.tenantEdit}
+          element={
+            <ProtectedRoute>
+              <TenantEditPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.tenantCreate}
+          element={
+            <ProtectedRoute>
+              <CreateTenantPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path={ROUTES.tenants}
-        element={
-          <ProtectedRoute>
-            <TenantListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.tenantDetail}
-        element={
-          <ProtectedRoute>
-            <TenantDetailPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.tenantEdit}
-        element={
-          <ProtectedRoute>
-            <TenantEditPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.tenantCreate}
-        element={
-          <ProtectedRoute>
-            <CreateTenantPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Bills */}
+        <Route
+          path={ROUTES.bills}
+          element={
+            <ProtectedRoute>
+              <BillListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.createBill}
+          element={
+            <ProtectedRoute>
+              <CreateBillPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.billDetail}
+          element={
+            <ProtectedRoute>
+              <BillDetailPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path={ROUTES.bills}
-        element={
-          <ProtectedRoute>
-            <BillListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.billDetail}
-        element={
-          <ProtectedRoute>
-            <BillDetailPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Guests */}
+        <Route
+          path={ROUTES.receiveGuestRegistration}
+          element={
+            <ProtectedRoute>
+              <ReceiveGuestRegistrationPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path={ROUTES.receiveGuestRegistration}
-        element={
-          <ProtectedRoute>
-            <ReceiveGuestRegistrationPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Notifications */}
+        <Route
+          path={ROUTES.notifications}
+          element={
+            <ProtectedRoute>
+              <NotificationListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.createNotification}
+          element={
+            <ProtectedRoute>
+              <CreateNotificationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.editNotification}
+          element={
+            <ProtectedRoute>
+              <EditNotificationPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* regulation  */}
+        <Route
+          path={ROUTES.regulations}
+          element={
+            <ProtectedRoute>
+              <RegulationListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.createRegulation}
+          element={
+            <ProtectedRoute>
+              <CreateRegulationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.editRegulation}
+          element={
+            <ProtectedRoute>
+              <EditRegulationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.viewRegulation}
+          element={
+            <ProtectedRoute>
+              <ViewRegulationPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path={ROUTES.createTenants}
-        element={
-          <ProtectedRoute>
-            <CreateTenantPage />
-          </ProtectedRoute>
-        }
-      />
-      {/* Notification */}
-      <Route
-        path={ROUTES.notifications}
-        element={
-          <ProtectedRoute>
-            <NotificationListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.createNotification}
-        element={
-          <ProtectedRoute>
-            <CreateNotificationPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.editNotification}
-        element={
-          <ProtectedRoute>
-            <EditNotificationPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Maintenance */}
+        <Route
+          path={ROUTES.maintainceRequests}
+          element={
+            <ProtectedRoute>
+              <MaintenanceListPage />
+            </ProtectedRoute>
+          }
+        />
 
+        {/* Buildings */}
+        <Route
+          path={ROUTES.buildings}
+          element={
+            <ProtectedRoute>
+              <BuildingListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.editBuilding}
+          element={
+            <ProtectedRoute>
+              <EditBuildingPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Floorplan (lazy with Suspense) */}
+        <Route
+          path={ROUTES.floorplanCreate}
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={LazyFallback}>
+                <CreateFloorPlan />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.floorplanView}
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={LazyFallback}>
+                <ViewFloorPlan />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Dashboard */}
+        <Route
+          path={ROUTES.tenantAggregates}
+          element={
+            <ProtectedRoute>
+              <TenantAggregatesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.viewTimebaseReport}
+          element={
+            <ProtectedRoute>
+              <ViewTimeBasedReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Vehicle Registrations  */}
+        <Route
+          path={ROUTES.vehicleRegistrations}
+          element={
+            <ProtectedRoute>
+              <VehicleRegistrationListPage />
+            </ProtectedRoute>
+          }
+        />
+      </Route>
       {/* Fallback */}
       <Route path="/" element={<HomeRedirect />} />
       <Route path="*" element={<HomeRedirect />} />
-
-      {/* maintenance */}
-      <Route
-        path={ROUTES.maintainceRequests}
-        element={
-          <ProtectedRoute>
-            <MaintenanceListPage />
-          </ProtectedRoute>
-        }
-      />
-      {/* buildings */}
-      <Route
-        path={ROUTES.buildings}
-        element={
-          <ProtectedRoute>
-            <BuildingListPage />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path={ROUTES.editBuilding}
-        element={
-          <ProtectedRoute>
-            <EditBuildingPage />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Dashboard */}
-      <Route
-        path={ROUTES.tenantAggregates}
-        element={
-          <ProtectedRoute>
-            <TenantAggregatesPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.viewTimebaseReport}
-        element={
-          <ProtectedRoute>
-            <ViewTimeBasedReportsPage />
-          </ProtectedRoute>
-        }
-      />
     </Routes>
   );
 }

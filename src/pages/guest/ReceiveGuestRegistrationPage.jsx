@@ -1,275 +1,271 @@
-import React, { useContext, useState } from "react";
-import { GuestRegistrationContext } from "../../contexts/GuestRegistrationContext";
-import Header from "../../components/Header";
-import Sidebar from "../../components/SideBar";
-import { colors } from "../../constants/colors";
+// src/pages/ReceiveGuestRegistrationPage.jsx
+import React, { useEffect, useState } from "react";
+import { Table, Button, Spinner, Badge, Form, Row, Col } from "react-bootstrap";
+import {
+  listGuestRegistrations,
+  approveGuestRegistration,
+  rejectGuestRegistration,
+} from "../../services/api/guest";
 
-function ReceiveGuestRegistrationPage() {
-  const { guestRegistrationData, setGuestRegistrationData } = useContext(
-    GuestRegistrationContext
-  );
+export default function ReceiveGuestRegistrationPage() {
+  const [guestRegistrations, setGuestRegistrations] = useState([]);
+  const [filteredRegistrations, setFilteredRegistrations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState(null);
 
-  const [showPopup, setShowPopup] = useState(false);
-  const [selectedGuest, setSelectedGuest] = useState(null);
-  const [actionType, setActionType] = useState("");
+  const [searchName, setSearchName] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
-  // ✅ Mở popup xác nhận
-  const openPopup = (guest, type) => {
-    setSelectedGuest(guest);
-    setActionType(type);
-    setShowPopup(true);
-  };
-
-  // ✅ Xử lý xác nhận hành động
-  const confirmAction = () => {
-    const newStatus = actionType === "approve" ? "Approved" : "Rejected";
-    const updatedData = guestRegistrationData.map((guest) =>
-      guest.id === selectedGuest.id
-        ? { ...guest, status: newStatus, actionDone: true }
-        : guest
-    );
-    setGuestRegistrationData(updatedData);
-    setShowPopup(false);
-    setSelectedGuest(null);
-  };
-
-  // ✅ Hiển thị trạng thái tiếng Việt
-  const getStatusLabel = (status) => {
+  // Map trạng thái sang tiếng Việt
+  const mapStatus = (status) => {
     switch (status) {
-      case "Pending":
-        return "Chờ phản hồi";
-      case "Approved":
-        return "Đồng ý";
-      case "Rejected":
+      case "approved":
+        return "Chấp nhận";
+      case "rejected":
         return "Từ chối";
+      case "pending":
+        return "Chờ xử lý";
+      case "cancelled":
+        return "Đã hủy";
       default:
         return status;
     }
   };
 
+  // Màu trạng thái
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Chấp nhận":
+        return "success";
+      case "Từ chối":
+        return "danger";
+      case "Chờ xử lý":
+        return "warning";
+      case "Đã hủy":
+        return "secondary";
+      default:
+        return "dark";
+    }
+  };
+
+  // Fetch danh sách đăng ký
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const res = await listGuestRegistrations();
+      console.log("API response:", res);
+
+      // Truy cập trực tiếp vào registrations
+      const registrations = Array.isArray(res?.registrations)
+        ? res.registrations
+        : [];
+
+      setGuestRegistrations(registrations);
+      setFilteredRegistrations(registrations);
+
+      console.log("Loaded guest registrations:", registrations);
+    } catch (error) {
+      console.error("Failed to load guest registrations:", error);
+      setGuestRegistrations([]);
+      setFilteredRegistrations([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Phê duyệt
+  const handleApprove = async (id) => {
+    try {
+      setProcessingId(id);
+      await approveGuestRegistration(id);
+      setGuestRegistrations((prev) =>
+        prev.map((item) =>
+          item.registration_id === id ? { ...item, status: "approved" } : item
+        )
+      );
+    } catch (error) {
+      console.error("Approve error:", error);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // Từ chối
+  const handleReject = async (id) => {
+    const reason = prompt("Lý do từ chối:");
+    if (!reason) return;
+
+    try {
+      setProcessingId(id);
+      const cancelledAt = new Date().toISOString();
+
+      // Gọi API reject
+      await rejectGuestRegistration(id, {
+        cancellation_reason: reason,
+        cancelled_at: cancelledAt,
+      });
+
+      // Cập nhật local
+      setGuestRegistrations((prev) =>
+        prev.map((item) =>
+          item.registration_id === id
+            ? {
+                ...item,
+                status: "rejected",
+                cancelled_at: cancelledAt,
+                cancelled_by: "Admin", // hoặc set tên người xử lý nếu backend trả về
+                cancellation_reason: reason,
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error("Reject error:", error);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // Search & filter
+  useEffect(() => {
+    const filtered = guestRegistrations.filter((item) => {
+      const nameMatch = item.tenants?.users?.full_name
+        ?.toLowerCase()
+        .includes(searchName.toLowerCase());
+      const statusMatch = filterStatus
+        ? mapStatus(item.status) === filterStatus
+        : true;
+      return nameMatch && statusMatch;
+    });
+    setFilteredRegistrations(filtered);
+  }, [searchName, filterStatus, guestRegistrations]);
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      {/* Header */}
-      <div
-        style={{
-          marginBottom: 10,
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
-          flexShrink: 0,
-        }}
-      >
-        <Header />
-      </div>
+    <div className="container mt-4">
+      <h3 className="mb-3">Danh sách đăng ký khách</h3>
 
-      {/* Main content */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Sidebar */}
-        <div
-          style={{
-            width: "220px",
-            backgroundColor: colors.brand,
-            color: "white",
-            height: "100%",
-            borderRadius: "0 10px 10px 0",
-            flexShrink: 0,
-          }}
-        >
-          <Sidebar />
-        </div>
-
-        {/* Table content */}
-        <div
-          style={{
-            flex: 1,
-            padding: "30px",
-            backgroundColor: colors.background,
-            overflowY: "auto",
-          }}
-        >
-          <h2 style={{ marginBottom: "20px", color: colors.brand }}>
-            Danh sách khách tạm trú
-          </h2>
-
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              textAlign: "left",
-              backgroundColor: "#fff",
-              borderRadius: "10px",
-              boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-              overflow: "hidden",
-            }}
+      {/* Search & Filter */}
+      <Row className="mb-3">
+        <Col md={6}>
+          <Form.Control
+            placeholder="Tìm theo tên người gửi..."
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+          />
+        </Col>
+        <Col md={3}>
+          <Form.Select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
           >
-            <thead>
-              <tr style={{ backgroundColor: "#f2f2f2" }}>
-                <th style={thStyle}>#</th>
-                <th style={thStyle}>Phòng</th>
-                <th style={thStyle}>Tên khách</th>
-                <th style={thStyle}>Số điện thoại</th>
-                <th style={thStyle}>Ngày bắt đầu</th>
-                <th style={thStyle}>Ngày kết thúc</th>
-                <th style={thStyle}>Lí do</th>
-                <th style={thStyle}>Thông tin thêm</th>
-                <th style={thStyle}>Trạng thái</th>
-                <th style={thStyle}>Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {guestRegistrationData.map((guest, index) => (
-                <tr key={guest.id} style={{ borderBottom: "1px solid #ddd" }}>
-                  <td style={tdStyle}>{index + 1}</td>
-                  <td style={tdStyle}>{guest.room}</td>
-                  <td style={tdStyle}>{guest.name}</td>
-                  <td style={tdStyle}>{guest.phone}</td>
-                  <td style={tdStyle}>{guest.startDate}</td>
-                  <td style={tdStyle}>{guest.endDate}</td>
-                  <td style={tdStyle}>{guest.reason}</td>
-                  <td style={tdStyle}>{guest.additionalInfo}</td>
-                  <td
-                    style={{
-                      ...tdStyle,
-                      fontWeight: "bold",
-                      color: getStatusColor(guest.status),
-                    }}
-                  >
-                    {getStatusLabel(guest.status)}
-                  </td>
-                  <td style={tdStyle}>
-                    {guest.status === "Pending" && !guest.actionDone && (
-                      <>
-                        <button
-                          style={acceptButtonStyle}
-                          onClick={() => openPopup(guest, "approve")}
-                        >
-                          Phê duyệt
-                        </button>
-                        <button
-                          style={rejectButtonStyle}
-                          onClick={() => openPopup(guest, "reject")}
-                        >
-                          Từ chối
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            <option value="">Tất cả trạng thái</option>
+            <option value="Chờ xử lý">Chờ xử lý</option>
+            <option value="Chấp nhận">Chấp nhận</option>
+            <option value="Từ chối">Từ chối</option>
+            <option value="Đã hủy">Đã hủy</option>
+          </Form.Select>
+        </Col>
+      </Row>
 
-      {/* Popup xác nhận */}
-      {showPopup && (
-        <div style={popupOverlayStyle}>
-          <div style={popupStyle}>
-            <p style={{ fontSize: "18px", marginBottom: "20px" }}>
-              Bạn có chắc chắn muốn{" "}
-              {actionType === "approve" ? "phê duyệt" : "từ chối"} khách tạm trú
-              này không?
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button
-                style={cancelButtonStyle}
-                onClick={() => setShowPopup(false)}
-              >
-                Hủy
-              </button>
-              <button style={confirmButtonStyle} onClick={confirmAction}>
-                Xác nhận
-              </button>
-            </div>
-          </div>
+      {loading ? (
+        <div className="text-center py-5">
+          <Spinner animation="border" />
         </div>
+      ) : (
+        <Table striped bordered hover responsive>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên người gửi</th>
+              <th>Phòng</th>
+              <th>Ngày tạo đơn</th>
+              <th>Ngày vào</th>
+              <th>Ngày ra</th>
+              <th>Thông tin khách</th>
+              <th>Trạng thái</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRegistrations.length === 0 ? (
+              <tr>
+                <td colSpan="9" className="text-center">
+                  Không có dữ liệu
+                </td>
+              </tr>
+            ) : (
+              filteredRegistrations.map((item, index) => {
+                const statusVN = mapStatus(item.status);
+                return (
+                  <tr key={item.registration_id}>
+                    <td>{index + 1}</td>
+                    <td>{item.tenants?.users?.full_name || "-"}</td>
+                    <td>{item.rooms?.room_number || "-"}</td>
+                    <td>
+                      {item.created_at
+                        ? new Date(item.created_at).toLocaleDateString()
+                        : "-"}
+                    </td>
+                    <td>
+                      {item.arrival_date
+                        ? new Date(item.arrival_date).toLocaleDateString()
+                        : "-"}
+                    </td>
+                    <td>
+                      {item.departure_date
+                        ? new Date(item.departure_date).toLocaleDateString()
+                        : "-"}
+                    </td>
+                    <td>
+                      {item.guest_details?.map((g) => (
+                        <div key={g.detail_id}>
+                          {g.full_name} - {g.id_number}
+                        </div>
+                      ))}
+                    </td>
+                    <td>
+                      <Badge bg={getStatusColor(statusVN)}>{statusVN}</Badge>
+                    </td>
+                    <td>
+                      {statusVN === "Chờ xử lý" && (
+                        <div className="d-flex gap-2">
+                          <Button
+                            variant="success"
+                            disabled={processingId === item.registration_id}
+                            onClick={() => handleApprove(item.registration_id)}
+                          >
+                            {processingId === item.registration_id ? (
+                              <Spinner size="sm" animation="border" />
+                            ) : (
+                              "Duyệt"
+                            )}
+                          </Button>
+
+                          <Button
+                            variant="danger"
+                            disabled={processingId === item.registration_id}
+                            onClick={() => handleReject(item.registration_id)}
+                          >
+                            {processingId === item.registration_id ? (
+                              <Spinner size="sm" animation="border" />
+                            ) : (
+                              "Từ chối"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </Table>
       )}
     </div>
   );
 }
-
-// ✅ Màu trạng thái
-const getStatusColor = (status) => {
-  switch (status) {
-    case "Pending":
-      return "#e0a800"; // vàng
-    case "Approved":
-      return "#28a745"; // xanh
-    case "Rejected":
-      return "#dc3545"; // đỏ
-    default:
-      return "#000";
-  }
-};
-
-// ✅ Style chung
-const thStyle = {
-  borderBottom: "2px solid #ccc",
-  padding: "10px",
-  fontWeight: "bold",
-};
-
-const tdStyle = {
-  padding: "8px",
-};
-
-const acceptButtonStyle = {
-  backgroundColor: "#28a745",
-  color: "white",
-  border: "none",
-  padding: "5px 10px",
-  marginRight: "8px",
-  borderRadius: "4px",
-  cursor: "pointer",
-};
-
-const rejectButtonStyle = {
-  backgroundColor: "#dc3545",
-  color: "white",
-  border: "none",
-  padding: "5px 10px",
-  borderRadius: "4px",
-  cursor: "pointer",
-};
-
-const popupOverlayStyle = {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  width: "100vw",
-  height: "100vh",
-  backgroundColor: "rgba(0,0,0,0.3)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 2000,
-};
-
-const popupStyle = {
-  backgroundColor: "#fff",
-  padding: "25px",
-  borderRadius: "10px",
-  width: "400px",
-  boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-};
-
-const cancelButtonStyle = {
-  backgroundColor: "#6c757d",
-  color: "white",
-  border: "none",
-  padding: "6px 12px",
-  marginRight: "10px",
-  borderRadius: "4px",
-  cursor: "pointer",
-};
-
-const confirmButtonStyle = {
-  backgroundColor: "#007bff",
-  color: "white",
-  border: "none",
-  padding: "6px 12px",
-  borderRadius: "4px",
-  cursor: "pointer",
-};
-
-export default ReceiveGuestRegistrationPage;

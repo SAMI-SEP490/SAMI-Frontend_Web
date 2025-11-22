@@ -1,3 +1,4 @@
+// src/pages/floorplan/CreateFloorPlan.jsx
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -13,52 +14,12 @@ import {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-/* ================= Storage helpers ================= */
-const STORAGE_KEY = "sami_floorplans_v1";
-const loadAllPlans = () => {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-  } catch {
-    return {};
-  }
-};
-const saveAllPlans = (obj) =>
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
-const saveSinglePlan = (buildingId, floorId, plan) => {
-  const all = loadAllPlans();
-  const next = {
-    ...all,
-    [buildingId]: { ...(all[buildingId] || {}), [floorId]: plan },
-  };
-  saveAllPlans(next);
-};
-const loadSinglePlan = (buildingId, floorId) =>
-  (loadAllPlans()[buildingId] || {})[floorId] || null;
+import { listBuildings } from "../../services/api/building";
+import { createFloorPlan } from "../../services/api/floorplan";
 
-/* ================= Geometry helpers ================= */
-const pathFromPoints = (pts) =>
-  pts?.length ? `M${pts.map((p) => `${p.x} ${p.y}`).join(" L ")} Z` : "";
-const bboxOf = (pts) => {
-  const xs = pts.map((p) => p.x),
-    ys = pts.map((p) => p.y);
-  const minX = Math.min(...xs),
-    maxX = Math.max(...xs);
-  const minY = Math.min(...ys),
-    maxY = Math.max(...ys);
-  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
-};
-const scalePointsToBox = (pts, newW, newH) => {
-  const { minX, minY, w, h } = bboxOf(pts);
-  const sx = w ? newW / w : 1,
-    sy = h ? newH / h : 1;
-  return pts.map((p) => ({
-    x: minX + (p.x - minX) * sx,
-    y: minY + (p.y - minY) * sy,
-  }));
-};
-const snap = (v, g = 20) => Math.round(v / g) * g;
+const API_BASE = "/api/floor-plan";
 
-/* Shapes (world units = px) */
+/* ---------- helpers vẽ shape ---------- */
 const rectPoints = (W, H) => [
   { x: 0, y: 0 },
   { x: W, y: 0 },
@@ -97,13 +58,38 @@ const tPoints = (W, H, t) => {
   ];
 };
 
-/* ================= Small utilities ================= */
+const snap = (v, g = 20) => Math.round(v / g) * g;
+
+const pathFromPoints = (pts) =>
+  pts?.length ? `M${pts.map((p) => `${p.x} ${p.y}`).join(" L ")} Z` : "";
+
+const bboxOf = (pts) => {
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+};
+
+const scalePointsToBox = (pts, newW, newH) => {
+  const { minX, minY, w, h } = bboxOf(pts);
+  const sx = w ? newW / w : 1;
+  const sy = h ? newH / h : 1;
+  return pts.map((p) => ({
+    x: minX + (p.x - minX) * sx,
+    y: minY + (p.y - minY) * sy,
+  }));
+};
+
+/* ---------- drag util cho handle ---------- */
 function useDrag(callback) {
   return (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const startX = e.clientX,
-      startY = e.clientY;
+    const startX = e.clientX;
+    const startY = e.clientY;
     const onMove = (me) => callback(me.clientX - startX, me.clientY - startY);
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
@@ -114,6 +100,7 @@ function useDrag(callback) {
   };
 }
 
+/* ---------- icon + label ---------- */
 const Icon = ({ name, size = 16 }) => {
   const common = {
     width: size,
@@ -122,6 +109,18 @@ const Icon = ({ name, size = 16 }) => {
     fill: "currentColor",
   };
   switch (name) {
+    case "room":
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+        </svg>
+      );
+    case "corridor":
+      return (
+        <svg {...common}>
+          <rect x="3" y="10" width="18" height="4" rx="1" />
+        </svg>
+      );
     case "door":
       return (
         <svg {...common}>
@@ -160,18 +159,6 @@ const Icon = ({ name, size = 16 }) => {
           <path d="M5 13h14v8H5v-8Zm2 2v4h10v-4H7Z" />
         </svg>
       );
-    case "room":
-      return (
-        <svg {...common}>
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-        </svg>
-      );
-    case "corridor":
-      return (
-        <svg {...common}>
-          <rect x="3" y="10" width="18" height="4" rx="1" />
-        </svg>
-      );
     default:
       return null;
   }
@@ -180,22 +167,27 @@ const Icon = ({ name, size = 16 }) => {
 function EditableLabel({ text, onCommit }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(text);
+
   useEffect(() => {
     if (!editing) setVal(text);
   }, [text, editing]);
+
   const start = (e) => {
     e.stopPropagation();
     setEditing(true);
   };
+
   const commit = () => {
     const t = (val || "").trim();
     onCommit?.(t || text);
     setEditing(false);
   };
+
   const cancel = () => {
     setVal(text);
     setEditing(false);
   };
+
   return (
     <div
       onDoubleClick={start}
@@ -222,17 +214,18 @@ function EditableLabel({ text, onCommit }) {
             border: "1px solid #94a3b8",
             borderRadius: 6,
             background: "#fff",
-            minWidth: 60,
+            minWidth: 70,
+            fontSize: 13,
           }}
         />
       ) : (
-        <span style={{ userSelect: "none" }}>{text}</span>
+        <span style={{ userSelect: "none", fontSize: 13 }}>{text}</span>
       )}
     </div>
   );
 }
 
-/* ================= Node renderers ================= */
+/* ---------- Node components ---------- */
 function BuildingNode({ data }) {
   const {
     points,
@@ -241,7 +234,7 @@ function BuildingNode({ data }) {
     grid = 40,
     onChangePoints,
   } = data || {};
-  const pts = points;
+  const pts = points || [];
 
   const Handle = ({ x, y, onDrag }) => (
     <circle
@@ -265,6 +258,7 @@ function BuildingNode({ data }) {
   };
 
   const { w, h } = bboxOf(pts);
+
   return (
     <div style={{ width: w, height: h }}>
       <svg width={w} height={h} style={{ display: "block" }}>
@@ -274,8 +268,6 @@ function BuildingNode({ data }) {
           stroke={stroke}
           strokeWidth="2"
           strokeLinejoin="round"
-          shapeRendering="crispEdges"
-          pointerEvents="none"
         />
         <path
           className="building__drag"
@@ -376,22 +368,38 @@ function SmallNode({ data }) {
   );
 }
 
-/* ================= Editor ================= */
+/* =================== EDITOR =================== */
 function FloorplanEditor() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const wrapperRef = useRef(null);
+  const rf = useReactFlow(); // dùng rf.project
 
-  const wrapRef = useRef(null);
-  const rf = useReactFlow();
-
-  // Query params -> ưu tiên nếu có
   const qpBuilding = searchParams.get("building");
   const qpFloor = searchParams.get("floor");
 
-  const [activeBuilding, setActiveBuilding] = useState(qpBuilding || "A");
+  const [buildings, setBuildings] = useState([]);
+  const [loadingBuildings, setLoadingBuildings] = useState(false);
+  const [buildingError, setBuildingError] = useState("");
+
+  const [activeBuilding, setActiveBuilding] = useState(qpBuilding || "");
   const [activeFloor, setActiveFloor] = useState(qpFloor || "1");
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  // cho sẵn 1 node test để đảm bảo canvas hiển thị
+  const [nodes, setNodes, onNodesChange] = useNodesState([
+    {
+      id: "test-room",
+      type: "block",
+      position: { x: 200, y: 150 },
+      data: {
+        label: "Test phòng",
+        w: 160,
+        h: 100,
+        color: "#1e40af",
+        icon: "room",
+      },
+    },
+  ]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [gridGap, setGridGap] = useState(40);
   const [pxPerMeter, setPxPerMeter] = useState(80);
@@ -402,42 +410,59 @@ function FloorplanEditor() {
     []
   );
 
-  // Load khi đổi tòa/tầng
-  const comboKey = `${activeBuilding}::${activeFloor}`;
-  const prevKeyRef = useRef(comboKey);
-  useEffect(() => {
-    if (prevKeyRef.current === comboKey) return;
-    const plan = loadSinglePlan(activeBuilding, activeFloor);
-    if (plan) {
-      setNodes(plan.nodes || []);
-      setEdges(plan.edges || []);
-      if (plan.meta) {
-        setPxPerMeter(plan.meta.pxPerMeter ?? 80);
-        setGridGap(plan.meta.gridGap ?? 40);
-      }
-    } else {
-      setNodes([]);
-      setEdges([]);
-    }
-    setSelectedId(null);
-    prevKeyRef.current = comboKey;
-  }, [comboKey, activeBuilding, activeFloor, setNodes]);
+  const activeBuildingObj = useMemo(
+    () =>
+      buildings.find(
+        (b) => String(b.building_id) === String(activeBuilding || "")
+      ),
+    [buildings, activeBuilding]
+  );
 
-  // Mount lần đầu
+  const floorOptions = useMemo(() => {
+    const totalFloors = activeBuildingObj?.number_of_floors || 0;
+    if (!totalFloors || totalFloors <= 0) return [];
+    return Array.from({ length: totalFloors }, (_, i) => String(i + 1));
+  }, [activeBuildingObj]);
+
   useEffect(() => {
-    const plan = loadSinglePlan(activeBuilding, activeFloor);
-    if (plan) {
-      setNodes(plan.nodes || []);
-      setEdges(plan.edges || []);
-      if (plan.meta) {
-        setPxPerMeter(plan.meta.pxPerMeter ?? 80);
-        setGridGap(plan.meta.gridGap ?? 40);
+    if (floorOptions.length > 0) {
+      if (!floorOptions.includes(String(activeFloor))) {
+        setActiveFloor(floorOptions[0]);
       }
     }
-  }, []);
+  }, [floorOptions, activeFloor]);
 
-  // Inject callbacks cho các node (để đổi text / kéo đỉnh)
-  const injectNodeCallbacks = useCallback(() => {
+  // load list building – giống màn list
+  useEffect(() => {
+    let canceled = false;
+    async function fetchBuildings() {
+      try {
+        setLoadingBuildings(true);
+        setBuildingError("");
+        const data = await listBuildings();
+        if (canceled) return;
+        setBuildings(Array.isArray(data) ? data : []);
+        if (!qpBuilding && data?.length > 0) {
+          setActiveBuilding(String(data[0].building_id));
+        }
+      } catch (err) {
+        if (canceled) return;
+        setBuildingError(err?.message || "Không thể tải danh sách tòa nhà");
+      } finally {
+        if (!canceled) setLoadingBuildings(false);
+      }
+    }
+    fetchBuildings();
+    return () => {
+      canceled = true;
+    };
+  }, [qpBuilding]);
+
+  const comboKey = `${activeBuilding || "NO_BUILDING"}-${
+    activeFloor || "NO_FLOOR"
+  }`;
+
+  const injectCallbacks = useCallback(() => {
     setNodes((nds) =>
       nds.map((n) => {
         if (n.type === "building") {
@@ -479,40 +504,87 @@ function FloorplanEditor() {
       })
     );
   }, [gridGap, setNodes]);
+
+  // load layout theo building/tầng (nếu backend có) – tạm giữ nguyên
+  const loadFromAPI = useCallback(async () => {
+    if (!activeBuilding || !activeFloor) {
+      setNodes(([]) => []);
+      setEdges(([]) => []);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/${comboKey}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        setNodes(([]) => []);
+        setEdges(([]) => []);
+        return;
+      }
+      const json = await res.json();
+      const layout = json?.data?.layout;
+      if (layout) {
+        const { nodes: n = [], edges: e = [], meta = {} } = layout;
+        setNodes(n);
+        setEdges(e);
+        if (meta?.pxPerMeter) setPxPerMeter(meta.pxPerMeter);
+        if (meta?.gridGap) setGridGap(meta.gridGap);
+        setTimeout(injectCallbacks, 0);
+      } else {
+        setNodes(([]) => []);
+        setEdges(([]) => []);
+      }
+    } catch {
+      setNodes(([]) => []);
+      setEdges(([]) => []);
+    }
+  }, [
+    comboKey,
+    activeBuilding,
+    activeFloor,
+    injectCallbacks,
+    setNodes,
+    setEdges,
+  ]);
+
   useEffect(() => {
-    setTimeout(injectNodeCallbacks, 0);
-  }, [injectNodeCallbacks]);
+    loadFromAPI();
+  }, [loadFromAPI]);
 
-  const onConnect = useCallback(
-    (p) => setEdges((eds) => addEdge({ ...p, type: "smoothstep" }, eds)),
-    []
-  );
-  const onDragOver = useCallback((e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }, []);
+  useEffect(() => {
+    injectCallbacks();
+  }, [injectCallbacks]);
 
-  // Thả item từ palette → tạo node
+  /* ---------- Drag từ palette sang canvas (CHÍNH) ---------- */
   const addNodeFromType = useCallback(
-    (e) => {
-      e.preventDefault();
-      const type = e.dataTransfer.getData("application/sami-node");
+    (event) => {
+      event.preventDefault();
+
+      // lấy type từ palette
+      const type =
+        event.dataTransfer.getData("application/sami-node") ||
+        event.dataTransfer.getData("application/reactflow");
       if (!type) return;
 
-      const bounds = wrapRef.current.getBoundingClientRect();
-      const position = rf.screenToFlowPosition({
-        x: e.clientX - bounds.left,
-        y: e.clientY - bounds.top,
+      // ✅ dùng screenToFlowPosition đúng chuẩn: truyền thẳng clientX / clientY,
+      // KHÔNG trừ bounds nữa
+      const pos = rf.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
+
+      console.log("DROP NODE:", type, pos); // để debug, kéo là phải thấy log này
+
       const id = Math.random().toString(36).slice(2, 9);
 
-      const W = 18 * pxPerMeter,
-        H = 10 * pxPerMeter;
+      const W = 16 * pxPerMeter;
+      const H = 10 * pxPerMeter;
       const t = Math.max(16, Math.round(Math.min(W, H) * 0.16));
+
       const buildingBase = (pts) => ({
         id: "building",
         type: "building",
-        position: { x: 60, y: 40 },
+        position: { x: 60, y: 40 }, // toà nhà luôn ở 1 chỗ cố định
         draggable: true,
         dragHandle: ".building__drag",
         selectable: true,
@@ -529,7 +601,7 @@ function FloorplanEditor() {
         room: {
           id,
           type: "block",
-          position,
+          position: pos,
           style: { zIndex: 1 },
           data: {
             label: "Phòng",
@@ -542,7 +614,7 @@ function FloorplanEditor() {
         corridor: {
           id,
           type: "block",
-          position,
+          position: pos,
           style: { zIndex: 1 },
           data: {
             label: "Hành lang",
@@ -555,7 +627,7 @@ function FloorplanEditor() {
         door: {
           id,
           type: "small",
-          position,
+          position: pos,
           style: { zIndex: 1 },
           data: {
             label: "Cửa",
@@ -569,7 +641,7 @@ function FloorplanEditor() {
         stairs: {
           id,
           type: "small",
-          position,
+          position: pos,
           style: { zIndex: 1 },
           data: {
             label: "Cầu thang",
@@ -583,7 +655,7 @@ function FloorplanEditor() {
         elevator: {
           id,
           type: "small",
-          position,
+          position: pos,
           style: { zIndex: 1 },
           data: {
             label: "Thang máy",
@@ -597,7 +669,7 @@ function FloorplanEditor() {
         exit: {
           id,
           type: "small",
-          position,
+          position: pos,
           style: { zIndex: 1 },
           data: {
             label: "Lối thoát",
@@ -611,7 +683,7 @@ function FloorplanEditor() {
         ext: {
           id,
           type: "small",
-          position,
+          position: pos,
           style: { zIndex: 1 },
           data: {
             label: "Bình cứu hoả",
@@ -625,7 +697,7 @@ function FloorplanEditor() {
         clinic: {
           id,
           type: "small",
-          position,
+          position: pos,
           style: { zIndex: 1 },
           data: {
             label: "Y tế",
@@ -644,27 +716,20 @@ function FloorplanEditor() {
       if (type.startsWith("building-")) {
         setNodes((nds) => [cfg, ...nds.filter((n) => n.id !== "building")]);
         setSelectedId("building");
-        setTimeout(injectNodeCallbacks, 0);
+        setTimeout(injectCallbacks, 0);
       } else {
-        if (cfg.type === "block" || cfg.type === "small") {
-          cfg.data.onChangeLabel = (txt) =>
-            setNodes((curr) =>
-              curr.map((m) =>
-                m.id === id ? { ...m, data: { ...m.data, label: txt } } : m
-              )
-            );
-        }
         setNodes((nds) => nds.concat(cfg));
         setSelectedId(id);
+        setTimeout(injectCallbacks, 0);
       }
     },
-    [pxPerMeter, rf, gridGap, setNodes, injectNodeCallbacks]
+    [pxPerMeter, rf, gridGap, injectCallbacks, setNodes]
   );
 
-  // Kích thước đối tượng đang chọn (m)
   const selectedNode = nodes.find((n) => n.id === selectedId);
-  let lengthM = null,
-    widthM = null;
+  let lengthM = null;
+  let widthM = null;
+
   if (selectedNode?.type === "building") {
     const box = bboxOf(selectedNode.data.points);
     lengthM = box.w / pxPerMeter;
@@ -673,11 +738,12 @@ function FloorplanEditor() {
     lengthM = (selectedNode.data.w || 0) / pxPerMeter;
     widthM = (selectedNode.data.h || 0) / pxPerMeter;
   }
+
   const updateSizeMeters = (field, m) => {
     if (!selectedNode) return;
     if (selectedNode.type === "building") {
-      const pts = selectedNode.data.points,
-        box = bboxOf(pts);
+      const pts = selectedNode.data.points;
+      const box = bboxOf(pts);
       const newW = field === "w" ? m * pxPerMeter : box.w;
       const newH = field === "h" ? m * pxPerMeter : box.h;
       const scaled = scalePointsToBox(pts, newW, newH);
@@ -698,46 +764,42 @@ function FloorplanEditor() {
     }
   };
 
-  /* -------- AUTO SAVE -------- */
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const plan = {
-        nodes,
-        edges,
-        meta: { pxPerMeter, gridGap, savedAt: Date.now() },
+  const handleSaveToAPI = async () => {
+    try {
+      if (!activeBuilding) {
+        alert("Vui lòng chọn tòa nhà trước khi lưu layout");
+        return;
+      }
+      if (!activeFloor) {
+        alert("Vui lòng chọn tầng trước khi lưu layout");
+        return;
+      }
+
+      const buildingId = Number(activeBuilding);
+      const floorNumber = Number(activeFloor);
+      const buildingName =
+        activeBuildingObj?.name || `#${String(activeBuilding)}`;
+
+      const payload = {
+        building_id: buildingId,
+        floor_number: floorNumber,
+        name: `Tòa ${buildingName} - Tầng ${activeFloor}`,
+        layout: {
+          nodes,
+          edges,
+          meta: { pxPerMeter, gridGap, savedAt: Date.now() },
+        },
       };
-      saveSinglePlan(activeBuilding, activeFloor, plan);
-    }, 500);
-    return () => clearTimeout(t);
-  }, [nodes, edges, pxPerMeter, gridGap, activeBuilding, activeFloor]);
 
-  const handleSaveClick = () => {
-    const plan = {
-      nodes,
-      edges,
-      meta: { pxPerMeter, gridGap, savedAt: Date.now() },
-    };
-    saveSinglePlan(activeBuilding, activeFloor, plan);
-    alert(`Đã lưu layout: ${activeBuilding} - Tầng ${activeFloor}`);
-  };
-  const handleLoadClick = () => {
-    const plan = loadSinglePlan(activeBuilding, activeFloor);
-    if (!plan) {
-      alert("Chưa có layout đã lưu cho tổ hợp này.");
-      return;
+      await createFloorPlan(payload);
+      alert("Đã lưu layout lên backend!");
+    } catch (err) {
+      console.error(err);
+      alert(err?.message || "Lỗi khi lưu layout, kiểm tra console!");
     }
-    setNodes(plan.nodes || []);
-    setEdges(plan.edges || []);
-    if (plan.meta) {
-      setPxPerMeter(plan.meta.pxPerMeter ?? 80);
-      setGridGap(plan.meta.gridGap ?? 40);
-    }
-    setSelectedId(null);
-    setTimeout(injectNodeCallbacks, 0);
   };
 
-  /* ===== Palette items ===== */
-  const items = [
+  const paletteItems = [
     { type: "building-rect", label: "Tòa nhà (Rect)", icon: "room" },
     { type: "building-L", label: "Tòa nhà (L-shape)", icon: "room" },
     { type: "building-U", label: "Tòa nhà (U-shape)", icon: "room" },
@@ -757,64 +819,41 @@ function FloorplanEditor() {
     e.dataTransfer.effectAllowed = "move";
   }, []);
 
-  /* ==== Palette preview for building shapes ==== */
-  const miniPath = (type) => {
-    const W = 38,
-      H = 26,
-      t = 6;
-    const shift = (pts) => pts.map((p) => ({ x: p.x + 1, y: p.y + 1 }));
-    const toD = (pts) => `M${pts.map((p) => `${p.x},${p.y}`).join(" L ")} Z`;
-    if (type === "building-rect") return toD(shift(rectPoints(W - 2, H - 2)));
-    if (type === "building-L") return toD(shift(lPoints(W - 2, H - 2, t)));
-    if (type === "building-U") return toD(shift(uPoints(W - 2, H - 2, t)));
-    if (type === "building-T") return toD(shift(tPoints(W - 2, H - 2, t)));
-    return "";
+  const cardStyle = {
+    border: "1px solid #e5e7eb",
+    borderRadius: 10,
+    padding: 12,
+    background: "#ffffff",
+    boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
   };
-  const PaletteItemIcon = ({ type, icon }) => {
-    if (type.startsWith("building-")) {
-      return (
-        <svg width="38" height="26" style={{ flex: "0 0 auto" }}>
-          <rect x="0" y="0" width="38" height="26" rx="6" fill="#f8fafc" />
-          <path
-            d={miniPath(type)}
-            fill="#eef2ff"
-            stroke="#60a5fa"
-            strokeWidth="2"
-          />
-        </svg>
-      );
-    }
-    return (
-      <span
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: "50%",
-          background: "#fff",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          border: "1px solid #cbd5e1",
-          color: "#0ea5e9",
-          flex: "0 0 auto",
-        }}
-      >
-        <Icon name={icon || "room"} size={16} />
-      </span>
-    );
+
+  const labelStyle = {
+    display: "block",
+    fontWeight: 600,
+    fontSize: 13,
+    marginBottom: 4,
+    color: "#0f172a",
+  };
+
+  const inputStyle = {
+    width: "100%",
+    border: "1px solid #cbd5e1",
+    borderRadius: 8,
+    padding: "6px 10px",
+    fontSize: 13,
   };
 
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "340px 1fr",
+        gridTemplateColumns: "360px minmax(0, 1fr)",
         gap: 16,
-        height: "calc(100vh - 140px)",
-        padding: 16,
+        padding: "16px 20px 24px",
+        alignItems: "flex-start",
       }}
     >
-      {/* LEFT */}
+      {/* LEFT PANEL */}
       <div
         style={{
           display: "grid",
@@ -822,12 +861,12 @@ function FloorplanEditor() {
           gap: 12,
         }}
       >
-        {/* Header actions */}
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
           }}
         >
           <button
@@ -837,106 +876,140 @@ function FloorplanEditor() {
               borderRadius: 8,
               background: "#e2e8f0",
               color: "#0f172a",
-              fontWeight: 700,
+              fontWeight: 600,
               border: "1px solid #cbd5e1",
+              fontSize: 13,
+              whiteSpace: "nowrap",
             }}
           >
             ← Quay lại View
           </button>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleSaveClick}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 8,
-                background: "#0ea5e9",
-                color: "#fff",
-                fontWeight: 700,
-                border: "none",
-              }}
-            >
-              Lưu layout
-            </button>
-            <button
-              onClick={handleLoadClick}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 8,
-                background: "#e2e8f0",
-                color: "#0f172a",
-                fontWeight: 700,
-                border: "1px solid #cbd5e1",
-              }}
-            >
-              Tải layout đã lưu
-            </button>
-          </div>
+          <button
+            onClick={handleSaveToAPI}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              background: "#0ea5e9",
+              color: "#ffffff",
+              fontWeight: 700,
+              border: "none",
+              fontSize: 13,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Lưu layout
+          </button>
         </div>
 
-        {/* Tổ hợp tòa/tầng */}
-        <div
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            padding: 12,
-            background: "#fff",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Khu vực bản vẽ</div>
+        <div style={cardStyle}>
           <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}
+            style={{
+              fontWeight: 700,
+              marginBottom: 8,
+              fontSize: 14,
+              color: "#0f172a",
+            }}
+          >
+            Khu vực bản vẽ
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 10,
+            }}
           >
             <div>
-              <label style={{ fontWeight: 600 }}>Tòa nhà</label>
-              <input
+              <label style={labelStyle}>Tòa nhà</label>
+              <select
+                style={inputStyle}
                 value={activeBuilding}
                 onChange={(e) => setActiveBuilding(e.target.value)}
-                placeholder="VD: A"
-                style={{
-                  width: "100%",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: 8,
-                  padding: "8px 10px",
-                  marginTop: 4,
-                }}
-              />
+              >
+                {loadingBuildings && <option value="">Đang tải...</option>}
+                {!loadingBuildings && buildings.length === 0 && (
+                  <option value="">Không có tòa nhà</option>
+                )}
+                {!loadingBuildings &&
+                  buildings.map((b) => (
+                    <option key={b.building_id} value={b.building_id}>
+                      {b.name || `Tòa #${b.building_id}`}
+                    </option>
+                  ))}
+              </select>
+              {buildingError && (
+                <div
+                  style={{
+                    color: "#b91c1c",
+                    fontSize: 12,
+                    marginTop: 4,
+                  }}
+                >
+                  {buildingError}
+                </div>
+              )}
             </div>
             <div>
-              <label style={{ fontWeight: 600 }}>Tầng</label>
-              <input
-                value={activeFloor}
-                onChange={(e) => setActiveFloor(e.target.value)}
-                placeholder="VD: 3"
-                style={{
-                  width: "100%",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: 8,
-                  padding: "8px 10px",
-                  marginTop: 4,
-                }}
-              />
+              <label style={labelStyle}>Tầng</label>
+              {floorOptions.length > 0 ? (
+                <select
+                  style={inputStyle}
+                  value={activeFloor}
+                  onChange={(e) => setActiveFloor(e.target.value)}
+                >
+                  {floorOptions.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  style={inputStyle}
+                  value={activeFloor}
+                  onChange={(e) => setActiveFloor(e.target.value)}
+                  placeholder="VD: 1"
+                />
+              )}
             </div>
           </div>
-          <div style={{ color: "#64748b", marginTop: 8, fontSize: 12 }}>
-            Tổ hợp <b>{activeBuilding}</b>–<b>T{activeFloor}</b> sẽ tự lưu khi
-            thao tác. Bạn cũng có thể nhấn <b>Lưu layout</b>.
+          <div
+            style={{
+              color: "#64748b",
+              marginTop: 8,
+              fontSize: 12,
+              lineHeight: 1.4,
+            }}
+          >
+            Layout cho{" "}
+            <b>{activeBuildingObj?.name || `Tòa #${activeBuilding || "-"}`}</b>{" "}
+            – <b>Tầng {activeFloor}</b> sẽ được lưu lên hệ thống khi bạn nhấn{" "}
+            <b>Lưu layout</b>.
           </div>
         </div>
 
-        {/* Giá trị */}
-        <div
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            padding: 12,
-            background: "#fff",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Giá trị</div>
-          <div style={{ display: "grid", gap: 10 }}>
+        <div style={cardStyle}>
+          <div
+            style={{
+              fontWeight: 700,
+              marginBottom: 8,
+              fontSize: 14,
+              color: "#0f172a",
+            }}
+          >
+            Giá trị
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 10,
+            }}
+          >
             <div>
-              <label style={{ fontWeight: 600 }}>Tỉ lệ (px/m)</label>
+              <label style={labelStyle}>Tỉ lệ (px/m)</label>
               <input
+                style={inputStyle}
                 type="text"
                 inputMode="numeric"
                 value={String(pxPerMeter)}
@@ -944,18 +1017,12 @@ function FloorplanEditor() {
                   const t = e.target.value.replace(/[^\d]/g, "");
                   setPxPerMeter(Number(t || 0));
                 }}
-                style={{
-                  width: "100%",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: 8,
-                  padding: "6px 10px",
-                  marginTop: 4,
-                }}
               />
             </div>
             <div>
-              <label style={{ fontWeight: 600 }}>Grid (px)</label>
+              <label style={labelStyle}>Grid (px)</label>
               <input
+                style={inputStyle}
                 type="text"
                 inputMode="numeric"
                 value={String(gridGap)}
@@ -963,29 +1030,21 @@ function FloorplanEditor() {
                   const t = e.target.value.replace(/[^\d]/g, "");
                   setGridGap(Number(t || 0));
                 }}
-                style={{
-                  width: "100%",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: 8,
-                  padding: "6px 10px",
-                  marginTop: 4,
-                }}
               />
             </div>
           </div>
         </div>
 
-        {/* Kích thước đối tượng chọn */}
-        <div
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            padding: 12,
-            background: "#fff",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>
-            Kích thước đối tượng chọn (m)
+        <div style={cardStyle}>
+          <div
+            style={{
+              fontWeight: 700,
+              marginBottom: 8,
+              fontSize: 14,
+              color: "#0f172a",
+            }}
+          >
+            Kích thước đối tượng (m)
           </div>
           {selectedId ? (
             <div
@@ -996,61 +1055,48 @@ function FloorplanEditor() {
               }}
             >
               <div>
-                <label style={{ fontWeight: 600 }}>Dài</label>
+                <label style={labelStyle}>Dài</label>
                 <input
+                  style={inputStyle}
                   type="text"
                   value={lengthM ?? ""}
                   onChange={(e) =>
                     updateSizeMeters("w", Number(e.target.value))
                   }
-                  style={{
-                    width: "100%",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    padding: "6px 10px",
-                    marginTop: 4,
-                  }}
                 />
               </div>
               <div>
-                <label style={{ fontWeight: 600 }}>Rộng</label>
+                <label style={labelStyle}>Rộng</label>
                 <input
+                  style={inputStyle}
                   type="text"
                   value={widthM ?? ""}
                   onChange={(e) =>
                     updateSizeMeters("h", Number(e.target.value))
                   }
-                  style={{
-                    width: "100%",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    padding: "6px 10px",
-                    marginTop: 4,
-                  }}
                 />
               </div>
             </div>
           ) : (
-            <div style={{ color: "#64748b" }}>
-              Hãy click chọn một đối tượng trên canvas…
+            <div style={{ color: "#64748b", fontSize: 13 }}>
+              Hãy chọn một đối tượng trên canvas để chỉnh kích thước…
             </div>
           )}
         </div>
 
-        {/* Palette */}
-        <div
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            padding: 12,
-            background: "#fff",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>
-            Biểu tượng / Hình toà nhà
+        <div style={{ ...cardStyle, maxHeight: "100%", overflow: "auto" }}>
+          <div
+            style={{
+              fontWeight: 700,
+              marginBottom: 8,
+              fontSize: 14,
+              color: "#0f172a",
+            }}
+          >
+            Biểu tượng / Hình tòa nhà
           </div>
           <div style={{ display: "grid", gap: 8 }}>
-            {items.map((i) => (
+            {paletteItems.map((i) => (
               <div
                 key={i.type}
                 draggable
@@ -1058,16 +1104,32 @@ function FloorplanEditor() {
                 style={{
                   userSelect: "none",
                   cursor: "grab",
-                  padding: "10px 12px",
-                  border: "1px dashed #cbd5e1",
+                  padding: "8px 10px",
                   borderRadius: 8,
-                  background: "#ffffff",
+                  border: "1px dashed #cbd5e1",
+                  background: "#f8fafc",
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
+                  fontSize: 13,
                 }}
               >
-                <PaletteItemIcon type={i.type} icon={i.icon} />
+                <span
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: "999px",
+                    background: "#ffffff",
+                    border: "1px solid #cbd5e1",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#0ea5e9",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon name={i.icon} size={14} />
+                </span>
                 <span>{i.label}</span>
               </div>
             ))}
@@ -1075,32 +1137,38 @@ function FloorplanEditor() {
         </div>
       </div>
 
-      {/* CANVAS */}
+      {/* RIGHT CANVAS */}
       <div
-        ref={wrapRef}
+        ref={wrapperRef}
         style={{
           width: "100%",
-          height: "100%",
+          minHeight: 620,
           border: "1px solid #e5e7eb",
           borderRadius: 10,
+          background: "#ffffff",
           overflow: "hidden",
-          background: "#fff",
-          position: "relative",
+          boxShadow: "0 2px 4px rgba(15,23,42,0.06)",
+        }}
+        onDrop={addNodeFromType}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
         }}
       >
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onDrop={addNodeFromType}
-          onDragOver={onDragOver}
-          nodeTypes={nodeTypes}
+          onConnect={(p) =>
+            setEdges((eds) => addEdge({ ...p, type: "smoothstep" }, eds))
+          }
           fitView
           panOnDrag={[2]}
           panOnScroll={false}
           zoomOnScroll={false}
+          style={{ width: "100%", height: "100%" }}
           onSelectionChange={({ nodes: sel }) =>
             setSelectedId(sel?.[0]?.id || null)
           }

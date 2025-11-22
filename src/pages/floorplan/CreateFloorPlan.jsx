@@ -557,23 +557,23 @@ function FloorplanEditor() {
 
   /* ---------- Drag từ palette sang canvas (CHÍNH) ---------- */
   const addNodeFromType = useCallback(
-    (e) => {
-      e.preventDefault();
+    (event) => {
+      event.preventDefault();
 
       // lấy type từ palette
       const type =
-        e.dataTransfer.getData("application/sami-node") ||
-        e.dataTransfer.getData("application/reactflow");
+        event.dataTransfer.getData("application/sami-node") ||
+        event.dataTransfer.getData("application/reactflow");
       if (!type) return;
 
-      // ✅ DÙNG screenToFlowPosition với tọa độ màn hình gốc,
+      // ✅ dùng screenToFlowPosition đúng chuẩn: truyền thẳng clientX / clientY,
       // KHÔNG trừ bounds nữa
       const pos = rf.screenToFlowPosition({
-        x: e.clientX,
-        y: e.clientY,
+        x: event.clientX,
+        y: event.clientY,
       });
 
-      console.log("DROP NODE:", type, pos); // debug cho chắc
+      console.log("DROP NODE:", type, pos); // để debug, kéo là phải thấy log này
 
       const id = Math.random().toString(36).slice(2, 9);
 
@@ -584,8 +584,7 @@ function FloorplanEditor() {
       const buildingBase = (pts) => ({
         id: "building",
         type: "building",
-        // building mình vẫn giữ cố định một chỗ cho dễ canh
-        position: { x: 60, y: 40 },
+        position: { x: 60, y: 40 }, // toà nhà luôn ở 1 chỗ cố định
         draggable: true,
         dragHandle: ".building__drag",
         selectable: true,

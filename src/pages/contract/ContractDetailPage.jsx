@@ -6,7 +6,6 @@ import { colors } from "../../constants/colors";
 
 import { getContract } from "../../services/api/contracts";
 import { listUsers } from "../../services/api/users";
-import { listAppendices } from "../../services/api/appendix"; // nếu bạn có API riêng
 
 export default function ContractDetailPage() {
   const { id } = useParams();
@@ -58,8 +57,8 @@ export default function ContractDetailPage() {
         setTenant(foundTenant || null);
 
         // 3. Lấy phụ lục
-        const apx = await listAppendices();
-        const filtered = apx.items.filter(
+        
+        const filtered = c?.appendices?.items.filter(
           (a) => Number(a.contract_id) === Number(id)
         );
         setAppendices(filtered);

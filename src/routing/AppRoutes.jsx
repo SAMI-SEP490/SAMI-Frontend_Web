@@ -57,7 +57,7 @@ const CreateFloorPlan = lazy(() =>
   import("@/pages/floorplan/CreateFloorPlan.jsx")
 );
 const ViewFloorPlan = lazy(() => import("@/pages/floorplan/ViewFloorPlan.jsx"));
-
+const EditFloorPlan = lazy(() => import("@/pages/floorplan/EditFloorPlan.jsx"));
 // ===== Dashboard =====
 import TenantAggregatesPage from "../pages/dashboard/TenantAggregatesPage";
 import ViewTimeBasedReportsPage from "../pages/dashboard/ViewTimeBasedReportsPage";
@@ -331,7 +331,16 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/floorplan/edit/:planId"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={LazyFallback}>
+                <EditFloorPlan />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
         {/* Dashboard */}
         <Route
           path={ROUTES.tenantAggregates}

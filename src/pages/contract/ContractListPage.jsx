@@ -33,7 +33,7 @@ export default function ContractListPage() {
   const toVietnameseStatus = (s) => {
     switch (s) {
       case "active":
-        return "Hoạt động";
+        return "Có hiệu lực";
       case "pending":
         return "Đang xử lý";
       case "expired":
@@ -264,7 +264,7 @@ export default function ContractListPage() {
             <label className="label">Trạng thái:</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="all">Tất cả</option>
-              <option value="active">Hoạt động</option>
+              <option value="active">Có hiệu lực</option>
               <option value="pending">Đang xử lý</option>
               <option value="expired">Hết hạn</option>
               <option value="cancelled">Đã hủy</option>

@@ -121,13 +121,20 @@ export async function getDownloadUrl(id) {
   }
 }
 
-export async function downloadContractDirect(id) {
+export async function downloadContractDirect(id, returnBlob = false) {
   if (!id) throw new Error("Missing contract id");
+
   const res = await http.get(`/contract/${id}/download/direct`, {
     responseType: "blob",
   });
+
   const contentType = res?.headers?.["content-type"] || "application/pdf";
   const blob = new Blob([res.data], { type: contentType });
+
+  // nếu FE cần lấy blob → trả về để FE xử lý tiếp
+  if (returnBlob) return { blob };
+
+  // mặc định: tải trực tiếp
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

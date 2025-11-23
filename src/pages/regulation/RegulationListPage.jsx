@@ -3,7 +3,7 @@ import {
   listRegulations,
   deleteRegulation,
   publishRegulation,
-  archiveRegulation,
+  unpublishRegulation,
 } from "../../services/api/regulation";
 import { useNavigate } from "react-router-dom";
 import {
@@ -71,7 +71,7 @@ export default function RegulationListPage() {
 
   async function handleArchive(id) {
     try {
-      await archiveRegulation(id);
+      await unpublishRegulation(id);
       alert("✅ Quy định đã được hủy xuất bản / lưu trữ.");
       fetchData();
     } catch (err) {

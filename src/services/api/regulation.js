@@ -68,8 +68,8 @@ export async function publishRegulation(id) {
 }
 
 // Archive regulation
-export async function archiveRegulation(id) {
-  const { data } = await http.post(`/regulation/${id}/archive`);
+export async function unpublishRegulation(id) {
+  const { data } = await http.post(`/regulation/${id}/unpublish`);
   return unwrap(data);
 }
 

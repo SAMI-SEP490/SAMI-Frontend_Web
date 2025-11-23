@@ -16,7 +16,7 @@ export default function CreateContractPage() {
     endDate: "",
     rentAmount: "",
     depositAmount: "",
-    status: "pending",
+    status: "active",
     note: "",
     file: null,
   });
@@ -229,19 +229,6 @@ export default function CreateContractPage() {
                 value={form.depositAmount}
                 onChange={onChange}
               />
-            </div>
-
-            {/* STATUS */}
-            <div className="field">
-              <label className="label">Trạng thái</label>
-              <select name="status" value={form.status} onChange={onChange}>
-                <option value="pending">pending</option>
-                <option value="active">active</option>
-                <option value="terminated">terminated</option>
-              </select>
-              <div className="hint">
-                Mặc định “pending” để đúng luồng duyệt trước khi kích hoạt.
-              </div>
             </div>
 
             {/* NOTE */}

@@ -1,5 +1,5 @@
 // src/layouts/PrivateLayout.jsx
-import React from "react";
+import React, { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "../components/Header";
 import Sidebar from "../components/SideBar";
@@ -8,9 +8,12 @@ import { colors } from "../constants/colors";
 export default function PrivateLayout() {
   const location = useLocation();
 
-  // Danh sách các route cần ẩn Header + Sidebar
-  const hideLayoutRoutes = ["/contracts/create", "/other-route-to-hide"];
+  // >>> NEW: Trạng thái mở/đóng Sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
+  const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
+
+  const hideLayoutRoutes = ["/contracts/create", "/other-route-to-hide"];
   const hideLayout = hideLayoutRoutes.includes(location.pathname);
 
   return (
@@ -26,35 +29,37 @@ export default function PrivateLayout() {
             flexShrink: 0,
           }}
         >
-          <Header />
+          <Header onToggleSidebar={toggleSidebar} /> {/* <<< thêm callback */}
         </div>
       )}
 
-      {/* Main content */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Sidebar */}
-        {!hideLayout && (
-          <div
-            style={{
-              width: "220px",
-              backgroundColor: colors.brand,
-              color: "white",
-              height: "100%",
-              borderRadius: "0 10px 10px 0",
-              flexShrink: 0,
-            }}
-          >
-            <Sidebar />
-          </div>
-        )}
+        {!hideLayout &&
+          isSidebarOpen && ( // <<< kiểm tra mở/đóng
+            <div
+              style={{
+                width: "220px",
+                backgroundColor: colors.brand,
+                color: "white",
+                height: "100%",
+                borderRadius: "0 10px 10px 0",
+                flexShrink: 0,
+                transition: "width 0.3s",
+              }}
+            >
+              <Sidebar toggleSidebar={toggleSidebar} /> {/* <<< truyền xuống */}
+            </div>
+          )}
 
-        {/* Nội dung chính */}
+        {/* Main */}
         <div
           style={{
             flex: 1,
             padding: "30px",
             backgroundColor: colors.background,
             overflowY: "auto",
+            transition: "margin-left 0.3s",
           }}
         >
           <Outlet />

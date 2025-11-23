@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   getRegulationById,
   publishRegulation,
-  archiveRegulation,
+  unpublishRegulation,
 } from "../../services/api/regulation";
 import "./ViewRegulationPage.css"; // import CSS riêng
 
@@ -51,7 +51,7 @@ export default function ViewRegulationPage() {
     if (!window.confirm("Bạn có chắc muốn hủy xuất bản quy định này?")) return;
     try {
       setActionLoading(true);
-      await archiveRegulation(id);
+      await unpublishRegulation(id);
       alert("✅ Quy định đã được hủy xuất bản / lưu trữ.");
       const res = await getRegulationById(id);
       setRegulation(res.data || res);

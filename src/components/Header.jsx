@@ -4,7 +4,7 @@ import { Badge } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { getProfile, logout as apiLogout } from "../services/api/auth";
 
-export default function Header() {
+export default function Header({ onToggleSidebar, isSidebarOpen }) {
   // cache tạm để không trắng tên
   const [user, setUser] = useState(() => {
     try {
@@ -13,6 +13,7 @@ export default function Header() {
       return null;
     }
   });
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -59,10 +60,29 @@ export default function Header() {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        padding: "8px 20px",
+        padding: "0 20px",
         height: "50px",
+        position: "sticky",
+        top: 0,
+        zIndex: 1000,
       }}
     >
+      {/* Nút mở/đóng Sidebar */}
+      <button
+        onClick={onToggleSidebar}
+        style={{
+          background: "none",
+          border: "none",
+          color: "#fff",
+          fontSize: 24,
+          cursor: "pointer",
+          marginRight: 10,
+        }}
+        title={isSidebarOpen ? "Đóng Sidebar" : "Mở Sidebar"}
+      >
+        {isSidebarOpen ? "☰" : "☰"} {/* Bạn có thể đổi icon khác */}
+      </button>
+
       <strong style={{ fontSize: "16px" }}>SAMI</strong>
 
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
@@ -72,7 +92,6 @@ export default function Header() {
           style={{ position: "relative", cursor: "pointer" }}
           title="Thông báo"
         >
-          {/* chuông đơn giản để giữ UI tương tự */}
           <span style={{ fontSize: 18 }}>🔔</span>
           <Badge
             bg="danger"
@@ -90,6 +109,7 @@ export default function Header() {
         >
           👤
         </span>
+
         <span
           onClick={handleLogout}
           style={{ cursor: "pointer", fontSize: 18 }}

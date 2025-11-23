@@ -27,7 +27,7 @@ const SideBar = () => {
       <div
         style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
       >
-        Thống kê & Quản lý
+        <b>Quản lý</b>
       </div>
 
       <button onClick={() => navigate("/contracts")} style={buttonStyle}>
@@ -60,6 +60,13 @@ const SideBar = () => {
       >
         Danh sách bảo trì
       </button>
+
+      <div
+        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
+      >
+        <b>Thống kê</b>
+      </div>
+
       <button
         onClick={() => navigate("/dashboard/tenant-aggregates")}
         style={buttonStyle}
@@ -79,6 +86,12 @@ const SideBar = () => {
       >
         Danh sách đăng ký xe
       </button>
+
+      <div
+        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
+      >
+        <b>Tòa nhà và sơ đồ</b>
+      </div>
 
       {/* ✅ Chỉ hiện khi role là OWNER */}
       {role === "OWNER" && (

@@ -9,27 +9,23 @@ import {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-/* ===== Storage ===== */
-const STORAGE_KEY = "sami_floorplans_v1";
-const loadAllPlans = () => {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-  } catch {
-    return {};
-  }
-};
+import { listBuildings } from "../../services/api/building";
+import {
+  listFloorPlans,
+  getFloorPlanDetail,
+} from "../../services/api/floorplan";
 
 /* ===== Simple SVG building (no handles) ===== */
 const pathFromPoints = (pts) =>
   pts?.length ? `M${pts.map((p) => `${p.x} ${p.y}`).join(" L ")} Z` : "";
 const bboxOf = (pts = []) => {
   if (!pts.length) return { w: 0, h: 0 };
-  const xs = pts.map((p) => p.x),
-    ys = pts.map((p) => p.y);
-  const minX = Math.min(...xs),
-    maxX = Math.max(...xs);
-  const minY = Math.min(...ys),
-    maxY = Math.max(...ys);
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
   return { w: maxX - minX, h: maxY - minY };
 };
 
@@ -56,6 +52,7 @@ function BuildingNodeView({ data }) {
     </div>
   );
 }
+
 function BlockNodeView({ data }) {
   const { label = "Phòng", w = 120, h = 80, color = "#1e40af" } = data || {};
   return (
@@ -77,6 +74,7 @@ function BlockNodeView({ data }) {
     </div>
   );
 }
+
 function SmallNodeView({ data }) {
   const {
     label = "Icon",
@@ -108,15 +106,24 @@ function SmallNodeView({ data }) {
 function ViewerInner() {
   const navigate = useNavigate();
 
-  const [allPlans, setAllPlans] = useState({});
-  const [buildingIds, setBuildingIds] = useState([]);
+  // ======= State chọn tòa & tầng =======
+  const [buildings, setBuildings] = useState([]);
+  const [loadingBuildings, setLoadingBuildings] = useState(false);
+  const [buildingError, setBuildingError] = useState("");
+
   const [activeBuilding, setActiveBuilding] = useState("");
+
+  // danh sách plan mới nhất cho từng tầng của tòa đang chọn
+  const [plansByFloor, setPlansByFloor] = useState({}); // { '1': {plan_id,...}, ... }
   const [floorIds, setFloorIds] = useState([]);
   const [activeFloor, setActiveFloor] = useState("");
 
+  // ======= Data vẽ ReactFlow =======
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [gridGap, setGridGap] = useState(40);
+
+  const [loadingPlan, setLoadingPlan] = useState(false);
 
   const nodeTypes = useMemo(
     () => ({
@@ -127,58 +134,185 @@ function ViewerInner() {
     []
   );
 
-  // Load index
-  useEffect(() => {
-    const data = loadAllPlans();
-    setAllPlans(data);
-    const bIds = Object.keys(data);
-    setBuildingIds(bIds);
-    setActiveBuilding(bIds[0] || "");
-  }, []);
-
-  // Update floors when building changes
-  useEffect(() => {
-    if (!activeBuilding) {
-      setFloorIds([]);
-      setActiveFloor("");
-      setNodes([]);
-      setEdges([]);
-      return;
-    }
-    const fIds = Object.keys(allPlans[activeBuilding] || {}).sort(
-      (a, b) => Number(a) - Number(b)
-    );
-    setFloorIds(fIds);
-    setActiveFloor(fIds[0] || "");
-  }, [activeBuilding, allPlans]);
-
-  // Load specific plan
-  useEffect(() => {
-    if (!activeBuilding || !activeFloor) {
-      setNodes([]);
-      setEdges([]);
-      return;
-    }
-    const plan = (allPlans[activeBuilding] || {})[activeFloor];
-    if (plan) {
-      const nn = (plan.nodes || []).map((n) => ({
-        ...n,
-        draggable: false,
-        selectable: false,
-        style: { ...(n.style || {}), zIndex: n.type === "building" ? 0 : 1 },
-      }));
-      setNodes(nn);
-      setEdges(plan.edges || []);
-      setGridGap(plan.meta?.gridGap ?? 40);
-    } else {
-      setNodes([]);
-      setEdges([]);
-      setGridGap(40);
-    }
-  }, [activeBuilding, activeFloor, allPlans]);
-
   const hasPlan = nodes && nodes.length > 0;
 
+  // ===================== 1. Lấy danh sách tòa nhà =====================
+  useEffect(() => {
+    let canceled = false;
+
+    async function fetchBuildings() {
+      try {
+        setLoadingBuildings(true);
+        setBuildingError("");
+
+        const data = await listBuildings();
+        if (canceled) return;
+
+        const arr = Array.isArray(data) ? data : [];
+        setBuildings(arr);
+
+        if (arr.length > 0) {
+          const firstId = String(arr[0].building_id);
+          setActiveBuilding((prev) => prev || firstId);
+        }
+      } catch (err) {
+        if (canceled) return;
+        console.error(err);
+        setBuildingError(err?.message || "Không thể tải danh sách tòa nhà");
+      } finally {
+        if (!canceled) setLoadingBuildings(false);
+      }
+    }
+
+    fetchBuildings();
+
+    return () => {
+      canceled = true;
+    };
+  }, []);
+
+  const activeBuildingObj = useMemo(
+    () =>
+      buildings.find((b) => String(b.building_id) === String(activeBuilding)) ||
+      null,
+    [buildings, activeBuilding]
+  );
+
+  // ===================== 2. Lấy danh sách floor plan theo tòa =====================
+  useEffect(() => {
+    let canceled = false;
+
+    async function fetchPlansForBuilding() {
+      if (!activeBuilding) {
+        setPlansByFloor({});
+        setFloorIds([]);
+        setActiveFloor("");
+        setNodes([]);
+        setEdges([]);
+        return;
+      }
+
+      try {
+        setLoadingPlan(true);
+
+        const buildingIdInt = parseInt(activeBuilding, 10);
+        if (!buildingIdInt || Number.isNaN(buildingIdInt)) {
+          setPlansByFloor({});
+          setFloorIds([]);
+          setActiveFloor("");
+          setNodes([]);
+          setEdges([]);
+          return;
+        }
+
+        // Gọi GET /floor-plan?building_id=... để lấy danh sách,
+        // service BE đã order version desc nên bản ghi đầu tiên của mỗi floor là version mới nhất
+        const { items } = await listFloorPlans({
+          building_id: buildingIdInt,
+          page: 1,
+          limit: 200,
+        });
+
+        // Gộp về "phiên bản mới nhất cho mỗi tầng"
+        const latestByFloor = {};
+        for (const plan of items || []) {
+          const floorKey = String(plan.floor_number ?? "");
+          if (!floorKey) continue;
+          if (!latestByFloor[floorKey]) {
+            latestByFloor[floorKey] = plan; // vì items đã sort version desc
+          }
+        }
+
+        const floors = Object.keys(latestByFloor).sort(
+          (a, b) => Number(a) - Number(b)
+        );
+
+        if (canceled) return;
+
+        setPlansByFloor(latestByFloor);
+        setFloorIds(floors);
+
+        // Nếu tầng đang chọn không còn trong list thì auto chọn tầng đầu tiên có layout
+        if (!floors.includes(activeFloor)) {
+          setActiveFloor(floors[0] || "");
+        }
+      } catch (err) {
+        if (canceled) return;
+        console.error(err);
+        setPlansByFloor({});
+        setFloorIds([]);
+        setActiveFloor("");
+        setNodes([]);
+        setEdges([]);
+      } finally {
+        if (!canceled) setLoadingPlan(false);
+      }
+    }
+
+    fetchPlansForBuilding();
+
+    return () => {
+      canceled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBuilding]);
+
+  // ===================== 3. Lấy chi tiết layout cho tòa + tầng đang chọn =====================
+  useEffect(() => {
+    let canceled = false;
+
+    async function fetchPlanDetail() {
+      if (!activeBuilding || !activeFloor) {
+        setNodes([]);
+        setEdges([]);
+        return;
+      }
+
+      const summary = plansByFloor[activeFloor];
+      if (!summary || !summary.plan_id) {
+        setNodes([]);
+        setEdges([]);
+        return;
+      }
+
+      try {
+        setLoadingPlan(true);
+
+        const detail = await getFloorPlanDetail(summary.plan_id);
+        if (canceled) return;
+
+        const layout = detail?.layout || {};
+        const rawNodes = Array.isArray(layout.nodes) ? layout.nodes : [];
+        const rawEdges = Array.isArray(layout.edges) ? layout.edges : [];
+
+        const nn = rawNodes.map((n) => ({
+          ...n,
+          draggable: false,
+          selectable: false,
+          style: { ...(n.style || {}), zIndex: n.type === "building" ? 0 : 1 },
+        }));
+
+        setNodes(nn);
+        setEdges(rawEdges);
+        setGridGap(layout.meta?.gridGap ?? 40);
+      } catch (err) {
+        if (canceled) return;
+        console.error(err);
+        setNodes([]);
+        setEdges([]);
+      } finally {
+        if (!canceled) setLoadingPlan(false);
+      }
+    }
+
+    fetchPlanDetail();
+
+    return () => {
+      canceled = true;
+    };
+  }, [activeBuilding, activeFloor, plansByFloor]);
+
+  // ===================== 4. Điều hướng sang màn Create/Edit =====================
   const gotoCreate = () => {
     const qs = new URLSearchParams({
       building: activeBuilding || "",
@@ -188,16 +322,16 @@ function ViewerInner() {
     navigate(`/floorplan/create?${qs}`);
   };
 
-  const gotoEdit = () => {
+   const gotoEdit = () => {
     if (!hasPlan) return;
-    const qs = new URLSearchParams({
-      building: activeBuilding,
-      floor: activeFloor,
-      mode: "edit",
-    }).toString();
-    navigate(`/floorplan/create?${qs}`);
+    const summary = plansByFloor[activeFloor];
+    if (!summary || !summary.plan_id) return;
+
+    // chuyển sang màn edit riêng, truyền planId
+    navigate(`/floorplan/edit/${summary.plan_id}`);
   };
 
+  // ===================== RENDER UI =====================
   return (
     <div
       style={{
@@ -208,7 +342,7 @@ function ViewerInner() {
         padding: 16,
       }}
     >
-      {/* LEFT */}
+      {/* LEFT: chọn tòa & tầng */}
       <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: 12 }}>
         <div
           style={{
@@ -237,6 +371,7 @@ function ViewerInner() {
                   color: "#fff",
                   fontWeight: 700,
                   border: "none",
+                  cursor: "pointer",
                 }}
                 title="Tạo mới hoặc tạo nhanh tầng đang chọn"
               >
@@ -277,16 +412,23 @@ function ViewerInner() {
                   marginTop: 4,
                 }}
               >
-                {buildingIds.length === 0 && (
+                {loadingBuildings && <option value="">Đang tải...</option>}
+                {!loadingBuildings && buildings.length === 0 && (
                   <option value="">(Chưa có dữ liệu)</option>
                 )}
-                {buildingIds.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
+                {buildings.map((b) => (
+                  <option key={b.building_id} value={b.building_id}>
+                    {b.name || `Tòa #${b.building_id}`}
                   </option>
                 ))}
               </select>
+              {buildingError && (
+                <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>
+                  {buildingError}
+                </div>
+              )}
             </div>
+
             <div>
               <label style={{ fontWeight: 600 }}>Tầng</label>
               <select
@@ -301,7 +443,7 @@ function ViewerInner() {
                 }}
               >
                 {floorIds.length === 0 && (
-                  <option value="">(Chưa có dữ liệu)</option>
+                  <option value="">(Chưa có layout)</option>
                 )}
                 {floorIds.map((f) => (
                   <option key={f} value={f}>
@@ -313,13 +455,13 @@ function ViewerInner() {
           </div>
 
           <div style={{ marginTop: 12, color: "#64748b", fontSize: 12 }}>
-            Chế độ <b>chỉ xem</b>. Dữ liệu lấy từ lần lưu gần nhất trên trang
-            tạo/chỉnh.
+            Chế độ <b>chỉ xem</b>. Dữ liệu lấy từ bản vẽ mới nhất đã lưu trên
+            backend cho tòa nhà / tầng đang chọn.
           </div>
         </div>
       </div>
 
-      {/* RIGHT viewer */}
+      {/* RIGHT: Viewer ReactFlow */}
       <div
         style={{
           width: "100%",
@@ -340,7 +482,9 @@ function ViewerInner() {
               color: "#64748b",
             }}
           >
-            Chưa có layout cho tổ hợp đã chọn.
+            {loadingPlan
+              ? "Đang tải layout..."
+              : "Chưa có layout cho tổ hợp đã chọn."}
           </div>
         ) : (
           <ReactFlow

@@ -88,16 +88,8 @@ const SideBar = () => {
       )}
 
       {/* ===== Floor plan (mới) ===== */}
-      <div
-        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
-      >
-        Sơ đồ tòa nhà
-      </div>
       <button onClick={() => navigate("/floorplan/view")} style={buttonStyle}>
         Xem sơ đồ tầng
-      </button>
-      <button onClick={() => navigate("/floorplan/create")} style={buttonStyle}>
-        Tạo/Chỉnh sửa sơ đồ
       </button>
     </div>
   );

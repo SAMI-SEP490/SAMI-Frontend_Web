@@ -58,6 +58,13 @@ export default function ContractDetailPage() {
           (u) => Number(u.id) === Number(mapped.tenantUserId)
         );
         setTenant(foundTenant || null);
+
+        // 3. Lấy phụ lục
+        
+        const filtered = c?.appendices?.items.filter(
+          (a) => Number(a.contract_id) === Number(id)
+        );
+        setAppendices(filtered);
       } catch (e) {
         console.error(e);
       } finally {

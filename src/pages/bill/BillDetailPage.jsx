@@ -4,8 +4,9 @@ import { colors } from "../../constants/colors";
 import { ROUTES } from "../../constants/routes";
 import { getBillById } from "../../services/api/bills";
 import { http } from "../../services/http";
+import { listUsers } from "../../services/api/users";
 
-/* =============== Helpers =============== */
+/* =============== Helpers chung =============== */
 function parseDate(d) {
   if (!d) return null;
   const dt = new Date(d);
@@ -45,16 +46,16 @@ function monthLabelFromPeriod(startISO, endISO) {
     count.set(key, (count.get(key) || 0) + 1);
     d.setDate(d.getDate() + 1);
   }
-  let best = s.getMonth() + 1,
-    days = -1;
-  for (const [m, c] of count.entries())
+  let best = s.getMonth() + 1;
+  let days = -1;
+  for (const [m, c] of count.entries()) {
     if (c > days) {
       days = c;
       best = m;
     }
+  }
   return `Hóa đơn tháng ${best}`;
 }
-/** Suy ra trạng thái thanh toán */
 function getPaidInfo(b) {
   const status = String(
     b?.status || b?.bill_status || b?.payment_status || ""
@@ -77,8 +78,78 @@ function getPaidInfo(b) {
   return {
     isPaid,
     label: isPaid ? "Đã thanh toán" : "Chưa thanh toán",
-    totalPaid: Number.isFinite(totalPaid) ? totalPaid : null,
+    totalPaid,
   };
+}
+
+/* =============== Helpers cho room / user =============== */
+function extractRoomId(detail) {
+  return (
+    detail?.room_id ??
+    detail?.roomId ??
+    detail?.room?.room_id ??
+    detail?.room?.id ??
+    null
+  );
+}
+function extractPayerId(detail) {
+  return (
+    detail?.tenant_user_id ??
+    detail?.tenantUserId ??
+    detail?.tenant_id ??
+    detail?.tenantId ??
+    detail?.user_id ??
+    detail?.userId ??
+    detail?.payer_id ??
+    detail?.payerId ??
+    detail?.tenant?.user_id ??
+    detail?.tenant?.id ??
+    null
+  );
+}
+function extractCreatorId(detail) {
+  return (
+    detail?.created_by_user_id ??
+    detail?.created_by ??
+    detail?.creator_id ??
+    detail?.createdByUserId ??
+    detail?.staff_id ??
+    detail?.staffId ??
+    detail?.owner_id ??
+    null
+  );
+}
+function extractPayerNameFromDetail(detail) {
+  const t = detail?.tenant ?? {};
+  return (
+    detail?.payer_name ??
+    detail?.tenant_name ??
+    detail?.tenantFullName ??
+    detail?.tenant_full_name ??
+    t?.full_name ??
+    t?.name ??
+    t?.username ??
+    null
+  );
+}
+function extractCreatorNameFromDetail(detail) {
+  const c = detail?.creator ?? detail?.created_by ?? {};
+  return (
+    detail?.creator_name ??
+    detail?.creatorFullName ??
+    detail?.creator_full_name ??
+    detail?.created_by_name ??
+    c?.full_name ??
+    c?.name ??
+    c?.username ??
+    null
+  );
+}
+function extractUserId(u) {
+  return u?.id ?? u?.user_id ?? u?.userId ?? u?.uid ?? null;
+}
+function extractUserName(u) {
+  return u?.full_name ?? u?.name ?? u?.username ?? u?.email ?? null;
 }
 
 /* =============== Page =============== */
@@ -97,86 +168,98 @@ export default function BillDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
+
     async function load() {
       try {
         setLoading(true);
         setErr("");
-        // id an toàn: params -> state
-        const raw = id ?? location?.state?.billId ?? location?.state?.id;
-        const numId = Number(raw);
+
+        // bill id
+        const rawId = id ?? location?.state?.billId ?? location?.state?.id;
+        const numId = Number(rawId);
         if (!Number.isFinite(numId) || numId <= 0) {
-          setErr("Invalid Bill ID");
-          setLoading(false);
+          if (!cancelled) {
+            setErr("Invalid Bill ID");
+            setLoading(false);
+          }
           return;
         }
 
-        const detail = await getBillById(numId);
+        // 1) lấy chi tiết hoá đơn
+        const detailFromApi = await getBillById(numId);
+        const stateBill = location?.state?.bill || {};
+        const detail = { ...detailFromApi, ...stateBill };
+
         if (cancelled) return;
         setBill(detail);
 
-        // room label
-        const rid = detail?.room_id ?? detail?.roomId;
-        if (rid) {
-          const r = await http.get(`/room/${rid}`, {
-            validateStatus: () => true,
-          });
-          const rd = r?.data?.data ?? r?.data ?? {};
-          const label = rd?.room_number ?? rd?.name ?? `Phòng ${rid}`;
-          if (!cancelled) setRoomLabel(String(label));
-        }
-
-        // payer
-        const uid = detail?.tenant_user_id ?? detail?.tenantUserId;
-        if (uid) {
-          let ures = await http.get(`/user/detail/${uid}`, {
-            validateStatus: () => true,
-          });
-          if (ures?.status >= 400) {
-            ures = await http.get(`/user/${uid}`, {
+        // 2) lấy thông tin phòng (1 call duy nhất)
+        const roomId = extractRoomId(detail);
+        if (roomId) {
+          try {
+            const res = await http.get(`/room/${roomId}`, {
               validateStatus: () => true,
             });
+            const rd = res?.data?.data ?? res?.data ?? {};
+            const label =
+              rd?.room_number ?? rd?.name ?? rd?.number ?? `Phòng ${roomId}`;
+            if (!cancelled) setRoomLabel(String(label));
+          } catch {
+            if (!cancelled) setRoomLabel(`Phòng ${roomId}`);
           }
-          const ud = ures?.data?.data ?? ures?.data ?? {};
-          const name =
-            ud?.full_name ??
-            ud?.name ??
-            ud?.username ??
-            ud?.email ??
-            `User #${uid}`;
-          if (!cancelled) setPayerName(String(name));
         }
 
-        // creator
-        const cid =
-          detail?.created_by_user_id ??
-          detail?.created_by ??
-          detail?.creator_id ??
-          detail?.createdByUserId ??
-          null;
-        if (cid) {
-          let cres = await http.get(`/user/detail/${cid}`, {
-            validateStatus: () => true,
+        // 3) Lấy danh sách user 1 lần -> map id -> name
+        let userMap = new Map();
+        try {
+          const res = await listUsers(); // GET /user/list-users
+          const arr = Array.isArray(res) ? res : res?.items ?? res?.data ?? [];
+          userMap = new Map();
+          arr.forEach((u) => {
+            const uid = extractUserId(u);
+            const name = extractUserName(u);
+            if (uid != null && name) {
+              userMap.set(Number(uid), String(name));
+            }
           });
-          if (cres?.status >= 400) {
-            cres = await http.get(`/user/${cid}`, {
-              validateStatus: () => true,
-            });
-          }
-          const cd = cres?.data?.data ?? cres?.data ?? {};
-          const cname =
-            cd?.full_name ??
-            cd?.name ??
-            cd?.username ??
-            cd?.email ??
-            `User #${cid}`;
-          if (!cancelled) setCreatorName(String(cname));
+        } catch (e) {
+          console.warn("Không load được listUsers:", e);
+        }
+
+        if (cancelled) return;
+
+        // 4) Suy ra tên người thanh toán
+        const payerNameFromDetail = extractPayerNameFromDetail(detail);
+        const payerId = extractPayerId(detail);
+        if (payerNameFromDetail) {
+          setPayerName(String(payerNameFromDetail));
+        } else if (payerId != null) {
+          const fromMap = userMap.get(Number(payerId));
+          setPayerName(fromMap ? fromMap : `User #${payerId}`);
+        } else {
+          setPayerName("—");
+        }
+
+        // 5) Suy ra tên người tạo
+        const creatorNameFromDetail = extractCreatorNameFromDetail(detail);
+        const creatorId = extractCreatorId(detail);
+        if (creatorNameFromDetail) {
+          setCreatorName(String(creatorNameFromDetail));
+        } else if (creatorId != null) {
+          const fromMap = userMap.get(Number(creatorId));
+          setCreatorName(fromMap ? fromMap : `User #${creatorId}`);
+        } else {
+          setCreatorName("—");
         }
       } catch (e) {
-        if (!cancelled) setErr(e?.message || "Không tải được chi tiết hóa đơn");
+        if (!cancelled) {
+          setErr(e?.message || "Không tải được chi tiết hoá đơn");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
+
     load();
     return () => {
       cancelled = true;
@@ -200,6 +283,7 @@ export default function BillDetailPage() {
   if (loading) {
     return <div style={{ padding: 24 }}>Đang tải…</div>;
   }
+
   if (err) {
     return (
       <div style={{ padding: 24 }}>
@@ -219,10 +303,11 @@ export default function BillDetailPage() {
       </div>
     );
   }
+
   if (!bill) {
     return (
       <div style={{ padding: 24 }}>
-        Không tìm thấy hóa đơn (ID: {id}) —{" "}
+        Không tìm thấy hoá đơn (ID: {id}) —{" "}
         <button onClick={() => navigate(ROUTES.bills)} style={linkBtn}>
           quay lại danh sách
         </button>

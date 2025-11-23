@@ -377,7 +377,7 @@ export default function BillListPage() {
                         style={chip(colors.brand, "#fff")}
                         onClick={() =>
                           billId &&
-                          navigate(`/bills/${billId}`, {
+                          navigate(`/bills/${billId}/edit`, {
                             state: { edit: true },
                           })
                         }

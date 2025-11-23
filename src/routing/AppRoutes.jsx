@@ -36,6 +36,7 @@ import CreateContractPage from "../pages/contract/CreateContractPage";
 import BillListPage from "../pages/bill/BillListPage";
 import BillDetailPage from "../pages/bill/BillDetailPage";
 import CreateBillPage from "../pages/bill/CreateBillPage";
+import EditBillPage from "../pages/bill/EditBillPage";
 
 // ===== Guests =====
 import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistrationPage";
@@ -193,6 +194,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <BillListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.editBill}
+          element={
+            <ProtectedRoute>
+              <EditBillPage />
             </ProtectedRoute>
           }
         />

@@ -1,15 +1,18 @@
-import React, { useContext, useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+// src/pages/notification/EditNotificationPage.jsx
+
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { colors } from "../../constants/colors";
-import { NotificationContext } from "../../contexts/NotificationContext";
+import { sendBroadcastNotification } from "../../services/api/notification";
+import { ROUTES } from "../../constants/routes";
 
 export default function EditNotificationPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { notificationData, setNotificationData } =
-    useContext(NotificationContext);
+  const location = useLocation();
 
-  const existing = notificationData.find((n) => n.id === parseInt(id));
+  // Dữ liệu thông báo được truyền qua location.state (nếu có)
+  const initialNotification = location.state?.notification || null;
 
   const [formData, setFormData] = useState({
     title: "",
@@ -20,67 +23,117 @@ export default function EditNotificationPage() {
     content: "",
   });
 
+  const [isSending, setIsSending] = useState(false);
+
   useEffect(() => {
-    if (existing) {
+    if (initialNotification) {
       setFormData({
-        title: existing.title || "",
-        category: existing.category || "",
-        building: existing.building || "",
-        effectiveDate: existing.effectiveDate || "",
-        expiryDate: existing.expiryDate || "",
-        content: existing.content || "",
+        title: initialNotification.title || "",
+        category: initialNotification.category || "",
+        building: initialNotification.building || "",
+        effectiveDate: initialNotification.effectiveDate || "",
+        expiryDate: initialNotification.expiryDate || "",
+        content: initialNotification.content || "",
       });
     }
-  }, [existing]);
+  }, [initialNotification]);
+
+  const inputStyle = {
+    width: "100%",
+    padding: "8px 10px",
+    borderRadius: 8,
+    border: "1px solid #CBD5E1",
+    fontSize: 14,
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSend = () => {
-    setNotificationData((prev) =>
-      prev.map((n) =>
-        n.id === parseInt(id) ? { ...n, ...formData, status: "Đã gửi" } : n
-      )
-    );
-    alert("Thông báo đã được gửi!");
-    navigate("/notifications");
-  };
-
-  const handleSaveDraft = () => {
-    setNotificationData((prev) =>
-      prev.map((n) =>
-        n.id === parseInt(id) ? { ...n, ...formData, status: "Nháp" } : n
-      )
-    );
-    alert("Đã lưu bản nháp!");
-    navigate("/notifications");
-  };
-
   const handleCancel = () => {
-    navigate(-1);
+    navigate(ROUTES.notifications);
   };
 
-  const inputStyle = {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 6,
-    border: "1px solid #E2E8F0",
-    marginTop: 4,
+  const handleSend = async () => {
+    if (!formData.title || !formData.content) {
+      alert("Vui lòng nhập tối thiểu Tiêu đề và Nội dung.");
+      return;
+    }
+
+    const payload = {
+      category: formData.category || "",
+      effectiveDate: formData.effectiveDate || "",
+      expiryDate: formData.expiryDate || "",
+      content: formData.content || "",
+      building: formData.building || "",
+      type: "REGULATION",
+      originalId: id, // chỉ để tham khảo nếu sau này cần
+    };
+
+    try {
+      setIsSending(true);
+      await sendBroadcastNotification({
+        title: formData.title,
+        body: formData.content,
+        payload,
+      });
+
+      alert("Đã gửi lại thông báo cho cư dân trên app.");
+      navigate(ROUTES.notifications);
+    } catch (error) {
+      console.error("Failed to resend notification:", error);
+      alert("Gửi thông báo thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsSending(false);
+    }
   };
+
+  if (!initialNotification) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: colors.background,
+          padding: 24,
+        }}
+      >
+        <h2 style={{ fontWeight: 700, marginBottom: 8 }}>
+          Không tìm thấy thông báo
+        </h2>
+        <p style={{ fontSize: 14, color: "#6B7280" }}>
+          Trang chỉnh sửa này yêu cầu bạn điều hướng từ danh sách và truyền dữ
+          liệu thông báo qua <code>location.state</code>.
+        </p>
+        <button
+          onClick={() => navigate(ROUTES.notifications)}
+          style={{
+            marginTop: 12,
+            background: "#0F3D8A",
+            color: "#fff",
+            padding: "8px 18px",
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontWeight: 700,
+          }}
+        >
+          Quay lại danh sách
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
       style={{
         minHeight: "100vh",
         background: colors.background,
-        padding: "24px",
-        overflowY: "auto",
+        padding: 24,
       }}
     >
       <h2 style={{ fontWeight: 700, marginBottom: 16 }}>
-        Chỉnh sửa quy định / Thông báo
+        Chỉnh sửa & gửi lại thông báo
       </h2>
 
       <form
@@ -88,23 +141,21 @@ export default function EditNotificationPage() {
           background: "#fff",
           padding: 20,
           borderRadius: 10,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          boxShadow: "0 1px 2px rgba(15,23,42,0.06)",
+          maxWidth: 900,
         }}
       >
-        {/* Tiêu đề */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontWeight: 600 }}>Tiêu đề quy định</label>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 600 }}>Tiêu đề</label>
           <input
             name="title"
             value={formData.title}
             onChange={handleChange}
-            type="text"
             style={inputStyle}
           />
         </div>
 
-        {/* Danh mục - Ngày hiệu lực - Ngày hết hạn */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
           <div style={{ flex: 1 }}>
             <label style={{ fontWeight: 600 }}>Danh mục</label>
             <select
@@ -143,20 +194,7 @@ export default function EditNotificationPage() {
           </div>
         </div>
 
-        {/* Nội dung */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontWeight: 600 }}>Nội dung quy định</label>
-          <textarea
-            name="content"
-            value={formData.content}
-            onChange={handleChange}
-            rows="8"
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
-
-        {/* Tòa nhà */}
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
           <label style={{ fontWeight: 600 }}>Tòa nhà</label>
           <select
             name="building"
@@ -171,13 +209,23 @@ export default function EditNotificationPage() {
           </select>
         </div>
 
-        {/* Nút hành động */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 600 }}>Nội dung</label>
+          <textarea
+            name="content"
+            value={formData.content}
+            onChange={handleChange}
+            rows={8}
+            style={{ ...inputStyle, resize: "vertical" }}
+          />
+        </div>
+
         <div
           style={{
+            marginTop: 20,
             display: "flex",
             justifyContent: "flex-end",
             gap: 12,
-            marginTop: 16,
           }}
         >
           <button
@@ -198,34 +246,20 @@ export default function EditNotificationPage() {
 
           <button
             type="button"
-            onClick={handleSaveDraft}
-            style={{
-              background: "#0F172A",
-              color: "#fff",
-              padding: "8px 18px",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            Lưu bản nháp
-          </button>
-
-          <button
-            type="button"
             onClick={handleSend}
+            disabled={isSending}
             style={{
-              background: "#0F3D8A",
+              background: isSending ? "#9CA3AF" : "#0F3D8A",
               color: "#fff",
               padding: "8px 18px",
               border: "none",
               borderRadius: 8,
-              cursor: "pointer",
+              cursor: isSending ? "default" : "pointer",
               fontWeight: 700,
+              opacity: isSending ? 0.8 : 1,
             }}
           >
-            Gửi
+            {isSending ? "Đang gửi..." : "Gửi lại"}
           </button>
         </div>
       </form>

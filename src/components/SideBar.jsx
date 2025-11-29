@@ -61,6 +61,13 @@ const SideBar = () => {
         Danh sách bảo trì
       </button>
 
+      <button
+        onClick={() => navigate("/vehicle-registrations")}
+        style={buttonStyle}
+      >
+        Danh sách đăng ký xe
+      </button>
+
       <div
         style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
       >
@@ -79,12 +86,6 @@ const SideBar = () => {
         style={buttonStyle}
       >
         Thống kê tổng hợp tài chính
-      </button>
-      <button
-        onClick={() => navigate("/vehicle-registrations")}
-        style={buttonStyle}
-      >
-        Danh sách đăng ký xe
       </button>
 
       <div

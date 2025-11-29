@@ -3,7 +3,10 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { colors } from "../../constants/colors";
 import { ROUTES } from "../../constants/routes";
 import "./LoginPage.css";
-import { login as apiLogin } from "../../services/api/auth";
+import {
+  login as apiLogin,
+  logout as apiLogout,
+} from "../../services/api/auth";
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -22,12 +25,58 @@ function LoginPage() {
     return fromState || fromQuery || ROUTES.contracts;
   }, [location.state, location.search]);
 
-  // Nếu đã login thì tự chuyển về trang chính
+  // Helper: lấy role từ object user bất kỳ
+  const extractRole = (userObj) => {
+    if (!userObj || typeof userObj !== "object") return "";
+    const rawRole =
+      userObj.role ||
+      userObj.role_name ||
+      userObj.roleName ||
+      userObj.role_code ||
+      userObj.roleCode ||
+      "";
+    return String(rawRole || "")
+      .toLowerCase()
+      .trim();
+  };
+
+  // Nếu đã login thì tự chuyển về trang chính (nhưng phải check không phải tenant)
   useEffect(() => {
     const access =
       localStorage.getItem("sami:access") ||
       localStorage.getItem("accessToken");
-    if (access) navigate(ROUTES.contracts, { replace: true });
+
+    if (!access) return;
+
+    const userStr = localStorage.getItem("sami:user");
+    if (userStr) {
+      try {
+        const savedUser = JSON.parse(userStr);
+        const roleStr = extractRole(savedUser);
+        const isTenant =
+          roleStr === "tenant" ||
+          roleStr === "r_tenant" ||
+          roleStr.includes("tenant");
+
+        // Nếu là tenant thì ko cho auto-redirect, dọn session luôn
+        if (isTenant) {
+          [
+            "sami:access",
+            "accessToken",
+            "sami:refresh",
+            "refreshToken",
+            "sami:user",
+          ].forEach((k) => localStorage.removeItem(k));
+          return;
+        }
+      } catch {
+        // Nếu parse lỗi thì cứ cho qua, không redirect
+        return;
+      }
+    }
+
+    // Không phải tenant -> cho vào hệ thống như cũ
+    navigate(ROUTES.contracts, { replace: true });
   }, [navigate]);
 
   const handleLogin = async (e) => {
@@ -43,7 +92,33 @@ function LoginPage() {
       setLoading(true);
       const res = await apiLogin({ email: email.trim(), password });
 
-      // Nhánh cần xác minh OTP
+      // Lấy user + role từ response (linh hoạt nhiều dạng BE trả về)
+      const rawUser =
+        res?.user ||
+        res?.data?.user ||
+        res?.data ||
+        res ||
+        JSON.parse(localStorage.getItem("sami:user") || "{}");
+
+      const roleStr = extractRole(rawUser);
+      const isTenant =
+        roleStr === "tenant" ||
+        roleStr === "r_tenant" ||
+        roleStr.includes("tenant");
+
+      if (isTenant) {
+        try {
+          await apiLogout();
+        } catch {
+          // ignore lỗi logout
+        }
+
+        setError(
+          "Tài khoản Tenant không được phép đăng nhập vào hệ thống web. Vui lòng sử dụng ứng dụng dành cho cư dân (Tenant App)."
+        );
+        return;
+      }
+
       if (res?.requiresOTP) {
         navigate(ROUTES.verifyCode, {
           state: { userId: res.userId, email: email.trim(), from: nextURL },
@@ -52,10 +127,25 @@ function LoginPage() {
         return;
       }
 
-      // Đăng nhập thành công (token đã được lưu trong service)
       navigate(nextURL, { replace: true });
     } catch (err) {
-      const msg = err?.response?.data?.message || "Đăng nhập thất bại";
+      let msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Đăng nhập thất bại. Vui lòng thử lại.";
+
+      // Nếu sai email/mật khẩu → luôn hiển thị tiếng Việt
+      const status = err?.response?.status;
+      const lower = String(msg || "").toLowerCase();
+
+      if (
+        status === 401 ||
+        lower.includes("invalid credential") ||
+        lower.includes("unauthorized")
+      ) {
+        msg = "Thông tin đăng nhập không chính xác";
+      }
+
       setError(msg);
     } finally {
       setLoading(false);

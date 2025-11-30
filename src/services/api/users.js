@@ -203,18 +203,30 @@ const GET_USER_PATHS = [
   "/tenants/:id",
 ];
 export async function getUserById(id) {
-  let lastErr;
   for (const raw of GET_USER_PATHS) {
     const url = raw.replace(":id", id);
     try {
-      const res = await http.get(url);
-      const data = unwrap(res);
-      return data?.data ?? data; // đồng nhất trả về object user
-    } catch (e) {
-      lastErr = e;
+      // Cho phép nhận cả 4xx/5xx, tự xử lý status
+      const res = await http.get(url, {
+        validateStatus: () => true,
+      });
+
+      // Nếu gọi được và status < 400 thì coi là thành công
+      if (res && res.status < 400) {
+        const data = unwrap(res);
+        return data?.data ?? data; // đồng nhất trả về object user
+      }
+
+      // Nếu status >= 400 thì thử path tiếp theo
+      continue;
+    } catch  {
+      // Lỗi network / parse... thì cũng thử path khác
+      continue;
     }
   }
-  throw lastErr;
+
+  // Nếu tất cả path đều fail ⇒ ném ra message chuẩn theo yêu cầu tester
+  throw new Error("Không lấy được thông tin người dùng");
 }
 
 /** =========================

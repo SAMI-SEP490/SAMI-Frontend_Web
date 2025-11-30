@@ -1,5 +1,5 @@
 // src/services/api/tenants.js
-import { http, unwrap } from "../http";
+import { http } from "../http";
 
 // unwrap các kiểu response {data:{data}} | {data} | data
 const un = (res) => res?.data?.data ?? res?.data ?? res;
@@ -162,6 +162,16 @@ export async function getUserById(userId) {
 
 // Lấy tất cả tenants (KHÔNG phân trang)
 export async function getAllTenants() {
-  const { data } = await http.get("/tenant/all");
-  return unwrap(data);
+  const res = await http.get("/tenant/all", {
+    validateStatus: () => true,
+  });
+
+  if (!res || res.status >= 400) {
+    const d = res?.data;
+    const msg = d?.message || d?.error || "Không lấy được danh sách người thuê";
+    throw new Error(msg);
+  }
+
+  const data = res?.data?.data ?? res?.data ?? res;
+  return Array.isArray(data) ? data : data?.items ?? [];
 }

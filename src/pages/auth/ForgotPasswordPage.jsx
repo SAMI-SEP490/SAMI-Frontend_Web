@@ -2,22 +2,56 @@ import React, { useState } from "react";
 import { colors } from "../../constants/colors";
 import { useNavigate } from "react-router-dom";
 import { forgotPassword } from "../../services/api/auth";
+import { listTenants } from "../../services/api/users"; // ✅ lấy data tenant từ BE
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const navigate = useNavigate();
 
   const handleNext = async () => {
-    if (!email.trim()) return alert("Vui lòng nhập email khôi phục");
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!re.test(email.trim())) return alert("Email không hợp lệ");
+    const trimmed = email.trim();
+    if (!trimmed) return alert("Vui lòng nhập email khôi phục");
 
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!re.test(trimmed)) return alert("Email không hợp lệ");
+
+    let isTenant = false;
+
+    // 1️⃣ Hỏi BE xem email này có phải tenant không
     try {
-      const res = await forgotPassword(email.trim());
+      const tenants = await listTenants(); // trả về mảng tenant từ BE
+      const lower = trimmed.toLowerCase();
+
+      const foundTenant = tenants.find((t) => {
+        const tEmail = String(
+          t.email || t.user_email || t.userEmail || ""
+        ).toLowerCase();
+        return tEmail === lower;
+      });
+
+      if (foundTenant) {
+        isTenant = true;
+      }
+    } catch (checkErr) {
+      console.warn(
+        "Không kiểm tra được role tenant, sẽ cho qua flow quên mật khẩu mặc định:",
+        checkErr
+      );
+    }
+
+    // 2️⃣ Nếu là tenant → chặn, không gửi OTP
+    if (isTenant) {
+      alert("Người thuê không có quyền sử dụng chức năng này!");
+      return;
+    }
+
+    // 3️⃣ Không phải tenant → cho dùng quên mật khẩu như bình thường
+    try {
+      const res = await forgotPassword(trimmed);
       alert(res?.message || "Đã gửi mã xác thực tới email của bạn.");
       // chuyển sang trang nhập OTP, mang theo email
-      navigate(`/verify-reset-otp?email=${encodeURIComponent(email.trim())}`, {
-        state: { email: email.trim() },
+      navigate(`/verify-reset-otp?email=${encodeURIComponent(trimmed)}`, {
+        state: { email: trimmed },
       });
     } catch (e) {
       const msg =

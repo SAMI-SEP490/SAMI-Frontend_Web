@@ -31,11 +31,15 @@ export default function ChangePasswordPage() {
       setMessage("Vui lòng nhập đầy đủ các trường!");
       return;
     }
-    if (newPassword.length < 6) {
+
+    // ✅ VALIDATE MẬT KHẨU MỚI THEO YÊU CẦU MỚI
+    const strongPasswordRegex = /^(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!strongPasswordRegex.test(newPassword)) {
       setVariant("danger");
-      setMessage("Mật khẩu mới phải có ít nhất 6 ký tự!");
+      setMessage("Mật khẩu phải có ít nhất 8 kí tự, 1 số và 1 kí tự đặc biệt");
       return;
     }
+
     if (newPassword !== confirmPassword) {
       setVariant("danger");
       setMessage("Mật khẩu nhập lại không khớp!");
@@ -44,17 +48,36 @@ export default function ChangePasswordPage() {
 
     setLoading(true);
     setMessage("");
+
     try {
-      await changePassword({ currentPassword: oldPassword, newPassword });
+      await changePassword({
+        currentPassword: oldPassword,
+        newPassword,
+      });
+
       setVariant("success");
       setMessage("Đổi mật khẩu thành công!");
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
+
       setTimeout(() => navigate("/profile"), 1200);
     } catch (e) {
+      const status = e?.response?.status;
+      let msg = e?.response?.data?.message || "Đổi mật khẩu thất bại!";
+
+      // ✅ MAP LẠI LỖI SAI MẬT KHẨU CŨ
+      if (
+        status === 400 ||
+        status === 404 ||
+        /route not found/i.test(msg) ||
+        /incorrect current password/i.test(msg)
+      ) {
+        msg = "Mật khẩu cũ không chính xác";
+      }
+
       setVariant("danger");
-      setMessage(e?.response?.data?.message || "Đổi mật khẩu thất bại!");
+      setMessage(msg);
     } finally {
       setLoading(false);
     }

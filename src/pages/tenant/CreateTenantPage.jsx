@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { colors } from "../../constants/colors";
 import { registerUser, changeManagerToTenant } from "../../services/api/users";
 import { listRoomsLite } from "../../services/api/rooms";
+import { getAllTenants } from "../../services/api/tenants";
 
 export default function CreateTenantPage() {
   const navigate = useNavigate();
@@ -17,9 +18,8 @@ export default function CreateTenantPage() {
     dob: "",
     gender: "",
     phone: "",
-    room: "", // room_id thật
+    room: "",
     idNumber: "",
-
     // Bước 2
     email: "",
     password: "",
@@ -31,7 +31,6 @@ export default function CreateTenantPage() {
 
   const onlyDigits = (v) => String(v || "").replace(/\D/g, "");
 
-  // Map gender sang đúng enum backend: "Male" | "Female" | "Other"
   const mapGenderForServer = (g) => {
     if (!g) return undefined;
     const key = String(g).trim().toLowerCase();
@@ -40,10 +39,11 @@ export default function CreateTenantPage() {
     return "Other";
   };
 
-  // ====== Lấy danh sách phòng từ API ======
+  // ====== Rooms + phone list ======
   const [rooms, setRooms] = useState([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomsError, setRoomsError] = useState("");
+  const [existingPhones, setExistingPhones] = useState(new Set());
 
   useEffect(() => {
     let mounted = true;
@@ -51,16 +51,77 @@ export default function CreateTenantPage() {
       try {
         setRoomsLoading(true);
         setRoomsError("");
-        const apiRooms = await listRoomsLite();
+
+        // 1) Lấy rooms từ API /room (qua listRoomsLite)
+        let apiRooms = [];
+        try {
+          apiRooms = await listRoomsLite();
+        } catch (e) {
+          console.warn("listRoomsLite error:", e);
+        }
+
+        // 2) Lấy tenants để:
+        //    - check trùng SĐT
+        //    - fallback tạo danh sách phòng nếu /room không trả về
+        let tenants = [];
+        try {
+          const data = await getAllTenants();
+          tenants = Array.isArray(data) ? data : data?.items ?? [];
+        } catch (e) {
+          console.warn("getAllTenants error:", e);
+        }
+
         if (!mounted) return;
 
-        const list = Array.isArray(apiRooms) ? apiRooms : [];
-        setRooms(
-          list.map((r) => ({
-            id: String(r.id),
-            label: String(r.label ?? r.name ?? r.room_number ?? r.id),
-          }))
-        );
+        // build set phone
+        const phoneSet = new Set();
+        tenants.forEach((t) => {
+          const rawPhone =
+            t?.phone ||
+            t?.phone_number ||
+            t?.user?.phone ||
+            t?.user?.phone_number;
+          const digits = onlyDigits(rawPhone);
+          if (digits) phoneSet.add(digits);
+        });
+        setExistingPhones(phoneSet);
+
+        // build rooms
+        let roomList = [];
+
+        if (Array.isArray(apiRooms) && apiRooms.length) {
+          // listRoomsLite đã trả về {id, label}
+          roomList = apiRooms
+            .filter((r) => r.id != null && r.label != null)
+            .map((r) => ({
+              id: String(r.id),
+              label: String(r.label),
+            }));
+        } else if (tenants.length) {
+          // fallback: tạo room list từ tenants
+          const map = new Map();
+          tenants.forEach((item) => {
+            const rid =
+              item?.room_id ??
+              item?.roomId ??
+              item?.room?.room_id ??
+              item?.room?.id;
+            const rcode =
+              item?.room?.room_number ??
+              item?.room_number ??
+              item?.room?.code ??
+              (rid != null ? `${rid}` : "");
+            if (rid != null && rcode) {
+              map.set(String(rid), {
+                id: String(rid),
+                label: String(rcode),
+              });
+            }
+          });
+          roomList = Array.from(map.values());
+        }
+
+        setRooms(roomList);
       } catch (e) {
         if (!mounted) return;
         console.error("Load rooms error:", e);
@@ -77,7 +138,7 @@ export default function CreateTenantPage() {
   }, []);
 
   const handleNext = async () => {
-    // ====== STEP 1: validate thông tin cơ bản ======
+    // ---------- STEP 1: validate thông tin cơ bản ----------
     if (step === 1) {
       if (
         !formData.name ||
@@ -91,8 +152,40 @@ export default function CreateTenantPage() {
         return;
       }
 
-      if (onlyDigits(formData.phone).length < 10) {
+      // Ngày sinh không được ở tương lai
+      try {
+        const dobDate = new Date(formData.dob);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        dobDate.setHours(0, 0, 0, 0);
+
+        if (isNaN(dobDate.getTime())) {
+          alert("Ngày sinh không hợp lệ, vui lòng nhập lại.");
+          handleChange("dob", "");
+          return;
+        }
+
+        if (dobDate > today) {
+          alert("Ngày sinh phải trước hiện tại.");
+          handleChange("dob", "");
+          return;
+        }
+      } catch {
+        alert("Ngày sinh không hợp lệ, vui lòng nhập lại.");
+        handleChange("dob", "");
+        return;
+      }
+
+      const phoneDigits = onlyDigits(formData.phone);
+      if (phoneDigits.length < 10) {
         alert("Số điện thoại phải có ít nhất 10 chữ số.");
+        return;
+      }
+
+      // Check trùng SĐT ngay ở màn này (giống DOB)
+      if (existingPhones.has(phoneDigits)) {
+        alert("Số điện thoại đã tồn tại.");
+        handleChange("phone", "");
         return;
       }
 
@@ -106,9 +199,16 @@ export default function CreateTenantPage() {
       return;
     }
 
-    // ====== STEP 2: đăng ký + change-to-tenant ======
+    // ---------- STEP 2: validate email + password ----------
     if (!formData.email || !formData.password || !formData.confirmPassword) {
       alert("Vui lòng nhập đầy đủ thông tin đăng nhập!");
+      return;
+    }
+
+    const email = formData.email.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert("Vui lòng nhập email đúng định dạng.");
       return;
     }
 
@@ -133,7 +233,7 @@ export default function CreateTenantPage() {
       // 1. Đăng ký user
       const user = await registerUser({
         full_name: formData.name.trim(),
-        email: formData.email.trim(),
+        email,
         password: formData.password,
         phone: onlyDigits(formData.phone),
         gender: mapGenderForServer(formData.gender),
@@ -170,7 +270,6 @@ export default function CreateTenantPage() {
         userId,
         roomId,
         idNumber,
-        // backend vẫn yêu cầu emergencyContactPhone, gửi luôn phone chính
         emergencyContactPhone: onlyDigits(formData.phone).slice(0, 11),
         note: room ? `Phòng: ${room.label}` : "",
       });
@@ -179,13 +278,27 @@ export default function CreateTenantPage() {
       navigate("/tenants", { replace: true });
     } catch (err) {
       console.error(err);
+
       const d = err?.response?.data;
-      const msg =
+      let rawMsg =
         (Array.isArray(d?.errors) && d.errors[0]?.message) ||
         d?.message ||
         d?.error ||
         err?.message ||
-        "Tạo tài khoản thất bại. Vui lòng thử lại.";
+        "";
+      rawMsg = String(rawMsg || "").toLowerCase();
+
+      let msg = "Tạo tài khoản thất bại. Vui lòng thử lại.";
+
+      if (rawMsg.includes("email") && rawMsg.includes("exist")) {
+        msg = "Email đã tồn tại.";
+      } else if (rawMsg.includes("phone") || rawMsg.includes("số điện thoại")) {
+        msg = "Số điện thoại đã tồn tại.";
+        handleChange("phone", "");
+      } else if (rawMsg.includes("validation")) {
+        msg = "Vui lòng nhập email đúng định dạng.";
+      }
+
       alert(msg);
     } finally {
       setSaving(false);
@@ -288,12 +401,6 @@ export default function CreateTenantPage() {
             {roomsError && (
               <div style={{ color: "#b91c1c", marginBottom: 8 }}>
                 {roomsError}
-              </div>
-            )}
-            {!roomsError && rooms.length === 0 && !roomsLoading && (
-              <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 8 }}>
-                Chưa có phòng nào trong hệ thống. Hãy tạo phòng trước khi thêm
-                người thuê.
               </div>
             )}
 

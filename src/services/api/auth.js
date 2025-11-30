@@ -139,12 +139,14 @@ function toISODate(v) {
 }
 
 export async function updateProfile(form = {}) {
-  // Chỉ gửi những field mà backend cho phép
+  // Gửi đầy đủ các field cho phép chỉnh sửa trên hồ sơ
   const payload = {
     full_name: form.full_name ?? form.fullName,
     gender: GENDER_TO_SERVER[form.gender] ?? form.gender,
     birthday: toISODate(form.birthday),
     avatar_url: form.avatar_url,
+    email: form.email, // ✅ THÊM EMAIL
+    phone: form.phone, // ✅ THÊM SĐT
   };
 
   // Xoá key rỗng
@@ -156,7 +158,19 @@ export async function updateProfile(form = {}) {
   const [method, path] = UPDATE_PROFILE_PATHS[0]; // ["put", "/auth/profile"]
   const res = await http[method](path, payload);
   const raw = unwrap(res);
-  return normalizeProfile(raw);
+
+  const profile = normalizeProfile(raw);
+
+  // Cập nhật lại localStorage để header / chỗ khác dùng user mới
+  try {
+    const oldUser = JSON.parse(localStorage.getItem("sami:user") || "{}");
+    const merged = { ...oldUser, ...profile };
+    localStorage.setItem("sami:user", JSON.stringify(merged));
+  } catch (e) {
+    console.warn("Không cập nhật được localStorage user:", e);
+  }
+
+  return profile;
 }
 
 const CHANGE_PW_PATHS = [

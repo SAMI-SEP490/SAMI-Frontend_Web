@@ -14,7 +14,7 @@ export default defineConfig({
     proxy: {
       "/api": {
         target:
-          "https://gratuit-intention-remained-dictionaries.trycloudflare.com/",
+          "https://loaded-taxation-combination-loading.trycloudflare.com/",
         changeOrigin: true,
         secure: false,
       },

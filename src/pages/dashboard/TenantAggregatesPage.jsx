@@ -106,32 +106,7 @@ export default function TenantAggregatesPage() {
         }}
       >
         <h2 style={{ fontWeight: 700 }}>Thống kê tổng hợp</h2>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            style={{
-              background: "#2563EB",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              padding: "8px 12px",
-              cursor: "pointer",
-            }}
-          >
-            <FaPrint /> In
-          </button>
-          <button
-            style={{
-              background: "#059669",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              padding: "8px 12px",
-              cursor: "pointer",
-            }}
-          >
-            <FaSave /> Lưu
-          </button>
-        </div>
+        <div style={{ display: "flex", gap: 10 }}></div>
       </div>
 
       {/* ===== KHỐI CHÍNH: KHÁCH THUÊ + PHÒNG CÙNG HÀNG ===== */}

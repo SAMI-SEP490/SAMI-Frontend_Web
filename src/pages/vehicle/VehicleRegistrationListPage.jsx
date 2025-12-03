@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Spinner } from "react-bootstrap";
+import { Table, Button, Spinner, Form, Row, Col } from "react-bootstrap";
 import {
   listVehicleRegistrations,
   approveVehicleRegistration,
   rejectVehicleRegistration,
 } from "../../services/api/vehicle";
 import { getUserById } from "../../services/api/users";
+import "./VehicleRegistrationList.css"; // 🔹 CSS mới
 
 const VEHICLE_TYPE_VN = {
   car: "Ô tô",
@@ -17,32 +18,31 @@ const VEHICLE_TYPE_VN = {
 
 const STATUS_VN = {
   requested: "Đã yêu cầu",
-  PENDING: "Đang chờ",
-  APPROVED: "Đã duyệt",
-  REJECTED: "Bị từ chối",
   pending: "Đang chờ",
   approved: "Đã duyệt",
   rejected: "Bị từ chối",
+  PENDING: "Đang chờ",
+  APPROVED: "Đã duyệt",
+  REJECTED: "Bị từ chối",
 };
 
 // 🔹 Hàm format ngày
 const formatDate = (dateString) => {
   if (!dateString) return "N/A";
   const d = new Date(dateString);
-  if (isNaN(d.getTime())) return "N/A"; // check invalid date
+  if (isNaN(d.getTime())) return "N/A";
   const pad = (n) => n.toString().padStart(2, "0");
-  const day = pad(d.getDate());
-  const month = pad(d.getMonth() + 1);
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
 function VehicleRegistrationListPage() {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  // 🔹 Fetch danh sách đăng ký xe
+  // Fetch danh sách
   const fetchRegistrations = async () => {
     setLoading(true);
     try {
@@ -51,22 +51,18 @@ function VehicleRegistrationListPage() {
 
       const parsed = await Promise.all(
         arr.map(async (r) => {
-          // Parse JSON reason
           let reason = {};
           try {
             reason = r.reason ? JSON.parse(r.reason) : {};
-          } catch (e) {
-            console.warn("Cannot parse reason JSON:", r.reason);
-          }
+          } catch (e) {}
 
-          // Lấy full_name từ user API
+          // Lấy full_name
           let requestedBy = "N/A";
           if (r.requested_by) {
             try {
               const user = await getUserById(r.requested_by);
               requestedBy = user?.full_name || r.requested_by;
             } catch (e) {
-              console.warn("Cannot get user full_name:", r.requested_by);
               requestedBy = r.requested_by;
             }
           }
@@ -79,8 +75,8 @@ function VehicleRegistrationListPage() {
             brand: reason.brand || "N/A",
             color: reason.color || "N/A",
             status: r.status,
-            startDate: r.start_date || null,
-            endDate: r.end_date || null,
+            startDate: r.start_date,
+            endDate: r.end_date,
             note: r.note || "",
           };
         })
@@ -104,8 +100,6 @@ function VehicleRegistrationListPage() {
     try {
       await approveVehicleRegistration(id);
       fetchRegistrations();
-    } catch (error) {
-      console.error("Lỗi khi duyệt đăng ký:", error);
     } finally {
       setActionLoading((prev) => ({ ...prev, [id]: false }));
     }
@@ -116,19 +110,61 @@ function VehicleRegistrationListPage() {
     try {
       await rejectVehicleRegistration(id);
       fetchRegistrations();
-    } catch (error) {
-      console.error("Lỗi khi từ chối đăng ký:", error);
     } finally {
       setActionLoading((prev) => ({ ...prev, [id]: false }));
     }
   };
 
+  // --------------------------------
+  // 🔎 Search + Filter
+  // --------------------------------
+  const filtered = registrations.filter((r) => {
+    const s = search.toLowerCase();
+    const matchSearch =
+      r.requestedBy.toLowerCase().includes(s) ||
+      r.plateNumber.toLowerCase().includes(s);
+
+    const matchStatus =
+      statusFilter === "all" ||
+      r.status.toLowerCase() === statusFilter.toLowerCase();
+
+    return matchSearch && matchStatus;
+  });
+
   if (loading) return <Spinner animation="border" />;
 
   return (
-    <div>
-      <h3>Danh sách đăng ký xe</h3>
-      <Table striped bordered hover responsive>
+    <div className="vehicle-page">
+      <h3 className="page-title">Danh sách đăng ký xe</h3>
+
+      {/* 🔹 Search + Filter */}
+      <Row className="filter-row">
+        <Col md={5}>
+          <Form.Control
+            placeholder="Tìm theo tên hoặc biển số..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="search-input"
+          />
+        </Col>
+
+        <Col md={3}>
+          <Form.Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="requested">Đã yêu cầu</option>
+            <option value="pending">Đang chờ</option>
+            <option value="approved">Đã duyệt</option>
+            <option value="rejected">Bị từ chối</option>
+          </Form.Select>
+        </Col>
+      </Row>
+
+      {/* TABLE */}
+      <Table striped bordered hover responsive className="vehicle-table">
         <thead>
           <tr>
             <th>#</th>
@@ -145,17 +181,19 @@ function VehicleRegistrationListPage() {
           </tr>
         </thead>
         <tbody>
-          {registrations.map((r, index) => (
+          {filtered.map((r, index) => (
             <tr key={r.id}>
               <td>{index + 1}</td>
               <td>{r.requestedBy}</td>
               <td>{r.plateNumber}</td>
-              <td>{VEHICLE_TYPE_VN[r.vehicleType] || r.vehicleType}</td>
+              <td>{VEHICLE_TYPE_VN[r.vehicleType]}</td>
               <td>{r.brand}</td>
               <td>{r.color}</td>
               <td>{formatDate(r.startDate)}</td>
               <td>{formatDate(r.endDate)}</td>
-              <td>{STATUS_VN[r.status] || r.status}</td>
+              <td className={`status status-${r.status.toLowerCase()}`}>
+                {STATUS_VN[r.status] || r.status}
+              </td>
               <td>{r.note}</td>
               <td>
                 {r.status.toLowerCase() === "requested" && (

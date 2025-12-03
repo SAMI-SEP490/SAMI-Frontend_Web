@@ -17,9 +17,10 @@ import { http } from "../../services/http"; // 🔹 thêm dòng này
 import { saveAs } from "file-saver";
 
 export default function ViewTimeBasedReportsPage() {
+  const now = new Date();
   const [reportType, setReportType] = useState("Tháng");
-  const [year, setYear] = useState(2025);
-  const [month, setMonth] = useState(11);
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
   const [type, setType] = useState("xlsx"); // 🔹 thêm state cho kiểu file
   const [data, setData] = useState([]);
   const [totalRevenue, setTotalRevenue] = useState(0);

@@ -13,8 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target:
-          "https://loaded-taxation-combination-loading.trycloudflare.com/",
+        target: "https://aid-labeled-adapted-been.trycloudflare.com/",
         changeOrigin: true,
         secure: false,
       },

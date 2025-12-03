@@ -77,7 +77,10 @@ const isAuthed = () =>
   !!localStorage.getItem("accessToken");
 
 const HomeRedirect = () => (
-  <Navigate to={isAuthed() ? ROUTES.contracts : ROUTES.login} replace />
+  <Navigate
+    to={isAuthed() ? ROUTES.viewTimebaseReport : ROUTES.login}
+    replace
+  />
 );
 
 const LazyFallback = <div style={{ padding: 16 }}>Loading…</div>;

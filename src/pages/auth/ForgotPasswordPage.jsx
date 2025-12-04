@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { colors } from "../../constants/colors";
 import { useNavigate } from "react-router-dom";
 import { forgotPassword } from "../../services/api/auth";
-import { listTenants } from "../../services/api/users"; // ✅ lấy data tenant từ BE
+import { listTenants } from "../../services/api/users"; // lấy data tenant từ BE
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -10,14 +10,22 @@ export default function ForgotPasswordPage() {
 
   const handleNext = async () => {
     const trimmed = email.trim();
-    if (!trimmed) return alert("Vui lòng nhập email khôi phục");
 
+    // 1️⃣ Bắt buộc nhập
+    if (!trimmed) {
+      alert("Vui lòng nhập email khôi phục");
+      return;
+    }
+
+    // 2️⃣ Validate format email
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!re.test(trimmed)) return alert("Email không hợp lệ");
+    if (!re.test(trimmed)) {
+      alert("Vui lòng nhập email đúng định dạng.");
+      return;
+    }
 
+    // 3️⃣ Check xem có phải tenant không
     let isTenant = false;
-
-    // 1️⃣ Hỏi BE xem email này có phải tenant không
     try {
       const tenants = await listTenants(); // trả về mảng tenant từ BE
       const lower = trimmed.toLowerCase();
@@ -39,17 +47,28 @@ export default function ForgotPasswordPage() {
       );
     }
 
-    // 2️⃣ Nếu là tenant → chặn, không gửi OTP
+    // 4️⃣ Nếu là tenant → chặn hẳn chức năng
     if (isTenant) {
       alert("Người thuê không có quyền sử dụng chức năng này!");
       return;
     }
 
-    // 3️⃣ Không phải tenant → cho dùng quên mật khẩu như bình thường
+    // 5️⃣ Gọi API quên mật khẩu cho các role khác (owner/manager/...)
     try {
       const res = await forgotPassword(trimmed);
+
+      // Backend ALWAYS trả success:true, nên phải đọc message
+      const rawMsg = String(res?.message || "").toLowerCase();
+
+      // ❌ Email không tồn tại trong hệ thống
+      if (rawMsg.includes("does not exist")) {
+        alert("Email không tồn tại trong hệ thống");
+        // Không điều hướng, cho user nhập lại email
+        return;
+      }
+
+      // ✅ Case bình thường: gửi OTP thành công
       alert(res?.message || "Đã gửi mã xác thực tới email của bạn.");
-      // chuyển sang trang nhập OTP, mang theo email
       navigate(`/verify-reset-otp?email=${encodeURIComponent(trimmed)}`, {
         state: { email: trimmed },
       });

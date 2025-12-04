@@ -13,8 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target:
-          "https://gratuit-intention-remained-dictionaries.trycloudflare.com/",
+        target: "https://aid-labeled-adapted-been.trycloudflare.com/",
         changeOrigin: true,
         secure: false,
       },

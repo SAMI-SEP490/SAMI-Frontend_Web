@@ -40,11 +40,11 @@ function Section({ title, children }) {
       </div>
       <div
         style={{
-          border: "1px solid #ddd",
-          borderTop: "none",
-          padding: 16,
+          padding: 20,
+          backgroundColor: "#fff",
           borderBottomLeftRadius: 8,
           borderBottomRightRadius: 8,
+          border: `1px solid ${colors.border}`,
         }}
       >
         {children}
@@ -53,15 +53,15 @@ function Section({ title, children }) {
   );
 }
 
-function GenderSelector({ value, onChange }) {
-  const items = ["Nam", "Nữ", "Khác"];
+function GenderToggle({ value, onChange }) {
+  const options = ["Nam", "Nữ", "Khác"];
   return (
-    <div style={{ display: "flex", gap: 10 }}>
-      {items.map((g) => (
+    <div style={{ display: "flex", gap: 8 }}>
+      {options.map((g) => (
         <Button
           key={g}
           variant={value === g ? "primary" : "outline-secondary"}
-          style={{ borderRadius: 20, padding: "5px 15px" }}
+          size="sm"
           onClick={() => onChange(g)}
         >
           {g}
@@ -88,25 +88,24 @@ export default function EditProfilePage() {
   const [message, setMessage] = useState("");
   const [variant, setVariant] = useState("success");
 
-  // Load profile lúc mở trang
+  // Load hồ sơ lúc mở trang
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       try {
-        const res = await getProfile();
-        const u = res?.user || res?.data?.user || res?.data || res || {};
+        const profile = await getProfile(); // đã normalize trong auth.js
 
         if (!mounted) return;
 
         setForm((prev) => ({
           ...prev,
-          ...u,
-          full_name: u.full_name ?? u.fullName ?? "",
-          email: u.email ?? "",
-          phone: u.phone ?? "",
-          birthday: toInputDate(u.birthday ?? u.dob),
-          gender: toUiGender(u.gender ?? u.sex),
-          avatar_url: u.avatar_url ?? u.avatarUrl ?? "",
+          full_name: profile.full_name ?? "",
+          email: profile.email ?? "",
+          phone: profile.phone ?? "",
+          birthday: toInputDate(profile.birthday),
+          gender: toUiGender(profile.gender),
+          avatar_url: profile.avatar_url ?? "",
         }));
       } catch (e) {
         if (!mounted) return;
@@ -132,6 +131,13 @@ export default function EditProfilePage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleChangeAvatar = () => {
+    const url = window.prompt("Nhập URL ảnh đại diện mới:", form.avatar_url);
+    if (url !== null) {
+      setForm((prev) => ({ ...prev, avatar_url: url.trim() }));
+    }
+  };
+
   const onSave = async () => {
     const fullName = (form.full_name || "").trim();
     const email = (form.email || "").trim();
@@ -139,7 +145,7 @@ export default function EditProfilePage() {
 
     if (!fullName || !email || !phone) {
       setVariant("danger");
-      setMessage("Vui lòng nhập đủ tên, email, SĐT.");
+      setMessage("Vui lòng nhập đầy đủ tên, email và số điện thoại.");
       return;
     }
 
@@ -147,7 +153,7 @@ export default function EditProfilePage() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setVariant("danger");
-      setMessage("Email không hợp lệ.");
+      setMessage("Email không đúng định dạng.");
       return;
     }
 
@@ -155,11 +161,11 @@ export default function EditProfilePage() {
     const phoneRegex = /^0\d{9,10}$/;
     if (!phoneRegex.test(phone)) {
       setVariant("danger");
-      setMessage("SĐT không hợp lệ.");
+      setMessage("Số điện thoại phải có ít nhất 10 chữ số và bắt đầu bằng 0.");
       return;
     }
 
-    // ✅ NGÀY SINH: 18–100 tuổi
+    // ✅ NGÀY SINH: trước hiện tại, >= 18 tuổi, <= 100 tuổi
     if (form.birthday) {
       const birth = new Date(form.birthday);
       if (Number.isNaN(birth.getTime())) {
@@ -169,15 +175,12 @@ export default function EditProfilePage() {
       }
 
       const today = new Date();
-
-      // sinh trong tương lai
       if (birth > today) {
         setVariant("danger");
-        setMessage("Ngày sinh không hợp lệ.");
+        setMessage("Ngày sinh phải trước thời gian hiện tại.");
         return;
       }
 
-      // > 100 tuổi
       const hundredYearsAgo = new Date();
       hundredYearsAgo.setFullYear(hundredYearsAgo.getFullYear() - 100);
       if (birth < hundredYearsAgo) {
@@ -186,7 +189,6 @@ export default function EditProfilePage() {
         return;
       }
 
-      // < 18 tuổi
       const eighteenYearsAgo = new Date();
       eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
       if (birth > eighteenYearsAgo) {
@@ -210,7 +212,11 @@ export default function EditProfilePage() {
 
       setVariant("success");
       setMessage("Cập nhật hồ sơ thành công!");
-      setTimeout(() => navigate("/profile"), 800);
+
+      // Điều hướng về trang profile sau khi lưu
+      setTimeout(() => {
+        navigate("/profile");
+      }, 800);
     } catch (e) {
       setVariant("danger");
       setMessage(
@@ -230,74 +236,76 @@ export default function EditProfilePage() {
         padding: "40px 20px",
         background: colors.background,
         display: "flex",
-        justifyContent: "center",
+        flexDirection: "column",
+        alignItems: "center",
       }}
     >
+      <h2 style={{ marginBottom: 20 }}>Chỉnh sửa hồ sơ</h2>
+
       <div
         style={{
-          width: "60%",
-          background: "#fff",
-          borderRadius: 10,
-          padding: 30,
-          boxShadow: "0 2px 6px rgba(0,0,0,.1)",
+          width: "70%",
+          maxWidth: 900,
+          backgroundColor: "#fff",
+          borderRadius: 12,
+          padding: 24,
+          boxShadow: "0 4px 12px rgba(15,23,42,0.08)",
         }}
       >
-        <h4 style={{ textAlign: "center", color: colors.brand }}>
-          Chỉnh sửa hồ sơ
-        </h4>
-
         {message && (
           <Alert
             variant={variant}
-            className="mt-3"
             onClose={() => setMessage("")}
             dismissible
+            className="mb-3"
           >
             {message}
           </Alert>
         )}
 
-        <Section title="Ảnh đại diện">
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <Image
-              src={
-                form.avatar_url ||
-                "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
-                  encodeURIComponent(form.full_name || "User")
-              }
-              roundedCircle
-              width={72}
-              height={72}
-            />
-            <div>
-              <div style={{ fontWeight: 600 }}>{form.full_name}</div>
-              <div style={{ color: "#666", fontSize: 13 }}>{form.email}</div>
+        {/* Avatar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            marginBottom: 24,
+          }}
+        >
+          <Image
+            src={
+              form.avatar_url ||
+              "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
+                encodeURIComponent(form.full_name || "User")
+            }
+            roundedCircle
+            style={{ width: 96, height: 96, objectFit: "cover" }}
+            alt="Avatar"
+          />
+          <div>
+            <div style={{ fontWeight: 600 }}>{form.full_name || "—"}</div>
+            <div style={{ fontSize: 14, color: colors.muted }}>
+              {form.email || "—"}
             </div>
-            <div>
-              <Button
-                variant="link"
-                onClick={() => alert("Upload avatar sẽ thêm sau.")}
-              >
-                <i className="bi bi-camera"></i> Đổi ảnh
-              </Button>
-            </div>
+            <Button
+              variant="outline-primary"
+              size="sm"
+              className="mt-2"
+              onClick={handleChangeAvatar}
+            >
+              <i className="bi bi-camera"></i> Đổi ảnh
+            </Button>
           </div>
-        </Section>
+        </div>
 
+        {/* Thông tin cơ bản */}
         <Section title="Thông tin cơ bản">
           <Form.Group className="mb-3">
             <Form.Label>Tên</Form.Label>
             <Form.Control
               value={form.full_name}
               onChange={onChange("full_name")}
-            />
-          </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Label>Giới tính</Form.Label>
-            <GenderSelector
-              value={form.gender}
-              onChange={(v) => setForm((prev) => ({ ...prev, gender: v }))}
+              placeholder="Nhập họ và tên"
             />
           </Form.Group>
 
@@ -305,12 +313,23 @@ export default function EditProfilePage() {
             <Form.Label>Ngày sinh</Form.Label>
             <Form.Control
               type="date"
-              value={form.birthday || ""}
+              value={form.birthday}
               onChange={onChange("birthday")}
             />
           </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Giới tính</Form.Label>
+            <div>
+              <GenderToggle
+                value={form.gender}
+                onChange={(g) => setForm((prev) => ({ ...prev, gender: g }))}
+              />
+            </div>
+          </Form.Group>
         </Section>
 
+        {/* Liên hệ */}
         <Section title="Liên hệ">
           <Form.Group className="mb-3">
             <Form.Label>Email</Form.Label>
@@ -318,14 +337,21 @@ export default function EditProfilePage() {
               type="email"
               value={form.email}
               onChange={onChange("email")}
+              placeholder="Nhập email"
             />
           </Form.Group>
+
           <Form.Group className="mb-3">
             <Form.Label>Số điện thoại</Form.Label>
-            <Form.Control value={form.phone} onChange={onChange("phone")} />
+            <Form.Control
+              value={form.phone}
+              onChange={onChange("phone")}
+              placeholder="Nhập số điện thoại"
+            />
           </Form.Group>
         </Section>
 
+        {/* Nút hành động */}
         <div
           style={{
             display: "flex",

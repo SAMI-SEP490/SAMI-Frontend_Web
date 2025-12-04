@@ -10,7 +10,7 @@ const SideBar = () => {
   return (
     <div
       style={{
-        width: "220px",
+        width: "250px",
         height: "100vh",
         backgroundColor: colors.brand,
         display: "flex",
@@ -24,9 +24,25 @@ const SideBar = () => {
       }}
     >
       {/* <h3 style={{ margin: 0, marginBottom: 8, fontWeight: 800 }}>SAMI</h3> */}
-      <div
-        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
+      <div style={{ marginTop: 6, fontSize: 18, color: "yellow" }}>
+        <b>Thống kê</b>
+      </div>
+
+      <button
+        onClick={() => navigate("/dashboard/timebase-report")}
+        style={buttonStyle}
       >
+        Thống kê tổng hợp tài chính
+      </button>
+
+      <button
+        onClick={() => navigate("/dashboard/tenant-aggregates")}
+        style={buttonStyle}
+      >
+        Thống kê tổng hợp người thuê
+      </button>
+
+      <div style={{ marginTop: 6, fontSize: 18, color: "yellow" }}>
         <b>Quản lý</b>
       </div>
 
@@ -68,29 +84,7 @@ const SideBar = () => {
         Danh sách đăng ký xe
       </button>
 
-      <div
-        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
-      >
-        <b>Thống kê</b>
-      </div>
-
-      <button
-        onClick={() => navigate("/dashboard/tenant-aggregates")}
-        style={buttonStyle}
-      >
-        Thống kê tổng hợp người thuê
-      </button>
-
-      <button
-        onClick={() => navigate("/dashboard/timebase-report")}
-        style={buttonStyle}
-      >
-        Thống kê tổng hợp tài chính
-      </button>
-
-      <div
-        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
-      >
+      <div style={{ marginTop: 6, fontSize: 18, color: "yellow" }}>
         <b>Tòa nhà và sơ đồ</b>
       </div>
 

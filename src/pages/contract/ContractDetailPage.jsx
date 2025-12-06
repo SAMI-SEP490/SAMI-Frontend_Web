@@ -18,7 +18,17 @@ export default function ContractDetailPage() {
 
   const [contract, setContract] = useState(null);
   const [tenant, setTenant] = useState(null);
+  const [appendices, setAppendices] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  /** ⭐ MAP TRẠNG THÁI TIẾNG VIỆT */
+  const STATUS_MAP = {
+    active: "Đang hiệu lực",
+    expired: "Hết hạn",
+    terminated: "Đã chấm dứt",
+    pending: "Chờ duyệt",
+    cancelled: "Đã hủy",
+  };
 
   /** ===== FETCH DATA ===== */
   useEffect(() => {
@@ -50,6 +60,13 @@ export default function ContractDetailPage() {
           note: c.note,
         };
 
+        /** ⭐ TỰ ĐỘNG ĐỔI TRẠNG THÁI HIỂN THỊ (KHÔNG GỌI API) */
+        const today = new Date();
+        const end = new Date(mapped.endDate);
+        if (today > end && mapped.status !== "expired") {
+          mapped.status = "expired"; // chỉ chỉnh UI
+        }
+
         setContract(mapped);
 
         // 2. Lấy thông tin tenant
@@ -60,7 +77,6 @@ export default function ContractDetailPage() {
         setTenant(foundTenant || null);
 
         // 3. Lấy phụ lục
-        
         const filtered = c?.appendices?.items.filter(
           (a) => Number(a.contract_id) === Number(id)
         );
@@ -178,7 +194,8 @@ export default function ContractDetailPage() {
               <strong>Số phòng:</strong> {contract.room}
             </div>
             <div className="col-md-6">
-              <strong>Trạng thái:</strong> {contract.status}
+              <strong>Trạng thái:</strong>{" "}
+              {STATUS_MAP[contract.status] || contract.status}
             </div>
           </div>
 

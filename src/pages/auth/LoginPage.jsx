@@ -22,7 +22,7 @@ function LoginPage() {
   const nextURL = useMemo(() => {
     const fromState = location.state?.from;
     const fromQuery = new URLSearchParams(location.search).get("from");
-    return fromState || fromQuery || ROUTES.contracts;
+    return fromState || fromQuery || ROUTES.viewTimebaseReport;
   }, [location.state, location.search]);
 
   // Helper: lấy role từ object user bất kỳ
@@ -76,7 +76,7 @@ function LoginPage() {
     }
 
     // Không phải tenant -> cho vào hệ thống như cũ
-    navigate(ROUTES.contracts, { replace: true });
+    navigate(ROUTES.viewTimebaseReport, { replace: true });
   }, [navigate]);
 
   const handleLogin = async (e) => {

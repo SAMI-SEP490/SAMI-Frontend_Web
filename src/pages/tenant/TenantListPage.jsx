@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getAllTenants,
-  deleteTenantByUserId,
+  deleteTenantByUserId
 } from "../../services/api/tenants";
 import { listRoomsLite } from "../../services/api/rooms";
 

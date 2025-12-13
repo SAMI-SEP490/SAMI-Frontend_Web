@@ -67,10 +67,21 @@ export default function ForgotPasswordPage() {
         return;
       }
 
+      // Lưu userId để verify OTP và reset mật khẩu
+      const userId = res?.userId;
+      try {
+        sessionStorage.setItem(
+          "sami:resetCtx",
+          JSON.stringify({ userId, email: trimmed })
+        );
+      } catch (e) {
+        console.warn("Không lưu được resetCtx:", e);
+      }
+
       // ✅ Case bình thường: gửi OTP thành công
       alert(res?.message || "Đã gửi mã xác thực tới email của bạn.");
       navigate(`/verify-reset-otp?email=${encodeURIComponent(trimmed)}`, {
-        state: { email: trimmed },
+        state: { email: trimmed, userId },
       });
     } catch (e) {
       const msg =

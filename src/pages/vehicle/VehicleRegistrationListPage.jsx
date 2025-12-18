@@ -116,9 +116,16 @@ function VehicleRegistrationListPage() {
   };
 
   // --------------------------------
-  // 🔎 Search + Filter
+  // 🔎 Search + Filter (LOẠI canceled)
   // --------------------------------
   const filtered = registrations.filter((r) => {
+    // ❗ CHỈ HIỂN THỊ status KHÁC canceled
+    if (
+      r.status?.toLowerCase() === "canceled" ||
+      r.status?.toLowerCase() === "cancelled"
+    )
+      return false;
+
     const s = search.toLowerCase();
     const matchSearch =
       r.requestedBy.toLowerCase().includes(s) ||

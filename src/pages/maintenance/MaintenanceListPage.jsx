@@ -1,30 +1,31 @@
 import React, { useState, useEffect } from "react";
 import { Table, Form, Button, Row, Col, Modal, Spinner } from "react-bootstrap";
-import { colors } from "../../constants/colors";
 import {
   listMaintenance,
   listUser,
   approveMaintenanceRequest,
   rejectMaintenanceRequest,
+  resolveMaintenanceRequest,
+  completeMaintenanceRequest,
 } from "../../services/api/maintenance";
+import "./MaintenanceListPage.css";
 
 function MaintenanceListPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState([]);
+  const [userData, setUserData] = useState([]);
+
   const [statusFilter, setStatusFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [userData, setUserData] = useState([]);
   const [loadingIds, setLoadingIds] = useState([]);
 
-  // Modal từ chối + modal xác nhận
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectId, setRejectId] = useState(null);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null); // "approve" hoặc "reject"
   const [confirmId, setConfirmId] = useState(null);
 
-  // Load dữ liệu
+  // ===== LOAD DATA =====
   useEffect(() => {
     async function fetchData() {
       try {
@@ -35,230 +36,218 @@ function MaintenanceListPage() {
         setMaintenanceRequests(maintenance);
         setUserData(users);
       } catch (error) {
-        console.error("Error fetching data:", error.response?.data || error);
         alert("❌ Lỗi khi tải dữ liệu!");
       }
     }
     fetchData();
   }, []);
 
-  const getUserFullName = (tenantUserId) => {
-    const user = userData.find((u) => u.user_id === tenantUserId);
+  // ===== UTILS =====
+  const getUserFullName = (id) => {
+    const user = userData.find((u) => u.user_id === id);
     return user ? user.full_name : "Không rõ";
   };
 
-  const translateStatus = (status) => {
+  const renderStatus = (status) => {
     switch (status) {
       case "pending":
-        return "Chờ xử lý";
+        return <span className="status draft">Chờ xử lý</span>;
       case "in_progress":
-        return "Đang xử lý";
+        return <span className="status published">Đang xử lý</span>;
       case "completed":
-        return "Hoàn thành";
+        return <span className="status archived">Hoàn thành</span>;
       case "rejected":
-        return "Từ chối";
+        return <span className="status archived">Từ chối</span>;
       default:
-        return "Không xác định";
+        return <span className="status">Không xác định</span>;
     }
   };
 
-  const translatePriority = (priority) => {
-    switch (priority) {
-      case "low":
-        return "Thấp";
-      case "normal":
-        return "Trung bình";
-      case "high":
-        return "Cao";
-      default:
-        return "Không xác định";
-    }
-  };
-
-  // Xử lý Approve
-  const handleApprove = async (id) => {
+  // ===== HANDLERS =====
+  const handleApprove = async () => {
     try {
-      setLoadingIds((prev) => [...prev, id]);
-      await approveMaintenanceRequest(id);
+      setLoadingIds((p) => [...p, confirmId]);
+      await approveMaintenanceRequest(confirmId);
       setMaintenanceRequests((prev) =>
-        prev.map((req) =>
-          req.request_id === id ? { ...req, status: "in_progress" } : req
+        prev.map((r) =>
+          r.request_id === confirmId ? { ...r, status: "in_progress" } : r
         )
       );
-      alert("✅ Đã phê duyệt yêu cầu bảo trì!");
-    } catch (error) {
-      console.error("Error approving request:", error.response?.data || error);
-      alert(`❌ Lỗi khi phê duyệt! ${error.response?.data?.message || ""}`);
     } finally {
-      setLoadingIds((prev) => prev.filter((i) => i !== id));
+      setLoadingIds((p) => p.filter((i) => i !== confirmId));
       setShowConfirmModal(false);
     }
   };
 
-  // Xử lý Reject
-  const handleReject = async (id) => {
-    if (!rejectReason.trim()) return alert("Bạn phải nhập lý do từ chối!");
+  const handleResolve = async (id) => {
     try {
-      setLoadingIds((prev) => [...prev, id]);
-      await rejectMaintenanceRequest(id, rejectReason);
+      setLoadingIds((p) => [...p, id]);
+      await resolveMaintenanceRequest(id);
+      await completeMaintenanceRequest(id);
       setMaintenanceRequests((prev) =>
-        prev.map((req) =>
-          req.request_id === id ? { ...req, status: "rejected" } : req
+        prev.map((r) =>
+          r.request_id === id ? { ...r, status: "completed" } : r
         )
       );
-      alert("🚫 Đã từ chối yêu cầu bảo trì!");
+    } finally {
+      setLoadingIds((p) => p.filter((i) => i !== id));
+    }
+  };
+
+  const handleReject = async () => {
+    if (!rejectReason.trim()) {
+      alert("Vui lòng nhập lí do từ chối!");
+      return;
+    }
+
+    try {
+      setLoadingIds((p) => [...p, rejectId]);
+      await rejectMaintenanceRequest(rejectId, rejectReason);
+      setMaintenanceRequests((prev) =>
+        prev.map((r) =>
+          r.request_id === rejectId ? { ...r, status: "rejected" } : r
+        )
+      );
       setShowRejectModal(false);
-    } catch (error) {
-      console.error("Error rejecting request:", error.response?.data || error);
-      alert(`❌ Lỗi khi từ chối! ${error.response?.data?.message || ""}`);
     } finally {
-      setLoadingIds((prev) => prev.filter((i) => i !== id));
-      setShowConfirmModal(false);
+      setLoadingIds((p) => p.filter((i) => i !== rejectId));
     }
   };
 
-  // Mở modal xác nhận trước khi Approve hoặc Reject
-  const openConfirmModal = (action, id) => {
-    setConfirmAction(action);
-    setConfirmId(id);
-    if (action === "reject") {
-      setRejectId(id);
-      setRejectReason("");
-      setShowRejectModal(true);
-    } else {
-      setShowConfirmModal(true);
-    }
-  };
-
-  // Filter + search theo tiêu đề và tên người gửi
+  // ===== FILTER =====
   const filteredRequests = maintenanceRequests.filter((req) => {
     const matchesStatus = statusFilter ? req.status === statusFilter : true;
     const term = searchTerm.toLowerCase();
-    const userName = getUserFullName(req.tenant_user_id).toLowerCase();
-    const matchesSearch =
-      req.title.toLowerCase().includes(term) || userName.includes(term);
-    return matchesStatus && matchesSearch;
+    const name = getUserFullName(req.tenant_user_id).toLowerCase();
+
+    return (
+      matchesStatus &&
+      (req.title.toLowerCase().includes(term) || name.includes(term))
+    );
   });
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        padding: "30px",
-        backgroundColor: colors.background,
-      }}
-    >
-      <h4 style={{ fontWeight: 600, marginBottom: "20px" }}>
-        Danh sách yêu cầu bảo trì
-      </h4>
+    <div className="container">
+      <h2 className="title">Danh sách yêu cầu bảo trì</h2>
 
-      <Row className="align-items-end mb-3">
-        <Col md={3}>
-          <Form.Label>Trạng thái:</Form.Label>
-          <Form.Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">Tất cả</option>
-            <option value="pending">Chờ xử lý</option>
-            <option value="in_progress">Đang xử lý</option>
-            <option value="completed">Đã hoàn thành</option>
-            <option value="rejected">Từ chối</option>
-          </Form.Select>
-        </Col>
-        <Col md={4}>
-          <Form.Label>Tìm kiếm:</Form.Label>
-          <Form.Control
-            type="text"
-            placeholder="Nhập tiêu đề hoặc người gửi..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </Col>
-      </Row>
+      {/* FILTER */}
+      <div className="filter-bar">
+        <input
+          className="search-input"
+          placeholder="🔎 Tìm theo tiêu đề hoặc người gửi..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
 
-      <Table bordered hover responsive>
-        <thead style={{ backgroundColor: "#E6E8ED" }}>
-          <tr>
-            <th>#</th>
-            <th>Tiêu đề</th>
-            <th>Người gửi</th>
-            <th>Phòng</th>
-            <th>Trạng thái</th>
-            <th>Ưu tiên</th>
-            <th>Ngày tạo</th>
-            <th>Ghi chú</th>
-            <th>Hành động</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredRequests.length > 0 ? (
-            filteredRequests.map((req, index) => {
-              const isLoading = loadingIds.includes(req.request_id);
-              const isPending = req.status === "pending";
+        <select
+          className="status-select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="">Tất cả trạng thái</option>
+          <option value="pending">Chờ xử lý</option>
+          <option value="in_progress">Đang xử lý</option>
+          <option value="completed">Hoàn thành</option>
+          <option value="rejected">Từ chối</option>
+        </select>
+      </div>
+
+      {/* TABLE */}
+      <div className="table-wrapper">
+        <Table bordered hover responsive>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tiêu đề</th>
+              <th>Người gửi</th>
+              <th>Phòng</th>
+              <th>Trạng thái</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filteredRequests.length === 0 && (
+              <tr>
+                <td colSpan={6} className="no-data">
+                  Không có yêu cầu phù hợp
+                </td>
+              </tr>
+            )}
+
+            {filteredRequests.map((req, index) => {
+              const loading = loadingIds.includes(req.request_id);
+
               return (
                 <tr key={req.request_id}>
                   <td>{index + 1}</td>
                   <td>{req.title}</td>
                   <td>{getUserFullName(req.tenant_user_id)}</td>
                   <td>{req.room_id}</td>
-                  <td>{translateStatus(req.status)}</td>
-                  <td>{translatePriority(req.priority)}</td>
-                  <td>
-                    {new Date(req.created_at).toLocaleDateString("vi-VN")}
-                  </td>
-                  <td>{req.note || "—"}</td>
-                  <td>
-                    {isPending && (
+                  <td>{renderStatus(req.status)}</td>
+                  <td className="action-buttons">
+                    {req.status === "pending" && (
                       <>
                         <Button
-                          variant="success"
                           size="sm"
-                          className="me-2"
-                          disabled={isLoading}
-                          onClick={() =>
-                            openConfirmModal("approve", req.request_id)
-                          }
+                          className="btn publish"
+                          disabled={loading}
+                          onClick={() => {
+                            setConfirmId(req.request_id);
+                            setShowConfirmModal(true);
+                          }}
                         >
-                          {isLoading ? (
-                            <Spinner animation="border" size="sm" />
+                          {loading ? (
+                            <Spinner size="sm" animation="border" />
                           ) : (
                             "Chấp nhận"
                           )}
                         </Button>
+
                         <Button
-                          variant="danger"
                           size="sm"
-                          disabled={isLoading}
-                          onClick={() =>
-                            openConfirmModal("reject", req.request_id)
-                          }
+                          className="btn delete"
+                          disabled={loading}
+                          onClick={() => {
+                            setRejectId(req.request_id);
+                            setRejectReason("");
+                            setShowRejectModal(true);
+                          }}
                         >
                           Từ chối
                         </Button>
                       </>
                     )}
+
+                    {req.status === "in_progress" && (
+                      <Button
+                        size="sm"
+                        className="btn edit"
+                        disabled={loading}
+                        onClick={() => handleResolve(req.request_id)}
+                      >
+                        {loading ? (
+                          <Spinner size="sm" animation="border" />
+                        ) : (
+                          "Đã hoàn thành"
+                        )}
+                      </Button>
+                    )}
                   </td>
                 </tr>
               );
-            })
-          ) : (
-            <tr>
-              <td colSpan="9" className="text-center">
-                Không có yêu cầu nào phù hợp
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </Table>
+            })}
+          </tbody>
+        </Table>
+      </div>
 
-      {/* Modal xác nhận Approve */}
+      {/* MODAL CONFIRM */}
       <Modal show={showConfirmModal} onHide={() => setShowConfirmModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Xác nhận</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          Bạn có chắc chắn muốn phê duyệt yêu cầu này không?
+          Bạn có chắc chắn muốn chấp nhận yêu cầu bảo trì này không?
         </Modal.Body>
         <Modal.Footer>
           <Button
@@ -267,16 +256,16 @@ function MaintenanceListPage() {
           >
             Hủy
           </Button>
-          <Button variant="success" onClick={() => handleApprove(confirmId)}>
+          <Button variant="success" onClick={handleApprove}>
             Xác nhận
           </Button>
         </Modal.Footer>
       </Modal>
 
-      {/* Modal nhập lý do Reject */}
+      {/* MODAL REJECT */}
       <Modal show={showRejectModal} onHide={() => setShowRejectModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Lý do từ chối</Modal.Title>
+          <Modal.Title>Nhập lí do từ chối</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form.Control
@@ -284,15 +273,15 @@ function MaintenanceListPage() {
             rows={3}
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="Nhập lý do từ chối..."
+            placeholder="Nhập lí do từ chối..."
           />
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowRejectModal(false)}>
             Hủy
           </Button>
-          <Button variant="danger" onClick={() => handleReject(rejectId)}>
-            Xác nhận
+          <Button variant="danger" onClick={handleReject}>
+            Từ chối
           </Button>
         </Modal.Footer>
       </Modal>

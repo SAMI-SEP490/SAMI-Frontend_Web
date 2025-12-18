@@ -4,6 +4,7 @@ import { colors } from "../../constants/colors";
 import { Form, Button, Alert, Image } from "react-bootstrap";
 import { getProfile, updateProfile } from "../../services/api/auth";
 
+// Chuẩn hóa date string về dạng YYYY-MM-DD cho input[type="date"]
 const toInputDate = (v) => {
   if (!v) return "";
   const s = String(v);
@@ -13,60 +14,200 @@ const toInputDate = (v) => {
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 };
 
-const toUiGender = (g) =>
-  g === "Male" ? "Nam" : g === "Female" ? "Nữ" : g ? "Khác" : "Nam";
+// Map giới tính từ BE sang UI
+const toUiGender = (g) => {
+  if (!g) return "";
+  const v = String(g).toLowerCase();
+  if (v === "male" || v === "nam") return "Nam";
+  if (v === "female" || v === "nữ" || v === "nu") return "Nữ";
+  return "Khác";
+};
+
+function Section({ title, children }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div
+        style={{
+          background: colors.brand,
+          color: "#fff",
+          padding: "8px 12px",
+          borderTopLeftRadius: 8,
+          borderTopRightRadius: 8,
+          fontWeight: 600,
+        }}
+      >
+        {title}
+      </div>
+      <div
+        style={{
+          border: "1px solid #ddd",
+          borderTop: "none",
+          padding: 16,
+          borderBottomLeftRadius: 8,
+          borderBottomRightRadius: 8,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function GenderSelector({ value, onChange }) {
+  const items = ["Nam", "Nữ", "Khác"];
+  return (
+    <div style={{ display: "flex", gap: 10 }}>
+      {items.map((g) => (
+        <Button
+          key={g}
+          variant={value === g ? "primary" : "outline-secondary"}
+          style={{ borderRadius: 20, padding: "5px 15px" }}
+          onClick={() => onChange(g)}
+        >
+          {g}
+        </Button>
+      ))}
+    </div>
+  );
+}
 
 export default function EditProfilePage() {
   const navigate = useNavigate();
+
   const [form, setForm] = useState({
-    id: "",
     full_name: "",
-    birthday: "",
-    gender: "Nam",
     email: "",
     phone: "",
+    birthday: "",
+    gender: "",
     avatar_url: "",
   });
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [variant, setVariant] = useState("danger");
+  const [variant, setVariant] = useState("success");
 
+  // Load profile lúc mở trang
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
-        setLoading(true);
-        const p = await getProfile();
-        setForm({
-          id: p.id || "",
-          full_name: p.full_name || "",
-          birthday: toInputDate(p.birthday),
-          gender: toUiGender(p.gender),
-          email: p.email || "",
-          phone: p.phone || "",
-          avatar_url: p.avatar_url || "",
-        });
+        const res = await getProfile();
+        const u = res?.user || res?.data?.user || res?.data || res || {};
+
+        if (!mounted) return;
+
+        setForm((prev) => ({
+          ...prev,
+          ...u,
+          full_name: u.full_name ?? u.fullName ?? "",
+          email: u.email ?? "",
+          phone: u.phone ?? "",
+          birthday: toInputDate(u.birthday ?? u.dob),
+          gender: toUiGender(u.gender ?? u.sex),
+          avatar_url: u.avatar_url ?? u.avatarUrl ?? "",
+        }));
       } catch (e) {
-        setMessage(e?.response?.data?.message || "Không tải được hồ sơ");
+        if (!mounted) return;
+        setVariant("danger");
+        setMessage(
+          e?.response?.data?.message ||
+            e?.message ||
+            "Không tải được thông tin hồ sơ."
+        );
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     })();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const onChange = (k) => (e) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const onChange = (field) => (eOrValue) => {
+    const value =
+      eOrValue && eOrValue.target ? eOrValue.target.value : eOrValue;
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
 
   const onSave = async () => {
-    if (!form.full_name || !form.email || !form.phone) {
+    const fullName = (form.full_name || "").trim();
+    const email = (form.email || "").trim();
+    const phone = (form.phone || "").trim();
+
+    if (!fullName || !email || !phone) {
       setVariant("danger");
       setMessage("Vui lòng nhập đủ tên, email, SĐT.");
       return;
     }
+
+    // ✅ EMAIL
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setVariant("danger");
+      setMessage("Email không hợp lệ.");
+      return;
+    }
+
+    // ✅ SĐT: 10–11 số, bắt đầu bằng 0
+    const phoneRegex = /^0\d{9,10}$/;
+    if (!phoneRegex.test(phone)) {
+      setVariant("danger");
+      setMessage("SĐT không hợp lệ.");
+      return;
+    }
+
+    // ✅ NGÀY SINH: 18–100 tuổi
+    if (form.birthday) {
+      const birth = new Date(form.birthday);
+      if (Number.isNaN(birth.getTime())) {
+        setVariant("danger");
+        setMessage("Ngày sinh không hợp lệ.");
+        return;
+      }
+
+      const today = new Date();
+
+      // sinh trong tương lai
+      if (birth > today) {
+        setVariant("danger");
+        setMessage("Ngày sinh không hợp lệ.");
+        return;
+      }
+
+      // > 100 tuổi
+      const hundredYearsAgo = new Date();
+      hundredYearsAgo.setFullYear(hundredYearsAgo.getFullYear() - 100);
+      if (birth < hundredYearsAgo) {
+        setVariant("danger");
+        setMessage("Ngày sinh không hợp lệ.");
+        return;
+      }
+
+      // < 18 tuổi
+      const eighteenYearsAgo = new Date();
+      eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+      if (birth > eighteenYearsAgo) {
+        setVariant("danger");
+        setMessage("Bạn phải ít nhất 18 tuổi.");
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       setMessage("");
-      await updateProfile(form);
+
+      // updateProfile trong auth.js đã tự map gender, birthday, avatar_url
+      await updateProfile({
+        ...form,
+        full_name: fullName,
+        email,
+        phone,
+      });
+
       setVariant("success");
       setMessage("Cập nhật hồ sơ thành công!");
       setTimeout(() => navigate("/profile"), 800);
@@ -105,37 +246,43 @@ export default function EditProfilePage() {
           Chỉnh sửa hồ sơ
         </h4>
 
-        {message && <Alert variant={variant}>{message}</Alert>}
-
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div
-            style={{
-              width: 120,
-              height: 120,
-              margin: "0 auto",
-              borderRadius: "50%",
-              background: "#fff",
-              border: "1px solid #E5E7EB",
-              overflow: "hidden",
-            }}
+        {message && (
+          <Alert
+            variant={variant}
+            className="mt-3"
+            onClose={() => setMessage("")}
+            dismissible
           >
-            {form.avatar_url ? (
-              <Image
-                src={form.avatar_url}
-                roundedCircle
-                style={{ width: 120, height: 120, objectFit: "cover" }}
-              />
-            ) : null}
+            {message}
+          </Alert>
+        )}
+
+        <Section title="Ảnh đại diện">
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <Image
+              src={
+                form.avatar_url ||
+                "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
+                  encodeURIComponent(form.full_name || "User")
+              }
+              roundedCircle
+              width={72}
+              height={72}
+            />
+            <div>
+              <div style={{ fontWeight: 600 }}>{form.full_name}</div>
+              <div style={{ color: "#666", fontSize: 13 }}>{form.email}</div>
+            </div>
+            <div>
+              <Button
+                variant="link"
+                onClick={() => alert("Upload avatar sẽ thêm sau.")}
+              >
+                <i className="bi bi-camera"></i> Đổi ảnh
+              </Button>
+            </div>
           </div>
-          <div>
-            <Button
-              variant="link"
-              onClick={() => alert("Upload avatar sẽ thêm sau.")}
-            >
-              <i className="bi bi-camera"></i> Đổi ảnh
-            </Button>
-          </div>
-        </div>
+        </Section>
 
         <Section title="Thông tin cơ bản">
           <Form.Group className="mb-3">
@@ -147,24 +294,24 @@ export default function EditProfilePage() {
           </Form.Group>
 
           <Form.Group className="mb-3">
-            <Form.Label>Ngày sinh</Form.Label>
-            <Form.Control
-              type="date"
-              value={form.birthday}
-              onChange={onChange("birthday")}
+            <Form.Label>Giới tính</Form.Label>
+            <GenderSelector
+              value={form.gender}
+              onChange={(v) => setForm((prev) => ({ ...prev, gender: v }))}
             />
           </Form.Group>
 
           <Form.Group className="mb-3">
-            <Form.Label>Giới tính</Form.Label>
-            <Gender
-              value={form.gender}
-              onChange={(v) => setForm((f) => ({ ...f, gender: v }))}
+            <Form.Label>Ngày sinh</Form.Label>
+            <Form.Control
+              type="date"
+              value={form.birthday || ""}
+              onChange={onChange("birthday")}
             />
           </Form.Group>
         </Section>
 
-        <Section title="Thông tin liên hệ">
+        <Section title="Liên hệ">
           <Form.Group className="mb-3">
             <Form.Label>Email</Form.Label>
             <Form.Control
@@ -182,69 +329,23 @@ export default function EditProfilePage() {
         <div
           style={{
             display: "flex",
-            justifyContent: "center",
-            gap: 20,
-            marginTop: 25,
+            justifyContent: "flex-end",
+            gap: 10,
+            marginTop: 20,
           }}
         >
           <Button
-            variant="outline-secondary"
+            variant="secondary"
+            disabled={saving}
             onClick={() => navigate("/profile")}
           >
-            Quay lại
+            Hủy
           </Button>
-          <Button variant="primary" onClick={onSave} disabled={saving}>
-            {saving ? "Đang lưu..." : "Lưu"}
+          <Button variant="primary" disabled={saving} onClick={onSave}>
+            {saving ? "Đang lưu..." : "Lưu thay đổi"}
           </Button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <div
-        style={{
-          background: colors.brand,
-          color: "#fff",
-          padding: "8px 12px",
-          borderTopLeftRadius: 8,
-          borderTopRightRadius: 8,
-          fontWeight: 600,
-        }}
-      >
-        {title}
-      </div>
-      <div
-        style={{
-          border: "1px solid #E5E7EB",
-          borderBottomLeftRadius: 8,
-          borderBottomRightRadius: 8,
-          padding: 16,
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Gender({ value, onChange }) {
-  const items = ["Nam", "Nữ", "Khác"];
-  return (
-    <div style={{ display: "flex", gap: 10 }}>
-      {items.map((g) => (
-        <Button
-          key={g}
-          variant={value === g ? "primary" : "outline-secondary"}
-          style={{ borderRadius: 20, padding: "5px 15px" }}
-          onClick={() => onChange(g)}
-        >
-          {g}
-        </Button>
-      ))}
     </div>
   );
 }

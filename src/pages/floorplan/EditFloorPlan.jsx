@@ -1,6 +1,6 @@
-// src/pages/floorplan/CreateFloorPlan.jsx
+// src/pages/floorplan/EditFloorPlan.jsx
 import { useCallback, useMemo, useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -15,9 +15,7 @@ import {
 import "reactflow/dist/style.css";
 
 import { listBuildings } from "../../services/api/building";
-import { createFloorPlan } from "../../services/api/floorplan";
-
-const API_BASE = "/api/floor-plan";
+import { createFloorPlan, getFloorPlanDetail } from "../../services/api/floorplan";
 
 /* ---------- helpers vẽ shape ---------- */
 const rectPoints = (W, H) => [
@@ -368,32 +366,32 @@ function SmallNode({ data }) {
   );
 }
 
-/* =================== EDITOR =================== */
-function FloorplanEditor() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const rf = useReactFlow();
+/* ---------- Node types ---------- */
+const NODE_TYPES = {
+  building: BuildingNode,
+  block: BlockNode,
+  small: SmallNode,
+};
 
-  const qpBuilding = searchParams.get("building");
-  const qpFloor = searchParams.get("floor");
+/* =================== EDITOR =================== */
+function FloorplanEdit() {
+  const navigate = useNavigate();
+  const { planId } = useParams();
+  const rf = useReactFlow();
 
   const [buildings, setBuildings] = useState([]);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const [buildingError, setBuildingError] = useState("");
 
-  const [activeBuilding, setActiveBuilding] = useState(qpBuilding || "");
-  const [activeFloor, setActiveFloor] = useState(qpFloor || "1");
+  const [activeBuilding, setActiveBuilding] = useState("");
+  const [activeFloor, setActiveFloor] = useState("1");
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [gridGap, setGridGap] = useState(40);
   const [pxPerMeter, setPxPerMeter] = useState(80);
   const [selectedId, setSelectedId] = useState(null);
-
-  const nodeTypes = useMemo(
-    () => ({ building: BuildingNode, block: BlockNode, small: SmallNode }),
-    []
-  );
+  const [loadingLayout, setLoadingLayout] = useState(true);
 
   const activeBuildingObj = useMemo(
     () =>
@@ -417,7 +415,7 @@ function FloorplanEditor() {
     }
   }, [floorOptions, activeFloor]);
 
-  // load list building
+  /* Load list building (giống Create) */
   useEffect(() => {
     let canceled = false;
 
@@ -433,13 +431,11 @@ function FloorplanEditor() {
         setBuildings(arr);
 
         if (arr.length > 0) {
-          // Kiểm tra xem activeBuilding hiện tại có khớp ID tòa nào không
           const exists = arr.some(
             (b) => String(b.building_id) === String(activeBuilding)
           );
           const isNumeric = /^\d+$/.test(String(activeBuilding));
 
-          // Nếu đang là "A" / "" / hoặc ID không tồn tại -> set về tòa đầu tiên
           if (!exists || !isNumeric) {
             setActiveBuilding(String(arr[0].building_id));
           }
@@ -458,10 +454,7 @@ function FloorplanEditor() {
     };
   }, [activeBuilding]);
 
-  const comboKey = `${activeBuilding || "NO_BUILDING"}-${
-    activeFloor || "NO_FLOOR"
-  }`;
-
+  /* Inject callback cho building + block/small */
   const injectCallbacks = useCallback(() => {
     setNodes((nds) =>
       nds.map((n) => {
@@ -505,56 +498,53 @@ function FloorplanEditor() {
     );
   }, [gridGap, setNodes]);
 
-  const loadFromAPI = useCallback(async () => {
-    if (!activeBuilding || !activeFloor) {
-      setNodes(() => []);
-      setEdges(() => []);
-      return;
-    }
-    try {
-      const res = await fetch(`${API_BASE}/${comboKey}`, {
-        credentials: "include",
-      });
-      if (!res.ok) {
-        setNodes(() => []);
-        setEdges(() => []);
-        return;
-      }
-      const json = await res.json();
-      const layout = json?.data?.layout;
-      if (layout) {
-        const { nodes: n = [], edges: e = [], meta = {} } = layout;
+  /* Load layout để EDIT theo planId */
+  useEffect(() => {
+    let canceled = false;
+
+    async function load() {
+      try {
+        const detail = await getFloorPlanDetail(planId);
+        if (canceled) return;
+
+        const layout = detail?.layout || {};
+        const n = Array.isArray(layout.nodes) ? layout.nodes : [];
+        const e = Array.isArray(layout.edges) ? layout.edges : [];
+
         setNodes(n);
         setEdges(e);
-        if (meta?.pxPerMeter) setPxPerMeter(meta.pxPerMeter);
-        if (meta?.gridGap) setGridGap(meta.gridGap);
-        setTimeout(injectCallbacks, 0);
-      } else {
-        setNodes(() => []);
-        setEdges(() => []);
+
+        if (layout.meta?.pxPerMeter) setPxPerMeter(layout.meta.pxPerMeter);
+        if (layout.meta?.gridGap) setGridGap(layout.meta.gridGap);
+
+        if (detail.building?.building_id)
+          setActiveBuilding(String(detail.building.building_id));
+
+        if (detail.floor_number != null)
+          setActiveFloor(String(detail.floor_number));
+
+        setLoadingLayout(false);
+      } catch (err) {
+        console.error(err);
+        setLoadingLayout(false);
       }
-    } catch {
-      setNodes(() => []);
-      setEdges(() => []);
     }
-  }, [
-    comboKey,
-    activeBuilding,
-    activeFloor,
-    injectCallbacks,
-    setNodes,
-    setEdges,
-  ]);
 
+    load();
+    return () => {
+      canceled = true;
+    };
+  }, [planId, setNodes, setEdges]);
+
+  /* Sau khi layout load xong mới inject + fitView */
   useEffect(() => {
-    loadFromAPI();
-  }, [loadFromAPI]);
+    if (!loadingLayout && nodes.length > 0) {
+      injectCallbacks();
+      rf.fitView?.();
+    }
+  }, [loadingLayout, nodes.length, injectCallbacks, rf]);
 
-  useEffect(() => {
-    injectCallbacks();
-  }, [injectCallbacks]);
-
-  /* ---------- Drag từ palette sang canvas ---------- */
+  /* Palette add node (y chang Create) */
   const addNodeFromType = useCallback(
     (event) => {
       event.preventDefault();
@@ -570,8 +560,6 @@ function FloorplanEditor() {
         x: event.clientX,
         y: event.clientY,
       });
-
-      console.log("DROP NODE:", type, pos);
 
       const id = Math.random().toString(36).slice(2, 9);
 
@@ -785,7 +773,8 @@ function FloorplanEditor() {
         return;
       }
 
-      const buildingName = activeBuildingObj?.name || `#${String(buildingId)}`;
+      const buildingName =
+        activeBuildingObj?.name || `#${String(buildingId)}`;
 
       const payload = {
         building_id: buildingId,
@@ -794,17 +783,18 @@ function FloorplanEditor() {
         layout: {
           nodes,
           edges,
-          meta: { pxPerMeter, gridGap, savedAt: Date.now() },
+          meta: { pxPerMeter, gridGap, editedFrom: planId, savedAt: Date.now() },
         },
       };
 
       await createFloorPlan(payload);
-      alert("Đã lưu layout lên backend!");
+      alert("Đã lưu layout (phiên bản mới) lên backend!");
     } catch (err) {
       console.error(err);
       alert(err?.message || "Lỗi khi lưu layout, kiểm tra console!");
     }
   };
+
   const paletteItems = [
     { type: "building-rect", label: "Tòa nhà (Rect)", icon: "room" },
     { type: "building-L", label: "Tòa nhà (L-shape)", icon: "room" },
@@ -824,7 +814,6 @@ function FloorplanEditor() {
     e.dataTransfer.setData("text/plain", type);
     e.dataTransfer.setData("application/sami-node", type);
     e.dataTransfer.effectAllowed = "move";
-    console.log("DRAG START:", type);
   }, []);
 
   const cardStyle = {
@@ -850,6 +839,10 @@ function FloorplanEditor() {
     padding: "6px 10px",
     fontSize: 13,
   };
+
+  if (loadingLayout) {
+    return <div style={{ padding: 30, fontSize: 16 }}>Đang tải layout…</div>;
+  }
 
   return (
     <div
@@ -909,6 +902,7 @@ function FloorplanEditor() {
           </button>
         </div>
 
+        {/* Khu vực bản vẽ */}
         <div style={cardStyle}>
           <div
             style={{
@@ -989,13 +983,16 @@ function FloorplanEditor() {
               lineHeight: 1.4,
             }}
           >
-            Layout cho{" "}
-            <b>{activeBuildingObj?.name || `Tòa #${activeBuilding || "-"}`}</b>{" "}
-            – <b>Tầng {activeFloor}</b> sẽ được lưu lên hệ thống khi bạn nhấn{" "}
-            <b>Lưu layout</b>.
+            Đang chỉnh sửa layout của{" "}
+            <b>
+              {activeBuildingObj?.name || `Tòa #${activeBuilding || "-"}`}
+            </b>{" "}
+            – <b>Tầng {activeFloor}</b>. Khi nhấn <b>Lưu layout</b>, một phiên
+            bản mới sẽ được tạo.
           </div>
         </div>
 
+        {/* Giá trị */}
         <div style={cardStyle}>
           <div
             style={{
@@ -1043,6 +1040,7 @@ function FloorplanEditor() {
           </div>
         </div>
 
+        {/* Kích thước đối tượng */}
         <div style={cardStyle}>
           <div
             style={{
@@ -1092,6 +1090,7 @@ function FloorplanEditor() {
           )}
         </div>
 
+        {/* Palette icons */}
         <div style={{ ...cardStyle, maxHeight: "100%", overflow: "auto" }}>
           <div
             style={{
@@ -1149,8 +1148,8 @@ function FloorplanEditor() {
       <div
         style={{
           width: "100%",
-          height: 620, // 👈 thêm
-          minHeight: 620, // 👈 thêm cho chắc
+          height: 620,
+          minHeight: 620,
           border: "1px solid #e5e7eb",
           borderRadius: 10,
           background: "#ffffff",
@@ -1161,7 +1160,7 @@ function FloorplanEditor() {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          nodeTypes={nodeTypes}
+          nodeTypes={NODE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={(p) =>
@@ -1175,10 +1174,7 @@ function FloorplanEditor() {
           onSelectionChange={({ nodes: sel }) =>
             setSelectedId(sel?.[0]?.id || null)
           }
-          onDrop={(event) => {
-            console.log("ReactFlow onDrop");
-            addNodeFromType(event);
-          }}
+          onDrop={addNodeFromType}
           onDragOver={(event) => {
             event.preventDefault();
             event.dataTransfer.dropEffect = "move";
@@ -1193,10 +1189,10 @@ function FloorplanEditor() {
   );
 }
 
-export default function CreateFloorPlan() {
+export default function EditFloorPlan() {
   return (
     <ReactFlowProvider>
-      <FloorplanEditor />
+      <FloorplanEdit />
     </ReactFlowProvider>
   );
 }

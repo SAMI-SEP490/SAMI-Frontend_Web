@@ -121,19 +121,10 @@ export async function registerUser({
 
 /** =========================
  *  CHANGE TO TENANT (POST /user/change-to-tenant)
+ *  Cho phép truyền cả roomId, idNumber, emergencyContactPhone, note...
  * ========================= */
-export async function changeToTenant({
-  userId,
-  idNumber,
-  emergencyContactPhone,
-  note,
-}) {
-  const res = await http.post("/user/change-to-tenant", {
-    userId,
-    idNumber,
-    emergencyContactPhone,
-    note,
-  });
+export async function changeToTenant(payload = {}) {
+  const res = await http.post("/user/change-to-tenant", payload);
   return unwrap(res);
 }
 
@@ -151,7 +142,6 @@ export async function registerTenantQuick(form) {
 
   if (phoneDigits.length < 10) {
     throw new Error("Số điện thoại phải có ít nhất 10 chữ số.");
-    // Hoặc xử lý theo yêu cầu UI của bạn
   }
 
   const userRes = await registerUser({
@@ -204,7 +194,6 @@ export async function registerTenantQuick(form) {
 
 /** =========================
  *  NEW: GET USER BY ID
- *  Thử các path phổ biến, ưu tiên đúng BE: /api/user/get-user/:id
  * ========================= */
 const GET_USER_PATHS = [
   "/user/get-user/:id",
@@ -214,24 +203,34 @@ const GET_USER_PATHS = [
   "/tenants/:id",
 ];
 export async function getUserById(id) {
-  let lastErr;
   for (const raw of GET_USER_PATHS) {
     const url = raw.replace(":id", id);
     try {
-      const res = await http.get(url);
-      const data = unwrap(res);
-      return data?.data ?? data; // đồng nhất trả về object user
-    } catch (e) {
-      lastErr = e;
+      // Cho phép nhận cả 4xx/5xx, tự xử lý status
+      const res = await http.get(url, {
+        validateStatus: () => true,
+      });
+
+      // Nếu gọi được và status < 400 thì coi là thành công
+      if (res && res.status < 400) {
+        const data = unwrap(res);
+        return data?.data ?? data; // đồng nhất trả về object user
+      }
+
+      // Nếu status >= 400 thì thử path tiếp theo
+      continue;
+    } catch  {
+      // Lỗi network / parse... thì cũng thử path khác
+      continue;
     }
   }
-  throw lastErr;
+
+  // Nếu tất cả path đều fail ⇒ ném ra message chuẩn theo yêu cầu tester
+  throw new Error("Không lấy được thông tin người dùng");
 }
 
 /** =========================
  *  NEW: UPDATE USER
- *  PUT /api/user/update/:id (BE đang mount theo dạng này)
- *  - Gửi cả camelCase & snake_case để tương thích nhiều middleware
  * ========================= */
 const UPDATE_USER_PATHS = ["/user/update/:id", "/users/:id"];
 export async function updateUser(id, form = {}) {
@@ -244,7 +243,6 @@ export async function updateUser(id, form = {}) {
     gender: GENDER_MAP[form.gender] || form.gender,
     // snake_case song song
     full_name: form.full_name ?? form.fullName,
-    // nếu BE ignore snake/camel thì vẫn nhận 1 trong 2
   };
 
   // Xoá field rỗng/undefined

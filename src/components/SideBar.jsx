@@ -10,7 +10,7 @@ const SideBar = () => {
   return (
     <div
       style={{
-        width: "220px",
+        width: "250px",
         height: "100vh",
         backgroundColor: colors.brand,
         display: "flex",
@@ -24,10 +24,26 @@ const SideBar = () => {
       }}
     >
       {/* <h3 style={{ margin: 0, marginBottom: 8, fontWeight: 800 }}>SAMI</h3> */}
-      <div
-        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
+      <div style={{ marginTop: 6, fontSize: 18, color: "yellow" }}>
+        <b>Thống kê</b>
+      </div>
+
+      <button
+        onClick={() => navigate("/dashboard/timebase-report")}
+        style={buttonStyle}
       >
-        Thống kê & Quản lý
+        Thống kê tổng hợp tài chính
+      </button>
+
+      <button
+        onClick={() => navigate("/dashboard/tenant-aggregates")}
+        style={buttonStyle}
+      >
+        Thống kê tổng hợp người thuê
+      </button>
+
+      <div style={{ marginTop: 6, fontSize: 18, color: "yellow" }}>
+        <b>Quản lý</b>
       </div>
 
       <button onClick={() => navigate("/contracts")} style={buttonStyle}>
@@ -60,25 +76,17 @@ const SideBar = () => {
       >
         Danh sách bảo trì
       </button>
-      <button
-        onClick={() => navigate("/dashboard/tenant-aggregates")}
-        style={buttonStyle}
-      >
-        Thống kê tổng hợp người thuê
-      </button>
 
-      <button
-        onClick={() => navigate("/dashboard/timebase-report")}
-        style={buttonStyle}
-      >
-        Thống kê tổng hợp tài chính
-      </button>
       <button
         onClick={() => navigate("/vehicle-registrations")}
         style={buttonStyle}
       >
         Danh sách đăng ký xe
       </button>
+
+      <div style={{ marginTop: 6, fontSize: 18, color: "yellow" }}>
+        <b>Tòa nhà và sơ đồ</b>
+      </div>
 
       {/* ✅ Chỉ hiện khi role là OWNER */}
       {role === "OWNER" && (
@@ -88,16 +96,8 @@ const SideBar = () => {
       )}
 
       {/* ===== Floor plan (mới) ===== */}
-      <div
-        style={{ marginTop: 6, opacity: 0.8, fontSize: 18, color: "yellow" }}
-      >
-        Sơ đồ tòa nhà
-      </div>
       <button onClick={() => navigate("/floorplan/view")} style={buttonStyle}>
         Xem sơ đồ tầng
-      </button>
-      <button onClick={() => navigate("/floorplan/create")} style={buttonStyle}>
-        Tạo/Chỉnh sửa sơ đồ
       </button>
     </div>
   );

@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://lonely-alberta-jackets-academics.trycloudflare.com/",
+        target: "https://aid-labeled-adapted-been.trycloudflare.com/",
         changeOrigin: true,
         secure: false,
       },

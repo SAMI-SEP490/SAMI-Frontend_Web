@@ -1,48 +1,44 @@
-import React, { useContext, useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+// src/pages/notification/CreateNotificationPage.jsx
+
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { colors } from "../../constants/colors";
-import { NotificationContext } from "../../contexts/NotificationContext";
+import { sendBroadcastNotification } from "../../services/api/notification";
+import { ROUTES } from "../../constants/routes";
 
-export default function EditNotificationPage() {
+export default function CreateNotificationPage() {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const { notificationData, setNotificationData } =
-    useContext(NotificationContext);
-
-  const existing = notificationData.find((n) => n.id === id);
 
   const [formData, setFormData] = useState({
     code: "",
     title: "",
     category: "",
-    effectiveDate: "",
-    expiryDate: "",
     content: "",
     building: "",
     attachmentName: "",
+    publishAt: "", // thời gian hiển thị trên app (datetime-local)
   });
 
-  useEffect(() => {
-    if (existing) {
-      setFormData({
-        code: existing.code || "",
-        title: existing.title || "",
-        category: existing.category || "",
-        effectiveDate: existing.effectiveDate || "",
-        expiryDate: existing.expiryDate || "",
-        content: existing.content || "",
-        building: existing.building || "",
-        attachmentName: existing.attachment || "",
-      });
-    }
-  }, [existing]);
+  const [isSending, setIsSending] = useState(false);
 
   const inputStyle = {
     width: "100%",
-    padding: "10px",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    marginTop: "5px",
+    padding: "8px 10px",
+    borderRadius: 8,
+    border: "1px solid #CBD5E1",
+    fontSize: 14,
+  };
+
+  // format "YYYY-MM-DDTHH:mm" cho input datetime-local
+  const getNowLocalInputValue = () => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth() + 1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
   };
 
   const handleChange = (e) => {
@@ -54,37 +50,61 @@ export default function EditNotificationPage() {
     }
   };
 
-  const updateNotification = (status) => {
-    if (!existing) return;
-    const updated = {
-      ...existing,
-      ...formData,
-      attachment: formData.attachmentName,
-      status,
-      updatedAt: new Date().toISOString(),
-    };
-
-    setNotificationData((prev) =>
-      prev.map((item) => (item.id === existing.id ? updated : item))
-    );
+  const handleCancel = () => {
+    navigate(ROUTES.notifications);
   };
 
   const handleSaveDraft = (e) => {
     e.preventDefault();
-    updateNotification("Nháp");
-    alert("Đã lưu bản nháp.");
+    alert(
+      "Hiện tại hệ thống chưa lưu bản nháp lên backend.\nBạn có thể giữ tab này mở để chỉnh sửa tiếp trước khi gửi."
+    );
   };
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    updateNotification("Đã gửi");
-    alert("Đã gửi thông báo.");
-    navigate("/notifications");
-  };
 
-  const handleCancel = (e) => {
-    e.preventDefault();
-    navigate("/notifications");
+    if (!formData.title || !formData.content) {
+      alert("Vui lòng nhập tối thiểu Tiêu đề và Nội dung thông báo.");
+      return;
+    }
+
+    // ✅ Validate: không cho chọn thời gian quá khứ
+    if (formData.publishAt) {
+      const selected = new Date(formData.publishAt); // datetime-local → local time
+      const now = new Date();
+      if (selected < now) {
+        alert("Thời gian hiển thị trên app không được ở trong quá khứ.");
+        return;
+      }
+    }
+
+    const payload = {
+      code: formData.code || "",
+      category: formData.category || "",
+      content: formData.content || "",
+      building: formData.building || "",
+      attachmentName: formData.attachmentName || "",
+      type: "REGULATION",
+      publishAt: formData.publishAt || null, // null hoặc "" = hiện ngay
+    };
+
+    try {
+      setIsSending(true);
+      await sendBroadcastNotification({
+        title: formData.title,
+        body: formData.content,
+        payload,
+      });
+
+      alert("Đã gửi thông báo cho cư dân trên app.");
+      navigate(ROUTES.notifications);
+    } catch (error) {
+      console.error("Failed to send notification:", error);
+      alert("Gửi thông báo thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -92,12 +112,11 @@ export default function EditNotificationPage() {
       style={{
         minHeight: "100vh",
         background: colors.background,
-        padding: "24px",
-        overflowY: "auto",
+        padding: 24,
       }}
     >
       <h2 style={{ fontWeight: 700, marginBottom: 16 }}>
-        Chỉnh sửa quy định / Thông báo
+        Tạo mới quy định / Thông báo
       </h2>
 
       <form
@@ -105,9 +124,9 @@ export default function EditNotificationPage() {
           background: "#fff",
           padding: 20,
           borderRadius: 10,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          boxShadow: "0 1px 2px rgba(15,23,42,0.06)",
+          maxWidth: 900,
         }}
-        onSubmit={(e) => e.preventDefault()}
       >
         {/* Code + Title */}
         <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
@@ -123,18 +142,19 @@ export default function EditNotificationPage() {
           </div>
 
           <div style={{ flex: 3 }}>
-            <label>Tiêu đề quy định</label>
+            <label>Tiêu đề quy định / thông báo</label>
             <input
               name="title"
               value={formData.title}
               onChange={handleChange}
               type="text"
               style={inputStyle}
+              placeholder="Ví dụ: Thông báo cắt điện ngày 30/11"
             />
           </div>
         </div>
 
-        {/* Category + Dates */}
+        {/* Category + Thời gian publish */}
         <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
           <div style={{ flex: 1 }}>
             <label>Danh mục</label>
@@ -152,37 +172,31 @@ export default function EditNotificationPage() {
           </div>
 
           <div style={{ flex: 1 }}>
-            <label>Ngày hiệu lực</label>
+            <label>Thời gian hiển thị trên app</label>
             <input
-              name="effectiveDate"
-              value={formData.effectiveDate}
+              type="datetime-local"
+              name="publishAt"
+              value={formData.publishAt}
               onChange={handleChange}
-              type="date"
               style={inputStyle}
+              min={getNowLocalInputValue()} // ✅ không cho chọn quá khứ
             />
-          </div>
-
-          <div style={{ flex: 1 }}>
-            <label>Ngày hết hạn</label>
-            <input
-              name="expiryDate"
-              value={formData.expiryDate}
-              onChange={handleChange}
-              type="date"
-              style={inputStyle}
-            />
+            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
+              Nếu để trống, thông báo sẽ hiển thị ngay khi bạn bấm <b>"Gửi"</b>.
+            </div>
           </div>
         </div>
 
         {/* Content */}
         <div style={{ marginBottom: 12 }}>
-          <label>Nội dung quy định</label>
+          <label>Nội dung quy định / thông báo</label>
           <textarea
             name="content"
             value={formData.content}
             onChange={handleChange}
-            rows="8"
+            rows={8}
             style={{ ...inputStyle, resize: "vertical" }}
+            placeholder="Ví dụ: Ngày 30/11/2025, tòa nhà sẽ cắt điện từ 8h00 đến 14h00 để bảo trì..."
           />
         </div>
 
@@ -195,51 +209,23 @@ export default function EditNotificationPage() {
             marginBottom: 12,
           }}
         >
-          <div style={{ flex: 1 }}>
-            <label>Tòa nhà</label>
-            <select
-              name="building"
-              value={formData.building}
-              onChange={handleChange}
-              style={inputStyle}
-            >
-              <option value="">-- Chọn tòa nhà --</option>
-              <option value="Tòa A">Tòa A</option>
-              <option value="Tòa B">Tòa B</option>
-              <option value="Tòa C">Tòa C</option>
-            </select>
-          </div>
-
-          <div style={{ flex: 1 }}>
-            <label>Đính kèm</label>
-            <input
-              name="attachment"
-              type="file"
-              onChange={handleChange}
-              style={{ marginTop: 6 }}
-            />
-            {formData.attachmentName && (
-              <div style={{ marginTop: 8, color: "#374151" }}>
-                Tệp đã chọn: {formData.attachmentName}
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Buttons */}
+        {/* Actions */}
         <div
           style={{
+            marginTop: 20,
             display: "flex",
             justifyContent: "flex-end",
             gap: 12,
-            marginTop: 16,
           }}
         >
           <button
             onClick={handleSaveDraft}
+            type="button"
             style={{
-              background: "#0F172A",
-              color: "#fff",
+              background: "#E5E7EB",
+              color: "#111827",
               padding: "8px 18px",
               border: "none",
               borderRadius: 8,
@@ -247,26 +233,30 @@ export default function EditNotificationPage() {
               fontWeight: 700,
             }}
           >
-            Lưu bản nháp
+            Lưu nháp
           </button>
 
           <button
             onClick={handleSend}
+            type="button"
+            disabled={isSending}
             style={{
-              background: "#0F3D8A",
+              background: isSending ? "#9CA3AF" : "#0F3D8A",
               color: "#fff",
               padding: "8px 18px",
               border: "none",
               borderRadius: 8,
-              cursor: "pointer",
+              cursor: isSending ? "default" : "pointer",
               fontWeight: 700,
+              opacity: isSending ? 0.8 : 1,
             }}
           >
-            Gửi
+            {isSending ? "Đang gửi..." : "Gửi"}
           </button>
 
           <button
             onClick={handleCancel}
+            type="button"
             style={{
               background: "#E5E7EB",
               color: "#111827",

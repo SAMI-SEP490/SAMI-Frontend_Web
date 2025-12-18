@@ -374,18 +374,6 @@ export default function BillListPage() {
                         Chi tiết
                       </button>
                       <button
-                        style={chip(colors.brand, "#fff")}
-                        onClick={() =>
-                          billId &&
-                          navigate(`/bills/${billId}`, {
-                            state: { edit: true },
-                          })
-                        }
-                        disabled={!billId}
-                      >
-                        Sửa
-                      </button>
-                      <button
                         style={chip("#DC2626", "#fff")}
                         onClick={() => billId && onDelete(billId)}
                         disabled={!billId}

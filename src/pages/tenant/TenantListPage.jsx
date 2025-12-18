@@ -1,7 +1,8 @@
+// src/pages/tenant/TenantListPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listTenants } from "../../services/api/tenants";
-import { listRoomsLite } from "../../services/api/rooms"; // đã export từ rooms.js
+import { getAllTenants } from "../../services/api/tenants";
+import { listRoomsLite } from "../../services/api/rooms";
 
 // Helper: lấy giá trị đầu tiên != null/""
 const pick = (...vals) => {
@@ -28,6 +29,7 @@ function normalize(item) {
   const email = pick(user?.email, "");
   const phone = pick(user?.phone, user?.phone_number, "");
   const avatar = pick(user?.avatar_url, "");
+
   const room_id = pick(
     item?.room_id,
     item?.roomId,
@@ -38,15 +40,18 @@ function normalize(item) {
     Array.isArray(item?.tenants) ? item?.tenants?.[0]?.room_id : undefined,
     Array.isArray(item?.tenants) ? item?.tenants?.[0]?.room?.room_id : undefined
   );
+
   const room = pick(
     item?.room?.room_number,
     item?.room_number,
+    item?.room,
     item?.tenant?.room?.room_number,
     Array.isArray(item?.tenants)
       ? item?.tenants?.[0]?.room?.room_number
       : undefined,
     room_id != null ? `Phòng ${room_id}` : ""
   );
+
   return {
     id,
     name,
@@ -69,13 +74,14 @@ export default function TenantListPage() {
   const [q, setQ] = useState("");
   const [searchKey, setSearchKey] = useState("");
 
+  // Lấy danh sách tenants từ /tenant/all
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoading(true);
         setErr("");
-        const data = await listTenants({ take: 500 });
+        const data = await getAllTenants();
         if (!mounted) return;
         const raw = Array.isArray(data) ? data : data?.items ?? [];
         setItems(raw.map(normalize));
@@ -89,9 +95,12 @@ export default function TenantListPage() {
         if (mounted) setLoading(false);
       }
     })();
-    return () => (mounted = false);
+    return () => {
+      mounted = false;
+    };
   }, []);
 
+  // Lấy danh sách phòng cho dropdown
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -102,6 +111,8 @@ export default function TenantListPage() {
         );
         return;
       }
+
+      // fallback: suy ra từ dữ liệu tenants
       const fromTenants = Array.from(
         new Map(
           items
@@ -118,7 +129,9 @@ export default function TenantListPage() {
       );
       if (mounted) setRooms(fromTenants);
     })();
-    return () => (mounted = false);
+    return () => {
+      mounted = false;
+    };
   }, [items]);
 
   const roomOptions = useMemo(
@@ -129,7 +142,10 @@ export default function TenantListPage() {
   const rows = useMemo(() => {
     const k = searchKey.trim().toLowerCase();
     return items.filter((x) => {
-      const okRoom = roomFilter === "all" || x.room_id === String(roomFilter);
+      const okRoom =
+        roomFilter === "all" ||
+        x.room_id === String(roomFilter) ||
+        x.room === String(roomFilter);
       if (!okRoom) return false;
       if (!k) return true;
       return (
@@ -161,7 +177,10 @@ export default function TenantListPage() {
         thead tr{background:#F1F5F9}th,td{padding:12px 16px;text-align:left;white-space:nowrap}
         tbody tr{border-top:1px solid #E5E7EB}tbody tr:hover{background:#F8FAFC}
         .avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid #E5E7EB}
-        .actions{display:flex;gap:10px}.link{background:transparent;border:0;color:#0EA5E9;cursor:pointer;font-weight:600}.link.gray{color:#475569}.link.red{color:#E11D48}
+        .actions{display:flex;gap:10px}
+        .link{background:transparent;border:0;color:#0EA5E9;cursor:pointer;font-weight:600}
+        .link.gray{color:#475569}
+        .link.red{color:#E11D48}
         .footerActions{display:flex;justify-content:flex-end;padding:12px 0 4px}
       `}</style>
 

@@ -1,45 +1,15 @@
-import React, { useContext, useMemo, useState } from "react";
+// src/pages/notification/NotificationListPage.jsx
+
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { colors } from "../../constants/colors";
-import { NotificationContext } from "../../contexts/NotificationContext";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { ROUTES } from "../../constants/routes";
 
 export default function NotificationListPage() {
   const navigate = useNavigate();
-  const { notificationData, setNotificationData } =
-    useContext(NotificationContext);
 
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [keyword, setKeyword] = useState("");
-
-  const filtered = useMemo(() => {
-    const kw = keyword.trim().toLowerCase();
-    return (notificationData || []).filter((n) => {
-      const byStatus =
-        statusFilter === "all" ||
-        n.status.toLowerCase() === statusFilter.toLowerCase();
-      const byKw =
-        kw === "" ||
-        n.title.toLowerCase().includes(kw) ||
-        n.category.toLowerCase().includes(kw) ||
-        n.building.toLowerCase().includes(kw);
-      return byStatus && byKw;
-    });
-  }, [notificationData, statusFilter, keyword]);
-
-  const handleDelete = (id) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa thông báo này không?")) {
-      setNotificationData((prev) => prev.filter((n) => n.id !== id));
-    }
-  };
-
-  const cell = { padding: "12px 16px", color: "#0F172A" };
-  const iconBtn = {
-    border: "none",
-    background: "none",
-    cursor: "pointer",
-    fontSize: 16,
-    marginRight: 12,
+  const goToCreate = () => {
+    navigate(ROUTES.createNotification);
   };
 
   return (
@@ -47,197 +17,58 @@ export default function NotificationListPage() {
       style={{
         minHeight: "100vh",
         background: colors.background,
-        padding: "24px",
-        overflowY: "auto",
+        padding: 24,
       }}
     >
-      {/* Tiêu đề */}
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <h2 style={{ fontWeight: 700, marginBottom: 16 }}>
-          Danh Sách Thông Báo / Quy Định
-        </h2>
-        <div>
-          <button
-            onClick={() => navigate("/notifications/create")}
-            style={{
-              background: "#059669",
-              color: "#fff",
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: 8,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            + Tạo Thông Báo Mới
-          </button>
-        </div>
-      </div>
-
-      {/* Bộ lọc */}
       <div
         style={{
+          marginBottom: 16,
           display: "flex",
-          alignItems: "center",
           justifyContent: "space-between",
-          background: "#fff",
-          borderRadius: 10,
-          padding: "12px 16px",
-          boxShadow: "0 2px 8px rgba(0,0,0,.05)",
-          marginBottom: 14,
+          alignItems: "center",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ color: "#334155" }}>Trạng thái:</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 8,
-              padding: "6px 10px",
-              minWidth: 120,
-              background: "#fff",
-            }}
-          >
-            <option value="all">Tất cả</option>
-            <option value="Đã gửi">Đã gửi</option>
-            <option value="Nháp">Nháp</option>
-          </select>
+        <div>
+          <h2 style={{ fontWeight: 700, marginBottom: 4 }}>
+            Quản lý thông báo / quy định
+          </h2>
+          <p style={{ fontSize: 14, color: "#6B7280", margin: 0 }}>
+            Trang này dùng để <b>tạo và gửi thông báo</b> cho cư dân/tenant, cư
+            dân sẽ đọc thông báo trên <b>ứng dụng mobile</b>.
+          </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ color: "#334155" }}>Tìm kiếm:</span>
-          <input
-            placeholder="Nhập tiêu đề hoặc danh mục"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 8,
-              padding: "8px 10px",
-              width: 300,
-            }}
-          />
-          <button
-            style={{
-              background: colors.brand,
-              color: "#fff",
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: 8,
-              fontWeight: 700,
-            }}
-          >
-            Tìm
-          </button>
-        </div>
-      </div>
-
-      {/* Bảng dữ liệu */}
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 10,
-          boxShadow: "0 2px 10px rgba(0,0,0,.06)",
-          overflow: "hidden",
-        }}
-      >
-        <table
+        <button
+          type="button"
+          onClick={goToCreate}
           style={{
-            width: "100%",
-            borderCollapse: "separate",
-            borderSpacing: 0,
+            background: "#0F3D8A",
+            color: "#fff",
+            padding: "8px 18px",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: 700,
+            cursor: "pointer",
           }}
         >
-          <thead style={{ background: "#F1F5F9" }}>
-            <tr>
-              {[
-                "#",
-                "Tiêu đề",
-                "Danh mục",
-                "Ngày hiệu lực",
-                "Ngày hết hạn",
-                "Tòa nhà",
-                "Trạng thái",
-                "Hành động",
-              ].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    textAlign: "left",
-                    padding: "12px 16px",
-                    color: "#334155",
-                    fontWeight: 700,
-                    borderBottom: "1px solid #E5E7EB",
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((n, index) => (
-              <tr key={n.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                <td style={cell}>{index + 1}</td>
-                <td style={cell}>{n.title}</td>
-                <td style={cell}>{n.category}</td>
-                <td style={cell}>{n.effectiveDate}</td>
-                <td style={cell}>{n.expiryDate}</td>
-                <td style={cell}>{n.building}</td>
-                <td style={cell}>
-                  <span
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 6,
-                      fontWeight: 700,
-                      color: n.status === "Đã gửi" ? "#059669" : "#DC2626",
-                      background:
-                        n.status === "Đã gửi"
-                          ? "#ECFDF5"
-                          : "rgba(220,38,38,0.1)",
-                    }}
-                  >
-                    {n.status}
-                  </span>
-                </td>
-                <td style={{ ...cell }}>
-                  {n.status === "Nháp" && (
-                    <>
-                      <button
-                        style={{ ...iconBtn, color: "#0F3D8A" }}
-                        onClick={() => navigate(`/notifications/${n.id}/edit`)}
-                      >
-                        <FaEdit />
-                      </button>
-                      <button
-                        style={{ ...iconBtn, color: "#DC2626" }}
-                        onClick={() => handleDelete(n.id)}
-                      >
-                        <FaTrash />
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td
-                  colSpan={8}
-                  style={{
-                    padding: 16,
-                    textAlign: "center",
-                    color: "#64748B",
-                  }}
-                >
-                  Không có dữ liệu phù hợp
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+          + Tạo thông báo mới
+        </button>
+      </div>
+
+      <div
+        style={{
+          marginTop: 16,
+          padding: 20,
+          borderRadius: 10,
+          background: "#fff",
+          boxShadow: "0 1px 2px rgba(15,23,42,0.06)",
+        }}
+      >
+        <p style={{ fontSize: 14, color: "#6B7280", marginBottom: 0 }}>
+          Hiện tại hệ thống không lưu lịch sử thông báo trên web. Khi bạn bấm{" "}
+          <b>"Tạo thông báo mới"</b> và gửi, backend sẽ gửi thông báo đến cư
+          dân/tenant, và họ sẽ xem thông báo trên <b>app mobile SAMI</b>.
+        </p>
       </div>
     </div>
   );

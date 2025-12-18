@@ -36,6 +36,7 @@ import CreateContractPage from "../pages/contract/CreateContractPage";
 import BillListPage from "../pages/bill/BillListPage";
 import BillDetailPage from "../pages/bill/BillDetailPage";
 import CreateBillPage from "../pages/bill/CreateBillPage";
+import EditBillPage from "../pages/bill/EditBillPage";
 
 // ===== Guests =====
 import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistrationPage";
@@ -57,7 +58,7 @@ const CreateFloorPlan = lazy(() =>
   import("@/pages/floorplan/CreateFloorPlan.jsx")
 );
 const ViewFloorPlan = lazy(() => import("@/pages/floorplan/ViewFloorPlan.jsx"));
-
+const EditFloorPlan = lazy(() => import("@/pages/floorplan/EditFloorPlan.jsx"));
 // ===== Dashboard =====
 import TenantAggregatesPage from "../pages/dashboard/TenantAggregatesPage";
 import ViewTimeBasedReportsPage from "../pages/dashboard/ViewTimeBasedReportsPage";
@@ -76,7 +77,10 @@ const isAuthed = () =>
   !!localStorage.getItem("accessToken");
 
 const HomeRedirect = () => (
-  <Navigate to={isAuthed() ? ROUTES.contracts : ROUTES.login} replace />
+  <Navigate
+    to={isAuthed() ? ROUTES.viewTimebaseReport : ROUTES.login}
+    replace
+  />
 );
 
 const LazyFallback = <div style={{ padding: 16 }}>Loading…</div>;
@@ -193,6 +197,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <BillListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.editBill}
+          element={
+            <ProtectedRoute>
+              <EditBillPage />
             </ProtectedRoute>
           }
         />
@@ -331,7 +343,16 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/floorplan/edit/:planId"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={LazyFallback}>
+                <EditFloorPlan />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
         {/* Dashboard */}
         <Route
           path={ROUTES.tenantAggregates}

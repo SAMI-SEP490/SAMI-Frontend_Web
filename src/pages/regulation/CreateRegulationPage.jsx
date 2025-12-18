@@ -151,7 +151,6 @@ export default function CreateRegulationPage() {
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="draft">Nháp</option>
-            <option value="archived">Lưu trữ</option>
           </Form.Select>
         </Form.Group>
 

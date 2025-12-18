@@ -21,3 +21,14 @@ export async function rejectMaintenanceRequest(id, reason) {
   const { data } = await http.post(`/maintenance/${id}/reject`, { reason });
   return unwrap(data);
 }
+// 🛠️ Đánh dấu yêu cầu bảo trì đã giải quyết
+export async function resolveMaintenanceRequest(id) {
+  const { data } = await http.post(`/maintenance/${id}/resolve`);
+  return unwrap(data);
+}
+
+// ✅ Đánh dấu yêu cầu bảo trì đã hoàn thành
+export async function completeMaintenanceRequest(id) {
+  const { data } = await http.post(`/maintenance/${id}/complete`);
+  return unwrap(data);
+}

@@ -52,6 +52,8 @@ import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
 // ===== Buildings =====
 import BuildingListPage from "../pages/building/BuildingListPage";
 import EditBuildingPage from "../pages/building/EditBuildingPage";
+import CreateBuildingPage from "../pages/building/CreateBuildingPage";
+import ViewBuildingDetail from "../pages/building/ViewBuildingDetail";
 
 // ===== Floorplan (lazy) =====
 const CreateFloorPlan = lazy(() =>
@@ -318,6 +320,22 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <EditBuildingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.createBuilding}
+          element={
+            <ProtectedRoute>
+              <CreateBuildingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.viewBuilding}
+          element={
+            <ProtectedRoute>
+              <ViewBuildingDetail />
             </ProtectedRoute>
           }
         />

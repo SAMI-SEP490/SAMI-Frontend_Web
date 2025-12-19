@@ -48,6 +48,8 @@ export const ROUTES = {
   // buildings
   buildings: "/buildings",
   editBuilding: "/buildings/:id/edit",
+  createBuilding: "/buildings/create",
+  viewBuilding: "/buildings/:id",
 
   // ===== Floor plan (mới) =====
   floorplanCreate: "/floorplan/create",

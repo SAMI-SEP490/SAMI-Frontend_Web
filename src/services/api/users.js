@@ -232,44 +232,34 @@ export async function getUserById(id) {
 /** =========================
  *  NEW: UPDATE USER
  * ========================= */
-const UPDATE_USER_PATHS = ["/user/update/:id", "/users/:id"];
 export async function updateUser(id, form = {}) {
   const payload = {
-    // camelCase
-    fullName: form.full_name ?? form.fullName,
+    user_id: id,
+    full_name: form.full_name,
     phone: String(form.phone ?? "").trim(),
-    email: form.email,
     birthday: normalizeDate(form.birthday),
     gender: GENDER_MAP[form.gender] || form.gender,
-    // snake_case song song
-    full_name: form.full_name ?? form.fullName,
   };
 
-  // Xoá field rỗng/undefined
+  // Xoá field rỗng
   Object.keys(payload).forEach((k) => {
-    if (payload[k] === undefined || payload[k] === "") delete payload[k];
-  });
-
-  let lastErr;
-  for (const raw of UPDATE_USER_PATHS) {
-    const url = raw.replace(":id", id);
-    try {
-      const res = await http.put(url, payload);
-      const data = unwrap(res);
-      return data?.data ?? data;
-    } catch (e) {
-      lastErr = e;
+    if (payload[k] === undefined || payload[k] === "") {
+      delete payload[k];
     }
-  }
-  throw lastErr;
+  });
+console.log("UPDATE PAYLOAD:", payload);
+  const res = await http.put(`/user/update/${id}`, payload);
+  
+  return unwrap(res);
 }
+
 
 // ✅ Đổi role
 export const changeManagerToTenant = async (payload) => {
   return unwrap(http.post("/user/change-to-tenant", payload));
 };
 
-export const changeTenantToManager = async (payload) => {
+export const changeToManager = async (payload) => {
   return unwrap(http.post("/user/change-to-manager", payload));
 };
 
@@ -279,3 +269,21 @@ export const listUsers = async () => {
   console.log("🌐 BASE URL:", http.defaults.baseURL);
   return unwrap(res);
 };
+export async function deleteUser(userId) {
+  const res = await http.delete(`/user/delete/${userId}`);
+  return unwrap(res);
+}
+
+// ♻️ Restore user
+export async function restoreUser(userId) {
+  const res = await http.post(`/user/restore/${userId}`);
+  return unwrap(res);
+}
+
+// 🔍 Search users
+export async function searchUsers(keyword) {
+  const res = await http.get("/user/search", {
+    params: { keyword },
+  });
+  return unwrap(res);
+}

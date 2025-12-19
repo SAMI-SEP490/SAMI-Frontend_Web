@@ -16,6 +16,11 @@ export const ROUTES = {
   tenantEdit: "/tenants/:id/edit",
   tenantCreate: "/tenants/create",
 
+  // Users
+  users: "/users",
+  userDetail: "/users/:id",
+  userEdit: "/users/:id/edit",
+  userCreate: "/users/create",
   // Contracts
   contracts: "/contracts",
   contractDetail: "/contracts/:id",

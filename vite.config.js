@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://aid-labeled-adapted-been.trycloudflare.com/",
+        target: "https://works-commonly-relating-camera.trycloudflare.com/",
         changeOrigin: true,
         secure: false,
       },

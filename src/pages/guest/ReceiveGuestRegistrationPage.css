@@ -58,6 +58,7 @@ tr:hover {
   background: #f9fafb;
 }
 
+/* STATUS */
 .status {
   padding: 4px 10px;
   border-radius: 12px;
@@ -70,8 +71,7 @@ tr:hover {
   color: #065f46;
 }
 
-.status.pending,
-.status.requested {
+.status.pending {
   background: #fef3c7;
   color: #92400e;
 }
@@ -81,6 +81,12 @@ tr:hover {
   color: #b91c1c;
 }
 
+.status.cancelled {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* ACTION */
 .action-col {
   min-width: 180px;
 }
@@ -110,8 +116,7 @@ tr:hover {
   color: #b91c1c;
 }
 
-.loading-text,
-.no-data {
+.loading-text {
   text-align: center;
   padding: 40px;
   color: #555;

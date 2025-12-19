@@ -1,207 +1,182 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Row, Col, Form, Spinner } from "react-bootstrap";
-import { colors } from "../../constants/colors";
 import { useNavigate } from "react-router-dom";
 import {
   listBuildings,
   getBuildingManagers,
   deleteBuilding,
 } from "../../services/api/building";
+import { Eye, Pencil, Trash } from "react-bootstrap-icons";
+import "./BuildingListPage.css";
 
-function BuildingListPage() {
-  const [buildings, setBuildings] = useState([]);
-  const [managersMap, setManagersMap] = useState({});
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [loading, setLoading] = useState(false);
+export default function BuildingListPage() {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    async function fetchBuildings() {
-      try {
-        setLoading(true);
-        const data = await listBuildings();
-        setBuildings(data);
+  const [buildings, setBuildings] = useState([]);
+  const [managersMap, setManagersMap] = useState({});
+  const [loading, setLoading] = useState(true);
 
-        const managersPromises = data.map(async (b) => {
-          const mgrs = await getBuildingManagers(b.building_id);
-          return [b.building_id, mgrs];
-        });
-        const results = await Promise.all(managersPromises);
-        setManagersMap(Object.fromEntries(results));
-      } catch (error) {
-        console.error("Error fetching buildings:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchBuildings();
-  }, []);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
-  const handleView = (id) => {
-    navigate(`/buildings/${id}`);
-  };
-  const handleDelete = async (building_id) => {
-    if (!window.confirm("Bạn có chắc muốn xóa tòa nhà này vĩnh viễn?")) return;
+  async function fetchData() {
     try {
       setLoading(true);
-      await deleteBuilding(building_id);
-      setBuildings((prev) => prev.filter((b) => b.building_id !== building_id));
-    } catch (error) {
-      console.error("Error deleting building:", error);
+      const data = await listBuildings();
+      setBuildings(data || []);
+
+      const managerPromises = data.map(async (b) => {
+        const mgrs = await getBuildingManagers(b.building_id);
+        return [b.building_id, mgrs];
+      });
+
+      const results = await Promise.all(managerPromises);
+      setManagersMap(Object.fromEntries(results));
+    } catch (err) {
+      console.error(err);
+      alert("❌ Lấy dữ liệu thất bại.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleEdit = (id) => {
-    navigate(`/buildings/${id}/edit`);
-  };
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const filteredBuildings = buildings.filter((b) => {
-    const matchName = b.name.toLowerCase().includes(searchTerm.toLowerCase());
+  async function handleDelete(id) {
+    if (!window.confirm("Bạn có chắc muốn xóa tòa nhà này?")) return;
+    try {
+      await deleteBuilding(id);
+      alert("🗑️ Đã xóa tòa nhà.");
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("❌ Xóa thất bại.");
+    }
+  }
+
+  const filtered = buildings.filter((b) => {
+    const matchSearch = b.name?.toLowerCase().includes(search.toLowerCase());
 
     const matchStatus =
-      statusFilter === "all"
+      statusFilter === ""
         ? true
         : statusFilter === "active"
         ? b.is_active
         : !b.is_active;
 
-    return matchName && matchStatus;
+    return matchSearch && matchStatus;
   });
 
+  if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        padding: 30,
-        backgroundColor: colors.background,
-      }}
-    >
-      <h4 style={{ fontWeight: "600", marginBottom: 20 }}>Quản lý tòa nhà</h4>
+    <div className="container">
+      <h2 className="title">Danh sách Tòa Nhà</h2>
 
-      {/* Bộ lọc */}
-      <Row className="mb-3 align-items-end">
-        <Col md={4}>
-          <Form.Label>Tìm kiếm tòa nhà</Form.Label>
-          <Form.Control
-            type="text"
-            placeholder="Nhập tên tòa nhà..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </Col>
+      {/* FILTER */}
+      <div className="filter-bar">
+        <input
+          type="text"
+          placeholder="🔎 Tìm kiếm theo tên tòa nhà..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="search-input"
+        />
 
-        <Col md={3}>
-          <Form.Label>Trạng thái</Form.Label>
-          <Form.Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">Tất cả</option>
-            <option value="active">Đang hoạt động</option>
-            <option value="inactive">Ngừng hoạt động</option>
-          </Form.Select>
-        </Col>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="status-select"
+        >
+          <option value="">Tất cả trạng thái</option>
+          <option value="active">Đang hoạt động</option>
+          <option value="inactive">Ngừng hoạt động</option>
+        </select>
+      </div>
 
-        {/* Button Thêm tòa nhà */}
-        <Col md={5} className="text-end">
-          <Button
-            variant="success"
-            onClick={() => navigate("/buildings/create")}
-          >
-            + Thêm tòa nhà
-          </Button>
-        </Col>
-      </Row>
-
-      <Table bordered hover responsive>
-        <thead style={{ backgroundColor: "#E6E8ED" }}>
-          <tr>
-            <th className="text-center">#</th>
-            <th className="text-center">Tên tòa nhà</th>
-            <th className="text-center">Địa chỉ</th>
-            <th className="text-center">Ngày tạo</th>
-            <th className="text-center">Quản lý tòa nhà</th>
-            <th className="text-center">Trạng thái</th>
-            <th className="text-center">Hành động</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
+      {/* TABLE */}
+      <div className="table-wrapper">
+        <table>
+          <thead>
             <tr>
-              <td colSpan="7" className="text-center">
-                <Spinner animation="border" size="sm" /> Đang tải...
-              </td>
+              <th className="center">#</th>
+              <th>Tên tòa nhà</th>
+              <th>Địa chỉ</th>
+              <th className="center">Ngày tạo</th>
+              <th>Quản lý tòa nhà</th>
+              <th className="center">Trạng thái</th>
+              <th className="center action-col">Hành động</th>
             </tr>
-          ) : filteredBuildings.length > 0 ? (
-            filteredBuildings.map((b, index) => (
+          </thead>
+
+          <tbody>
+            {filtered.map((b, index) => (
               <tr key={b.building_id}>
-                <td className="text-center">{index + 1}</td>
+                <td className="center">{index + 1}</td>
                 <td>{b.name}</td>
                 <td>{b.address}</td>
-                <td className="text-center">
+                <td className="center">
                   {new Date(b.created_at).toLocaleDateString("vi-VN")}
                 </td>
                 <td>
-                  {managersMap[b.building_id]
+                  {managersMap[b.building_id]?.length
                     ? managersMap[b.building_id]
                         .map((m) => m.full_name)
                         .join(", ")
-                    : "-"}
+                    : "—"}
                 </td>
-                <td className="text-center">
-                  {b.is_active ? (
-                    <span style={{ color: "green", fontWeight: 500 }}>
-                      Đang hoạt động
-                    </span>
-                  ) : (
-                    <span style={{ color: "red", fontWeight: 500 }}>
-                      Ngừng hoạt động
-                    </span>
-                  )}
+                <td className="center">
+                  <span
+                    className={`status ${
+                      b.is_active ? "published" : "archived"
+                    }`}
+                  >
+                    {b.is_active ? "Đang hoạt động" : "Ngừng hoạt động"}
+                  </span>
                 </td>
-                <td className="text-center">
-                  <Button
-                    variant="info"
-                    size="sm"
-                    className="me-2"
-                    onClick={() => handleView(b.building_id)}
-                  >
-                    Xem
-                  </Button>
 
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="me-2"
-                    onClick={() => handleEdit(b.building_id)}
+                <td className="action-buttons">
+                  <button
+                    className="btn view"
+                    onClick={() => navigate(`/buildings/${b.building_id}`)}
                   >
-                    Sửa
-                  </Button>
+                    <Eye size={14} /> Xem
+                  </button>
 
-                  <Button
-                    variant="danger"
-                    size="sm"
+                  <button
+                    className="btn edit"
+                    onClick={() => navigate(`/buildings/${b.building_id}/edit`)}
+                  >
+                    <Pencil size={14} /> Sửa
+                  </button>
+
+                  <button
+                    className="btn delete"
                     onClick={() => handleDelete(b.building_id)}
                   >
-                    Xóa
-                  </Button>
+                    <Trash size={14} /> Xóa
+                  </button>
                 </td>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="7" className="text-center">
-                Không có tòa nhà nào
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </Table>
+            ))}
+          </tbody>
+        </table>
+
+        {filtered.length === 0 && (
+          <p className="no-data">Không có tòa nhà nào.</p>
+        )}
+      </div>
+
+      {/* ADD BUTTON */}
+      <div className="add-button">
+        <button
+          className="btn add"
+          onClick={() => navigate("/buildings/create")}
+        >
+          + Thêm Tòa Nhà
+        </button>
+      </div>
     </div>
   );
 }
-
-export default BuildingListPage;

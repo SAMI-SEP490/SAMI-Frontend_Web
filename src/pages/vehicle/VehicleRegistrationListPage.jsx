@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Spinner, Form, Row, Col } from "react-bootstrap";
 import {
   listVehicleRegistrations,
   approveVehicleRegistration,
   rejectVehicleRegistration,
 } from "../../services/api/vehicle";
 import { getUserById } from "../../services/api/users";
-import "./VehicleRegistrationList.css"; // 🔹 CSS mới
+import "./VehicleRegistrationList.css";
 
 const VEHICLE_TYPE_VN = {
   car: "Ô tô",
@@ -21,48 +20,36 @@ const STATUS_VN = {
   pending: "Đang chờ",
   approved: "Đã duyệt",
   rejected: "Bị từ chối",
-  PENDING: "Đang chờ",
-  APPROVED: "Đã duyệt",
-  REJECTED: "Bị từ chối",
 };
 
-// 🔹 Hàm format ngày
-const formatDate = (dateString) => {
-  if (!dateString) return "N/A";
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return "N/A";
-  const pad = (n) => n.toString().padStart(2, "0");
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-};
+const formatDate = (d) => (d ? new Date(d).toLocaleDateString("vi-VN") : "—");
 
-function VehicleRegistrationListPage() {
+export default function VehicleRegistrationListPage() {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("");
 
-  // Fetch danh sách
   const fetchRegistrations = async () => {
     setLoading(true);
     try {
-      const data = await listVehicleRegistrations();
-      const arr = Array.isArray(data?.registrations) ? data.registrations : [];
+      const res = await listVehicleRegistrations();
+      const arr = Array.isArray(res?.registrations) ? res.registrations : [];
 
       const parsed = await Promise.all(
         arr.map(async (r) => {
           let reason = {};
           try {
             reason = r.reason ? JSON.parse(r.reason) : {};
-          } catch (e) {}
+          } catch {}
 
-          // Lấy full_name
-          let requestedBy = "N/A";
+          let requestedBy = "—";
           if (r.requested_by) {
             try {
-              const user = await getUserById(r.requested_by);
-              requestedBy = user?.full_name || r.requested_by;
-            } catch (e) {
+              const u = await getUserById(r.requested_by);
+              requestedBy = u?.full_name || r.requested_by;
+            } catch {
               requestedBy = r.requested_by;
             }
           }
@@ -70,22 +57,19 @@ function VehicleRegistrationListPage() {
           return {
             id: r.assignment_id,
             requestedBy,
-            plateNumber: reason.license_plate || "N/A",
-            vehicleType: reason.type || "other",
-            brand: reason.brand || "N/A",
-            color: reason.color || "N/A",
+            plate: reason.license_plate || "—",
+            type: reason.type || "other",
+            brand: reason.brand || "—",
+            color: reason.color || "—",
             status: r.status,
-            startDate: r.start_date,
-            endDate: r.end_date,
+            start: r.start_date,
+            end: r.end_date,
             note: r.note || "",
           };
         })
       );
 
       setRegistrations(parsed);
-    } catch (error) {
-      console.error("Lỗi khi lấy danh sách đăng ký xe:", error);
-      setRegistrations([]);
     } finally {
       setLoading(false);
     }
@@ -96,140 +80,124 @@ function VehicleRegistrationListPage() {
   }, []);
 
   const handleApprove = async (id) => {
-    setActionLoading((prev) => ({ ...prev, [id]: true }));
-    try {
-      await approveVehicleRegistration(id);
-      fetchRegistrations();
-    } finally {
-      setActionLoading((prev) => ({ ...prev, [id]: false }));
-    }
+    setActionLoading((p) => ({ ...p, [id]: true }));
+    await approveVehicleRegistration(id);
+    await fetchRegistrations();
+    setActionLoading((p) => ({ ...p, [id]: false }));
   };
 
   const handleReject = async (id) => {
-    setActionLoading((prev) => ({ ...prev, [id]: true }));
-    try {
-      await rejectVehicleRegistration(id);
-      fetchRegistrations();
-    } finally {
-      setActionLoading((prev) => ({ ...prev, [id]: false }));
-    }
+    setActionLoading((p) => ({ ...p, [id]: true }));
+    await rejectVehicleRegistration(id);
+    await fetchRegistrations();
+    setActionLoading((p) => ({ ...p, [id]: false }));
   };
 
-  // --------------------------------
-  // 🔎 Search + Filter (LOẠI canceled)
-  // --------------------------------
   const filtered = registrations.filter((r) => {
-    // ❗ CHỈ HIỂN THỊ status KHÁC canceled
-    if (
-      r.status?.toLowerCase() === "canceled" ||
-      r.status?.toLowerCase() === "cancelled"
-    )
+    if (["canceled", "cancelled"].includes(r.status?.toLowerCase()))
       return false;
 
     const s = search.toLowerCase();
     const matchSearch =
       r.requestedBy.toLowerCase().includes(s) ||
-      r.plateNumber.toLowerCase().includes(s);
+      r.plate.toLowerCase().includes(s);
 
-    const matchStatus =
-      statusFilter === "all" ||
-      r.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchStatus = !statusFilter || r.status === statusFilter;
 
     return matchSearch && matchStatus;
   });
 
-  if (loading) return <Spinner animation="border" />;
+  if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
 
   return (
-    <div className="vehicle-page">
-      <h3 className="page-title">Danh sách đăng ký xe</h3>
+    <div className="container">
+      <h2 className="title">Danh sách đăng ký xe</h2>
 
-      {/* 🔹 Search + Filter */}
-      <Row className="filter-row">
-        <Col md={5}>
-          <Form.Control
-            placeholder="Tìm theo tên hoặc biển số..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
-          />
-        </Col>
+      {/* FILTER */}
+      <div className="filter-bar">
+        <input
+          className="search-input"
+          placeholder="🔎 Tìm theo tên hoặc biển số..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
-        <Col md={3}>
-          <Form.Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="requested">Đã yêu cầu</option>
-            <option value="pending">Đang chờ</option>
-            <option value="approved">Đã duyệt</option>
-            <option value="rejected">Bị từ chối</option>
-          </Form.Select>
-        </Col>
-      </Row>
+        <select
+          className="status-select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="">Tất cả trạng thái</option>
+          <option value="requested">Đã yêu cầu</option>
+          <option value="pending">Đang chờ</option>
+          <option value="approved">Đã duyệt</option>
+          <option value="rejected">Bị từ chối</option>
+        </select>
+      </div>
 
       {/* TABLE */}
-      <Table striped bordered hover responsive className="vehicle-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Tên người đăng ký</th>
-            <th>Biển số xe</th>
-            <th>Loại xe</th>
-            <th>Thương hiệu</th>
-            <th>Màu</th>
-            <th>Ngày bắt đầu</th>
-            <th>Ngày kết thúc</th>
-            <th>Trạng thái</th>
-            <th>Ghi chú</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((r, index) => (
-            <tr key={r.id}>
-              <td>{index + 1}</td>
-              <td>{r.requestedBy}</td>
-              <td>{r.plateNumber}</td>
-              <td>{VEHICLE_TYPE_VN[r.vehicleType]}</td>
-              <td>{r.brand}</td>
-              <td>{r.color}</td>
-              <td>{formatDate(r.startDate)}</td>
-              <td>{formatDate(r.endDate)}</td>
-              <td className={`status status-${r.status.toLowerCase()}`}>
-                {STATUS_VN[r.status] || r.status}
-              </td>
-              <td>{r.note}</td>
-              <td>
-                {r.status.toLowerCase() === "requested" && (
-                  <>
-                    <Button
-                      variant="success"
-                      size="sm"
-                      disabled={actionLoading[r.id]}
-                      onClick={() => handleApprove(r.id)}
-                    >
-                      {actionLoading[r.id] ? "..." : "Chấp nhận"}
-                    </Button>{" "}
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      disabled={actionLoading[r.id]}
-                      onClick={() => handleReject(r.id)}
-                    >
-                      {actionLoading[r.id] ? "..." : "Từ chối"}
-                    </Button>
-                  </>
-                )}
-              </td>
+      <div className="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th className="center">#</th>
+              <th>Người đăng ký</th>
+              <th>Biển số</th>
+              <th>Loại xe</th>
+              <th>Hãng</th>
+              <th>Màu</th>
+              <th className="center">Bắt đầu</th>
+              <th className="center">Kết thúc</th>
+              <th className="center">Trạng thái</th>
+              <th>Ghi chú</th>
+              <th className="center action-col">Hành động</th>
             </tr>
-          ))}
-        </tbody>
-      </Table>
+          </thead>
+
+          <tbody>
+            {filtered.map((r, i) => (
+              <tr key={r.id}>
+                <td className="center">{i + 1}</td>
+                <td>{r.requestedBy}</td>
+                <td>{r.plate}</td>
+                <td>{VEHICLE_TYPE_VN[r.type]}</td>
+                <td>{r.brand}</td>
+                <td>{r.color}</td>
+                <td className="center">{formatDate(r.start)}</td>
+                <td className="center">{formatDate(r.end)}</td>
+                <td className="center">
+                  <span className={`status ${r.status}`}>
+                    {STATUS_VN[r.status]}
+                  </span>
+                </td>
+                <td>{r.note}</td>
+                <td className="action-buttons">
+                  {r.status === "requested" && (
+                    <>
+                      <button
+                        className="btn publish"
+                        disabled={actionLoading[r.id]}
+                        onClick={() => handleApprove(r.id)}
+                      >
+                        Chấp nhận
+                      </button>
+                      <button
+                        className="btn delete"
+                        disabled={actionLoading[r.id]}
+                        onClick={() => handleReject(r.id)}
+                      >
+                        Từ chối
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {filtered.length === 0 && <p className="no-data">Không có dữ liệu</p>}
+      </div>
     </div>
   );
 }
-
-export default VehicleRegistrationListPage;

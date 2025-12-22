@@ -219,7 +219,7 @@ export async function getUserById(id) {
 
       // Nếu status >= 400 thì thử path tiếp theo
       continue;
-    } catch  {
+    } catch {
       // Lỗi network / parse... thì cũng thử path khác
       continue;
     }
@@ -247,12 +247,11 @@ export async function updateUser(id, form = {}) {
       delete payload[k];
     }
   });
-console.log("UPDATE PAYLOAD:", payload);
+  console.log("UPDATE PAYLOAD:", payload);
   const res = await http.put(`/user/update/${id}`, payload);
-  
+
   return unwrap(res);
 }
-
 
 // ✅ Đổi role
 export const changeManagerToTenant = async (payload) => {
@@ -287,3 +286,27 @@ export async function searchUsers(keyword) {
   });
   return unwrap(res);
 }
+export const updateProfile = async ({
+  full_name,
+  birthday,
+  gender,
+  avatar, // ✅ ĐÚNG KEY
+}) => {
+  const formData = new FormData();
+
+  if (full_name) formData.append("full_name", full_name.trim());
+
+  if (birthday) formData.append("birthday", new Date(birthday).toISOString());
+
+  if (gender)
+    formData.append(
+      "gender",
+      gender === "Nam" ? "Male" : gender === "Nữ" ? "Female" : "Other"
+    );
+
+  if (avatar) {
+    formData.append("avatar", avatar); // 👈 multer.single("avatar")
+  }
+
+  return unwrap(http.put("/auth/profile", formData));
+};

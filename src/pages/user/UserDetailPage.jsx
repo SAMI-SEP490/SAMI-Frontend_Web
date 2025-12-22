@@ -8,6 +8,20 @@ const pick = (...vals) => {
   for (const v of vals) if (v !== undefined && v !== null && v !== "") return v;
   return undefined;
 };
+const normalizeTenant = (u) => ({
+  room: u?.room_name || "—",
+  idNumber: u?.id_number || "—",
+  emergencyContactPhone: u?.emergency_contact_phone || "—",
+  note: u?.note || "—",
+});
+
+const normalizeManager = (u) => ({
+  building: u?.building_name || `Tòa nhà #${u?.building_id ?? "—"}`,
+  assignedFrom: u?.assigned_from || null,
+  assignedTo: u?.assigned_to || null,
+  note: u?.note || "—",
+});
+
 
 // normalize giống UserListPage
 const normalizeUser = (u) => ({
@@ -57,7 +71,18 @@ export default function UserDetailPage() {
         setLoading(true);
         const data = await getUserById(id);
         if (!mounted) return;
-        setUser(normalizeUser(data));
+        const normalized = normalizeUser(data);
+
+if (String(normalized.role).toLowerCase() === "tenant") {
+  normalized.tenant = normalizeTenant(data);
+}
+
+if (String(normalized.role).toLowerCase() === "manager") {
+  normalized.manager = normalizeManager(data);
+}
+
+setUser(normalized);
+console.log("RAW USER", data);
       } catch (e) {
         setErr(
           e?.response?.data?.message ||
@@ -94,6 +119,7 @@ export default function UserDetailPage() {
   if (loading) return <div style={{ padding: 24 }}>Đang tải...</div>;
   if (err) return <div style={{ padding: 24, color: "#E11D48" }}>{err}</div>;
   if (!user) return null;
+const isManager = String(user.role).toLowerCase() === "manager";
 
   return (
     <div className="user-detail-page">
@@ -194,6 +220,60 @@ display: flex;
           <div className="label">Ngày sinh</div>
           <div className="value">{formatDateVN(user.birthday)}</div>
         </div>
+{user.role.toLowerCase() === "tenant" && user.tenant && (
+  <>
+    <h3 style={{ marginTop: 24 }}>Thông tin người thuê</h3>
+
+    <div className="row">
+      <div className="label">Phòng</div>
+      <div className="value">{user.tenant.room}</div>
+    </div>
+
+    <div className="row">
+      <div className="label">CCCD / CMND</div>
+      <div className="value">{user.tenant.idNumber}</div>
+    </div>
+
+    <div className="row">
+      <div className="label">SĐT khẩn cấp</div>
+      <div className="value">{user.tenant.emergencyContactPhone}</div>
+    </div>
+
+    <div className="row">
+      <div className="label">Ghi chú</div>
+      <div className="value">{user.tenant.note}</div>
+    </div>
+  </>
+)}
+{user.role.toLowerCase() === "manager" && user.manager && (
+  <>
+    <h3 style={{ marginTop: 24 }}>Thông tin quản lý</h3>
+
+    <div className="row">
+      <div className="label">Tòa nhà</div>
+      <div className="value">{user.manager.building}</div>
+    </div>
+
+    <div className="row">
+      <div className="label">Bắt đầu</div>
+      <div className="value">
+        {formatDateVN(user.manager.assignedFrom)}
+      </div>
+    </div>
+
+    <div className="row">
+      <div className="label">Kết thúc</div>
+      <div className="value">
+        {formatDateVN(user.manager.assignedTo)}
+      </div>
+    </div>
+
+    <div className="row">
+      <div className="label">Ghi chú</div>
+      <div className="value">{user.manager.note}</div>
+    </div>
+  </>
+)}
 
         <div className="actions">
           <button
@@ -202,12 +282,14 @@ display: flex;
           >
             Quay lại
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => navigate(`/users/${user.id}/edit`)}
-          >
-            Sửa thông tin
-          </button>
+          {isManager && (
+    <button
+      className="btn btn-primary"
+      onClick={() => navigate(`/users/${user.id}/edit`)}
+    >
+      Sửa thông tin
+    </button>
+  )}
         </div>
       </div>
     </div></div>

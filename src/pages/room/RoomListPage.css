@@ -1,1 +1,219 @@
-@import "../tenant/TenantListPage.css";
+/* Container */
+.container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 20px 30px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    font-family: Arial, sans-serif;
+}
+
+/* Title */
+.title {
+    font-size: 28px;
+    color: #1e3a8a;
+    font-weight: bold;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #1e90ff;
+    padding-bottom: 8px;
+}
+
+/* Filter bar */
+.filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.search-input,
+.status-select {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 200px;
+}
+
+.status-select {
+    min-width: 180px;
+}
+
+.search-input:focus,
+.status-select:focus {
+    outline: none;
+    border-color: #1e90ff;
+    box-shadow: 0 0 3px #1e90ff;
+}
+
+/* Table */
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-wrapper table thead {
+    background: #f4f4f4;
+}
+
+.table-wrapper table th,
+.table-wrapper table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #ddd;
+    font-size: 14px;
+    text-align: left;
+}
+
+.table-wrapper table thead th {
+    text-align: center;
+    vertical-align: middle;
+    font-weight: 600;
+    color: #333;
+}
+
+.table-wrapper table tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+/* Status badge */
+.status {
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-block;
+    text-align: center;
+}
+
+.status.active {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status.inactive {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+.status.occupied {
+    background-color: #dbeafe;
+    color: #1e3a8a;
+}
+
+.status.vacant {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.status.maintenance {
+    background-color: #f3e8ff;
+    color: #6b21a8;
+}
+
+/* Action buttons */
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: 0.2s;
+    white-space: nowrap;
+}
+
+.btn.view {
+    background-color: #dbeafe;
+    color: #1e3a8a;
+    border: 1px solid #93c5fd;
+}
+
+.btn.view:hover:not(:disabled) {
+    background-color: #bfdbfe;
+}
+
+.btn.edit {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+}
+
+.btn.edit:hover:not(:disabled) {
+    background-color: #fde68a;
+}
+
+.btn.publish {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+}
+
+.btn.publish:hover:not(:disabled) {
+    background-color: #a7f3d0;
+}
+
+.btn.delete {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+}
+
+.btn.delete:hover:not(:disabled) {
+    background-color: #fecaca;
+}
+
+.btn.danger {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+}
+
+.btn.danger:hover:not(:disabled) {
+    background-color: #fecaca;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* No data */
+.no-data {
+    text-align: center;
+    padding: 40px 0;
+    font-size: 16px;
+    color: #555;
+}
+
+/* Detail content */
+.detail-content {
+    line-height: 1.8;
+}
+
+.detail-content p {
+    margin-bottom: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-content strong {
+    color: #1e3a8a;
+    min-width: 150px;
+    display: inline-block;
+}

@@ -1,58 +1,48 @@
 // src/pages/contract/ContractListPage.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  listContracts,
-  getDownloadUrl,
-  deleteContract,
-  downloadContractDirect,
-} from "../../services/api/contracts";
+import { listContracts, deleteContract } from "../../services/api/contracts";
+import { Eye, Download, Trash } from "react-bootstrap-icons";
+import "./ContractListPage.css";
 
 export default function ContractListPage() {
-  const nav = useNavigate();
+  const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState([]);
+  const [contracts, setContracts] = useState([]);
   const [original, setOriginal] = useState([]);
 
-  const [status, setStatus] = useState("all");
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [q, setQ] = useState("");
 
-  // ================== Helpers ==================
-  const formatDate = (d) => {
-    if (!d) return "-";
-    const date = new Date(d);
-    if (isNaN(date)) return "-";
-    const dd = String(date.getDate()).padStart(2, "0");
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const yyyy = date.getFullYear();
-    return `${dd}-${mm}-${yyyy}`;
-  };
+  /* ================= Helpers ================= */
+  const formatDate = (d) => (d ? new Date(d).toLocaleDateString("vi-VN") : "—");
 
-  const toVietnameseStatus = (s) => {
+  const renderStatus = (s) => {
     switch (s) {
       case "active":
-        return "Có hiệu lực";
+        return <span className="status published">Có hiệu lực</span>;
       case "pending":
-        return "Đang xử lý";
+        return <span className="status draft">Đang xử lý</span>;
       case "expired":
-        return "Hết hạn";
+        return <span className="status archived">Hết hạn</span>;
       case "cancelled":
-        return "Đã hủy";
+        return <span className="status archived">Đã hủy</span>;
       default:
-        return "-";
+        return "—";
     }
   };
 
-  // ================== Fetch ==================
+  /* ================= Fetch ================= */
   useEffect(() => {
     (async () => {
-      setLoading(true);
       try {
+        setLoading(true);
         const data = await listContracts();
         const items = Array.isArray(data?.items) ? data.items : [];
-        setRows(items);
+        setContracts(items);
         setOriginal(items);
       } finally {
         setLoading(false);
@@ -60,318 +50,147 @@ export default function ContractListPage() {
     })();
   }, []);
 
-  // ================== AUTO FILTER ==================
-  useEffect(() => {
-    let filtered = [...original];
-
-    // Search
-    if (q.trim() !== "") {
-      filtered = filtered.filter((x) =>
-        x.tenant_name.toLowerCase().includes(q.toLowerCase())
-      );
-    }
-
-    // Status
-    if (status !== "all") {
-      filtered = filtered.filter((x) => x.status === status);
-    }
-
-    // Date From
-    if (from) {
-      const fromTime = new Date(from).setHours(0, 0, 0, 0);
-      filtered = filtered.filter(
-        (x) => new Date(x.start_date).setHours(0, 0, 0, 0) >= fromTime
-      );
-    }
-
-    // Date To
-    if (to) {
-      const toTime = new Date(to).setHours(23, 59, 59, 999);
-      filtered = filtered.filter(
-        (x) => new Date(x.end_date).setHours(0, 0, 0, 0) <= toTime
-      );
-    }
-
-    setRows(filtered);
+  /* ================= Filter ================= */
+  const filteredContracts = useMemo(() => {
+    return original
+      .filter((c) => {
+        if (!q.trim()) return true;
+        return c.tenant_name?.toLowerCase().includes(q.trim().toLowerCase());
+      })
+      .filter((c) => {
+        if (!status) return true;
+        return c.status === status;
+      })
+      .filter((c) => {
+        if (!from) return true;
+        const f = new Date(from).setHours(0, 0, 0, 0);
+        return new Date(c.start_date).setHours(0, 0, 0, 0) >= f;
+      })
+      .filter((c) => {
+        if (!to) return true;
+        const t = new Date(to).setHours(23, 59, 59, 999);
+        return new Date(c.end_date).setHours(0, 0, 0, 0) <= t;
+      });
   }, [q, status, from, to, original]);
 
-  // ================== Delete ==================
-  const onDelete = async (id) => {
-    if (!window.confirm("Xoá hợp đồng này?")) return;
-    try {
-      await deleteContract(id);
-      const data = await listContracts();
-      const items = Array.isArray(data?.items) ? data.items : [];
-      setRows(items);
-      setOriginal(items);
-      alert("Đã xoá!");
-    } catch (e) {
-      alert(
-        e?.response?.data?.message || e?.message || "Xoá hợp đồng thất bại"
-      );
-    }
+  /* ================= Actions ================= */
+  const handleDelete = async (id) => {
+    if (!window.confirm("Xóa hợp đồng này?")) return;
+    await deleteContract(id);
+    setOriginal((prev) => prev.filter((c) => c.contract_id !== id));
   };
 
-  // ================== Download ==================
-  // ================== Download ==================
-  // ================== Download ==================
-  const onDownload = async (id) => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/contract/${id}/download`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${
-              localStorage.getItem("accessToken") || ""
-            }`,
-          },
-        }
-      );
-      console.log("Download response:", res);
-
-      if (!res.ok) {
-        alert("Không thể tải hợp đồng (server trả lỗi).");
-        return;
-      }
-
-      const json = await res.json();
-      console.log("Download response JSON:", json);
-      const url = json?.data?.download_url;
-      console.log("Download URL:", url);
-      const fileName = json?.data?.file_name || `contract-${id}.pdf`;
-
-      if (!url) {
-        alert("Không lấy được link tải file từ server.");
-        return;
-      }
-
-      // Truy cập trực tiếp link S3 → tự động tải
-      window.location.href = url;
-    } catch (err) {
-      console.error("Download error:", err);
-      alert("Không tải được hợp đồng");
-    }
+  const handleDownload = (id) => {
+    window.location.href = `${
+      import.meta.env.VITE_API_BASE_URL
+    }/contract/${id}/download`;
   };
 
-  // ================== UI ==================
+  if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
+
   return (
-    <div className="contracts-container">
-      <style>{`
-        .contracts-container {
-          padding: 24px 32px;
-          background: #f8fafc;
-          color: #0f172a;
-          min-height: calc(100vh - 80px);
-        }
+    <div className="container">
+      <h2 className="title">Danh sách hợp đồng</h2>
 
-        h1 {
-          font-size: 28px;
-          font-weight: 700;
-          text-align: center;
-          margin-bottom: 20px;
-        }
+      {/* FILTER + ACTION */}
+      <div className="filter-bar grid">
+        <input
+          className="search-input"
+          placeholder="🔎 Tìm theo tên người thuê..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
 
-        .card {
-          background: #fff;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          padding: 16px;
-        }
+        <select
+          className="status-select"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+        >
+          <option value="">Tất cả trạng thái</option>
+          <option value="active">Có hiệu lực</option>
+          <option value="pending">Đang xử lý</option>
+          <option value="expired">Hết hạn</option>
+          <option value="cancelled">Đã hủy</option>
+        </select>
 
-        /* === FILTER GRID FIXED === */
-        .filter-grid {
-          display: grid;
-          grid-template-columns: repeat(1, 1fr);
-          gap: 12px;
-        }
+        <input
+          type="date"
+          className="search-input"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+        />
 
-        @media (min-width: 1100px) {
-          .filter-grid {
-            grid-template-columns: 200px 200px 200px 1fr;
-            align-items: center;
-          }
-        }
+        <input
+          type="date"
+          className="search-input"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+        />
 
-        .form-group {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .label {
-          font-size: 13px;
-          color: #475569;
-          margin-bottom: 4px;
-        }
-
-        input[type="text"], input[type="date"], select {
-          height: 38px;
-          border: 1px solid #CBD5E1;
-          border-radius: 8px;
-          padding: 0 10px;
-        }
-
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 16px;
-        }
-
-        th, td {
-          padding: 12px 16px;
-          border-top: 1px solid #E5E7EB;
-        }
-
-        thead tr {
-          background: #F1F5F9;
-        }
-
-        tbody tr:hover {
-          background: #F8FAFC;
-        }
-
-        .btn-link {
-          background: none;
-          border: none;
-          padding: 4px 8px;
-          cursor: pointer;
-          color: #0ea5e9;
-          font-weight: 600;
-        }
-
-        .btn-link:hover { text-decoration: underline; }
-
-        .btn-primary {
-          background: #0EA5E9;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          padding: 10px 16px;
-          font-weight: 600;
-          cursor: pointer;
-        }
-        .btn-primary:hover {
-          background: #0284C7;
-        }
-      `}</style>
-
-      <h1>Danh Sách Hợp Đồng</h1>
-
-      {/* ================= FILTER ================= */}
-      <div className="card">
-        <div className="filter-grid">
-          <div className="form-group">
-            <label className="label">Trạng thái:</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="all">Tất cả</option>
-              <option value="active">Có hiệu lực</option>
-              <option value="pending">Đang xử lý</option>
-              <option value="expired">Hết hạn</option>
-              <option value="cancelled">Đã hủy</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="label">Ngày (Từ):</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="label">Ngày (Đến):</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="label">Tìm kiếm:</label>
-            <input
-              type="text"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Nhập tên người thuê..."
-            />
-          </div>
-        </div>
+        <button
+          className="btn add"
+          onClick={() => navigate("/contracts/create")}
+        >
+          + Tạo hợp đồng mới
+        </button>
       </div>
 
-      {/* ================= TABLE ================= */}
-      <div className="card table-card">
+      {/* TABLE */}
+      <div className="table-wrapper">
         <table>
           <thead>
             <tr>
-              <th>#</th>
-              <th>Tên Người Thuê</th>
-              <th>Số Phòng</th>
-              <th>Ngày Bắt Đầu</th>
-              <th>Ngày Kết Thúc</th>
-              <th>Trạng Thái</th>
-              <th>Hành Động</th>
+              <th className="center">#</th>
+              <th>Tên người thuê</th>
+              <th className="center">Phòng</th>
+              <th className="center">Bắt đầu</th>
+              <th className="center">Kết thúc</th>
+              <th className="center">Trạng thái</th>
+              <th className="center action-col">Hành động</th>
             </tr>
           </thead>
 
           <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="7">Đang tải...</td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan="7">Không có kết quả.</td>
-              </tr>
-            ) : (
-              rows.map((r, idx) => (
-                <tr key={r.contract_id}>
-                  <td>{idx + 1}</td>
-                  <td>{r.tenant_name}</td>
-                  <td>{r.room_number || "-"}</td>
-                  <td>{formatDate(r.start_date)}</td>
-                  <td>{formatDate(r.end_date)}</td>
-                  <td>{toVietnameseStatus(r.status)}</td>
+            {filteredContracts.map((c, i) => (
+              <tr key={c.contract_id}>
+                <td className="center">{i + 1}</td>
+                <td>{c.tenant_name}</td>
+                <td className="center">{c.room_number || "—"}</td>
+                <td className="center">{formatDate(c.start_date)}</td>
+                <td className="center">{formatDate(c.end_date)}</td>
+                <td className="center">{renderStatus(c.status)}</td>
 
-                  <td>
-                    <button
-                      className="btn-link"
-                      onClick={() => nav(`/contracts/${r.contract_id}`)}
-                    >
-                      Xem
-                    </button>
-                    |
-                    <button
-                      className="btn-link"
-                      onClick={() => onDownload(r.contract_id)}
-                    >
-                      Tải
-                    </button>
-                    |
-                    <button
-                      className="btn-link"
-                      style={{ color: "#E11D48" }}
-                      onClick={() => onDelete(r.contract_id)}
-                    >
-                      Xóa
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
+                <td className="action-buttons">
+                  <button
+                    className="btn view"
+                    onClick={() => navigate(`/contracts/${c.contract_id}`)}
+                  >
+                    <Eye size={14} /> Xem
+                  </button>
+
+                  <button
+                    className="btn publish"
+                    onClick={() => handleDownload(c.contract_id)}
+                  >
+                    <Download size={14} /> Tải
+                  </button>
+
+                  <button
+                    className="btn delete"
+                    onClick={() => handleDelete(c.contract_id)}
+                  >
+                    <Trash size={14} /> Xóa
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
-      </div>
 
-      <button
-        className="btn btn-primary"
-        style={{ marginTop: 16 }}
-        onClick={() => nav("/contracts/create")}
-      >
-        Tạo hợp đồng mới
-      </button>
+        {filteredContracts.length === 0 && (
+          <p className="no-data">Không có hợp đồng nào.</p>
+        )}
+      </div>
     </div>
   );
 }

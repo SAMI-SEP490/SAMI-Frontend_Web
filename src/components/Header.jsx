@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { colors } from "../constants/colors";
 import { useNavigate } from "react-router-dom";
 import { getProfile, logout as apiLogout } from "../services/api/auth";
+import { FiUser, FiLogOut, FiMenu } from "react-icons/fi";
 
 export default function Header({ onToggleSidebar, isSidebarOpen }) {
   const [user, setUser] = useState(() => {
@@ -22,6 +23,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
         const u = data?.data || data;
         if (alive) setUser(u);
         localStorage.setItem("sami:user", JSON.stringify(u));
+      // eslint-disable-next-line no-empty
       } catch {}
     })();
     return () => {
@@ -29,11 +31,18 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
     };
   }, []);
 
-  const displayName = user?.full_name || user?.name || user?.email || "bạn";
+  // ✅ CHỈ GIỮ 1 displayName (FIX BUG)
+  const displayName =
+    user?.full_name ||
+    user?.name ||
+    user?.username ||
+    user?.email ||
+    "Người dùng";
 
   const handleLogout = async () => {
     try {
       await apiLogout();
+    // eslint-disable-next-line no-empty
     } catch {
     } finally {
       [
@@ -52,7 +61,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
       style={{
         backgroundColor: colors.brand,
         color: "#fff",
-        height: "80px", // ⬆️ cao hơn
+        height: "80px",
         display: "flex",
         alignItems: "center",
         padding: "0 20px",
@@ -74,11 +83,11 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
             cursor: "pointer",
           }}
         >
-          ☰
+          <FiMenu />
         </button>
       </div>
 
-      {/* CENTER – Logo */}
+      {/* CENTER – Logo (GIỮ NGUYÊN) */}
       <div
         style={{
           flex: 1,
@@ -89,7 +98,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
       >
         <img
           src="/logo2.png"
-          alt="Logo"
+          alt="SAMI Logo"
           style={{
             height: "80px",
             objectFit: "contain",
@@ -104,27 +113,25 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
           display: "flex",
           justifyContent: "flex-end",
           alignItems: "center",
-          gap: 18,
+          gap: 16,
           fontSize: 14,
         }}
       >
         <span>Xin chào {displayName}!</span>
 
-        <span
-          onClick={() => navigate("/profile")}
+        <FiUser
           title="Hồ sơ"
-          style={{ cursor: "pointer", fontSize: 18 }}
-        >
-          👤
-        </span>
+          size={18}
+          style={{ cursor: "pointer" }}
+          onClick={() => navigate("/profile")}
+        />
 
-        <span
-          onClick={handleLogout}
+        <FiLogOut
           title="Đăng xuất"
-          style={{ cursor: "pointer", fontSize: 18 }}
-        >
-          ↩️
-        </span>
+          size={18}
+          style={{ cursor: "pointer" }}
+          onClick={handleLogout}
+        />
       </div>
     </header>
   );

@@ -335,7 +335,7 @@ export default function CreateBillPage() {
         {/* PERIOD DATES */}
         <div className="col-md-2">
           <label className="form-label">
-            Bắt đầu kỳ <span className="text-danger">*</span>
+            Ngày bắt đầu kỳ <span className="text-danger">*</span>
           </label>
           <input
             type="date"
@@ -346,7 +346,7 @@ export default function CreateBillPage() {
         </div>
         <div className="col-md-2">
           <label className="form-label">
-            Ngày tạo kỳ <span className="text-danger">*</span>
+            Ngày kết thúc kỳ <span className="text-danger">*</span>
           </label>
           <input
             type="date"

@@ -26,6 +26,12 @@ import TenantDetailPage from "../pages/tenant/TenantDetailPage";
 import TenantEditPage from "../pages/tenant/TenantEditPage";
 import CreateTenantPage from "../pages/tenant/CreateTenantPage";
 
+// ===== Users =====
+import UserListPage from "../pages/user/UserListPage";
+import UserDetailPage from "../pages/user/UserDetailPage";
+import UserEditPage from "../pages/user/UserEditPage";
+import CreateUserPage from "../pages/user/CreateUserPage";
+
 // ===== Contracts =====
 import ContractListPage from "../pages/contract/ContractListPage";
 import ContractDetailPage from "../pages/contract/ContractDetailPage";
@@ -52,6 +58,8 @@ import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
 // ===== Buildings =====
 import BuildingListPage from "../pages/building/BuildingListPage";
 import EditBuildingPage from "../pages/building/EditBuildingPage";
+import CreateBuildingPage from "../pages/building/CreateBuildingPage";
+import ViewBuildingDetail from "../pages/building/ViewBuildingDetail";
 
 // ===== Floorplan (lazy) =====
 const CreateFloorPlan = lazy(() =>
@@ -190,7 +198,41 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path={ROUTES.users}
+          element={
+            <ProtectedRoute>
+              <UserListPage />
+            </ProtectedRoute>
+          }
+        />
+ 
+        <Route
+          path={ROUTES.userDetail}
+          element={
+            <ProtectedRoute>
+              <UserDetailPage />
+            </ProtectedRoute>
+          }
+        />
 
+        <Route
+          path={ROUTES.userEdit}
+          element={
+            <ProtectedRoute>
+              <UserEditPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.userCreate}
+          element={
+            <ProtectedRoute>
+              <CreateUserPage />
+            </ProtectedRoute>
+          }
+        /> 
         {/* Bills */}
         <Route
           path={ROUTES.bills}
@@ -318,6 +360,22 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <EditBuildingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.createBuilding}
+          element={
+            <ProtectedRoute>
+              <CreateBuildingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.viewBuilding}
+          element={
+            <ProtectedRoute>
+              <ViewBuildingDetail />
             </ProtectedRoute>
           }
         />

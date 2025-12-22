@@ -88,7 +88,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
         <span style={{ fontSize: 14 }}>Xin chào {displayName}!</span>
 
-        <div
+        {/* <div
           style={{ position: "relative", cursor: "pointer" }}
           title="Thông báo"
         >
@@ -100,7 +100,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
           >
             1
           </Badge>
-        </div>
+        </div> */}
 
         <span
           onClick={() => navigate("/profile")}

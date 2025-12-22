@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Table, Form, Button, Row, Col, Modal, Spinner } from "react-bootstrap";
+import { Table, Form, Button, Modal, Spinner } from "react-bootstrap";
 import {
   listMaintenance,
   listUser,
@@ -161,7 +161,9 @@ function MaintenanceListPage() {
               <th>Tiêu đề</th>
               <th>Người gửi</th>
               <th>Phòng</th>
+              <th>Mô tả</th>
               <th>Trạng thái</th>
+              <th>Ghi chú</th>
               <th>Hành động</th>
             </tr>
           </thead>
@@ -169,7 +171,7 @@ function MaintenanceListPage() {
           <tbody>
             {filteredRequests.length === 0 && (
               <tr>
-                <td colSpan={6} className="no-data">
+                <td colSpan={8} className="no-data">
                   Không có yêu cầu phù hợp
                 </td>
               </tr>
@@ -184,7 +186,10 @@ function MaintenanceListPage() {
                   <td>{req.title}</td>
                   <td>{getUserFullName(req.tenant_user_id)}</td>
                   <td>{req.room_id}</td>
+                  <td>{req.description || "-"}</td>
                   <td>{renderStatus(req.status)}</td>
+                  <td>{req.note || "-"}</td>
+
                   <td className="action-buttons">
                     {req.status === "pending" && (
                       <>

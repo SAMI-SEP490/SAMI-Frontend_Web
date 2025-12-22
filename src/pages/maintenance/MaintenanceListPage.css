@@ -146,3 +146,54 @@
     font-size: 16px;
     color: #555;
 }
+/* ===== TABLE HEADER: căn giữa tất cả ===== */
+.table-wrapper table thead th {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* ===== CĂN GIỮA NỘI DUNG CÁC CỘT YÊU CẦU ===== */
+
+/* Cột # */
+.table-wrapper table tbody td:nth-child(1) {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Cột Người gửi */
+.table-wrapper table tbody td:nth-child(3) {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Cột Phòng */
+.table-wrapper table tbody td:nth-child(4) {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Cột Trạng thái */
+.table-wrapper table tbody td:nth-child(5) {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Cột Hành động */
+.table-wrapper table tbody td:nth-child(6) {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* ===== NÚT HÀNH ĐỘNG CĂN GIỮA GỌN GÀNG ===== */
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* ===== STATUS TAG CĂN GIỮA ===== */
+.status {
+    display: inline-block;
+    text-align: center;
+    min-width: 100px;
+}

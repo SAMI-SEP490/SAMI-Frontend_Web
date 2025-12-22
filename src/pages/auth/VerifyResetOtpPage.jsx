@@ -3,47 +3,85 @@ import { colors } from "../../constants/colors";
 import { useLocation, useNavigate } from "react-router-dom";
 import { verifyResetOTP, resendResetOTP } from "../../services/api/auth";
 
-function useEmailFromLocation() {
-  const { state, search } = useLocation();
+function useResetContext() {
+  const location = useLocation();
   return useMemo(() => {
+    const { state, search } = location;
     const s = new URLSearchParams(search);
-    return state?.email || s.get("email") || "";
-  }, [state, search]);
+    const email = state?.email || s.get("email") || "";
+
+    let userId = state?.userId;
+    if (!userId) {
+      try {
+        const saved = JSON.parse(
+          sessionStorage.getItem("sami:resetCtx") || "{}"
+        );
+        if (saved.userId) userId = saved.userId;
+      } catch (e) {
+        console.warn("Không đọc được resetCtx từ sessionStorage:", e);
+      }
+    }
+
+    return { email, userId };
+  }, [location]);
 }
 
 export default function VerifyResetOtpPage() {
   const [code, setCode] = useState("");
-  const email = useEmailFromLocation();
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { email, userId } = useResetContext();
 
   const handleVerify = async () => {
     if (!code.trim()) return alert("Vui lòng nhập mã xác thực");
     if (!/^\d{6}$/.test(code)) return alert("Mã xác thực phải gồm 6 chữ số");
 
+    if (!userId) {
+      alert("Thiếu thông tin phiên đặt lại mật khẩu. Vui lòng nhập email lại.");
+      navigate("/forgot-password", { replace: true });
+      return;
+    }
+
     try {
-      // BE cho phép verify theo email (hoặc userId). Ở đây dùng email.
-      const res = await verifyResetOTP({ email, otp: code.trim() });
-      // res cần trả { userId, resetToken }
-      const { userId, resetToken, message } = res || {};
-      if (!userId || !resetToken)
+      setLoading(true);
+      // BE verify theo userId + otp
+      const res = await verifyResetOTP({ userId, otp: code.trim() });
+
+      const { userId: uid, resetToken, message } = res || {};
+      if (!uid || !resetToken) {
         throw new Error("Thiếu userId/resetToken từ server");
-      // để phòng F5 trang tiếp theo
-      sessionStorage.setItem(
-        "sami:resetCtx",
-        JSON.stringify({ userId, resetToken })
-      );
+      }
+
+      // Lưu lại để trang đổi mật khẩu dùng
+      try {
+        sessionStorage.setItem(
+          "sami:resetCtx",
+          JSON.stringify({ userId: uid, resetToken, email })
+        );
+      } catch (e) {
+        console.warn("Không lưu được resetCtx sau verify:", e);
+      }
+
       alert(message || "Xác nhận OTP thành công!");
-      navigate("/new-password", { state: { userId, resetToken } });
+      navigate("/new-password", { state: { userId: uid, resetToken } });
     } catch (e) {
       const msg =
         e?.response?.data?.message || e?.message || "Xác thực mã thất bại";
       alert(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleResend = async () => {
+    if (!userId) {
+      alert("Thiếu thông tin phiên đặt lại mật khẩu. Vui lòng nhập email lại.");
+      navigate("/forgot-password", { replace: true });
+      return;
+    }
+
     try {
-      const res = await resendResetOTP({ email });
+      const res = await resendResetOTP({ userId });
       alert(res?.message || "Đã gửi lại mã");
     } catch (e) {
       alert(
@@ -93,12 +131,13 @@ export default function VerifyResetOtpPage() {
             border: "1px solid #ccc",
             textAlign: "center",
             letterSpacing: 8,
-            marginBottom: 16,
+            marginBottom: 20,
           }}
         />
 
         <button
           onClick={handleVerify}
+          disabled={loading}
           style={{
             width: "100%",
             backgroundColor: colors.brand,
@@ -109,10 +148,11 @@ export default function VerifyResetOtpPage() {
             fontWeight: 600,
             border: "none",
             cursor: "pointer",
+            opacity: loading ? 0.8 : 1,
             marginBottom: 10,
           }}
         >
-          Xác nhận
+          {loading ? "Đang xác minh..." : "Xác nhận"}
         </button>
 
         <button

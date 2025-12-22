@@ -1,7 +1,10 @@
 // src/pages/tenant/TenantListPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAllTenants } from "../../services/api/tenants";
+import {
+  getAllTenants,
+  deleteTenantByUserId
+} from "../../services/api/tenants";
 import { listRoomsLite } from "../../services/api/rooms";
 
 // Helper: lấy giá trị đầu tiên != null/""

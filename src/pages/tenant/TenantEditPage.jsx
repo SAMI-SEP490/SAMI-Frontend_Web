@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { colors } from "../../constants/colors";
-import { getUserById, updateUser } from "../../services/api/users";
+import { getUserById, updateUser, listUsers } from "../../services/api/users";
 
 // helper: convert mọi dạng về 'YYYY-MM-DD' cho input[type=date]
 function toInputDate(v) {
@@ -29,8 +29,6 @@ export default function TenantEditPage() {
     email: "",
     birthday: "",
     gender: "Nam",
-    avatar_url: "",
-    avatar_preview: "",
   });
 
   useEffect(() => {
@@ -48,11 +46,14 @@ export default function TenantEditPage() {
           email: u?.email ?? "",
           birthday: toInputDate(u?.birthday),
           gender: u?.gender ?? "Nam",
-          avatar_url: u?.avatar_url ?? "",
-          avatar_preview: u?.avatar_url ?? "",
         });
       } catch (e) {
-        setErr(e?.response?.data?.message || e?.message || "Load failed");
+        if (!mounted) return;
+        setErr(
+          e?.response?.data?.message ||
+            e?.message ||
+            "Không lấy được thông tin người dùng"
+        );
       } finally {
         if (mounted) setLoading(false);
       }
@@ -67,47 +68,136 @@ export default function TenantEditPage() {
 
   async function onSubmit(e) {
     e.preventDefault();
+    setErr(null);
+
+    // ===== VALIDATE FRONTEND =====
+
+    // 1. Đầy đủ thông tin
+    if (
+      !form.full_name ||
+      !form.phone ||
+      !form.email ||
+      !form.birthday ||
+      !form.gender
+    ) {
+      setErr("Vui lòng nhập đầy đủ thông tin");
+      return;
+    }
+
+    // 2. Ngày sinh phải trước hiện tại
+    const dob = new Date(form.birthday);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dob.setHours(0, 0, 0, 0);
+
+    if (isNaN(dob.getTime()) || dob > today) {
+      setErr("Ngày sinh phải trước hiện tại");
+      return;
+    }
+
+    // 3. Số điện thoại >= 10 chữ số
+    const phoneDigits = String(form.phone).replace(/\D/g, "");
+    if (phoneDigits.length < 10) {
+      setErr("Số điện thoại phải có ít nhất 10 chữ số.");
+      return;
+    }
+
+    // 4. Email đúng định dạng
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailTrimmed = form.email.trim();
+    if (!emailRegex.test(emailTrimmed)) {
+      setErr("Email không đúng định dạng.");
+      return;
+    }
+
+    // 5. ✅ Email đã tồn tại trong hệ thống (trừ chính tenant đang sửa)
+    try {
+      const users = await listUsers(); // lấy toàn bộ user trong hệ thống
+      const currentId = String(form.id);
+      const normalizedEmail = emailTrimmed.toLowerCase();
+
+      const duplicated = users.some((u) => {
+        const uid =
+          u?.user_id ??
+          u?.id ??
+          u?.uid ??
+          u?._id ??
+          u?.data?.id ??
+          u?.data?.user_id;
+        const email = (u?.email || "").toLowerCase();
+        // trùng email + KHÁC userId hiện tại
+        return email && email === normalizedEmail && String(uid) !== currentId;
+      });
+
+      if (duplicated) {
+        setErr("Email đã tồn tại.");
+        return;
+      }
+    } catch (listErr) {
+      // Nếu listUsers lỗi (network, quyền, v.v.) thì bỏ qua bước check này
+      // và để backend validate như cũ
+      console.warn("Không kiểm tra được trùng email ở FE:", listErr);
+    }
+
+    // ===== GỌI API UPDATE =====
     try {
       setSaving(true);
-      setErr(null);
       await updateUser(form.id, {
         full_name: form.full_name,
         phone: form.phone,
-        email: form.email,
+        email: emailTrimmed,
         birthday: form.birthday,
         gender: form.gender,
       });
+
       alert("Cập nhật thành công");
       navigate(`/tenants/${form.id}`);
     } catch (e) {
-      setErr(e?.response?.data?.message || e?.message || "Update failed");
+      const raw =
+        e?.response?.data?.message ||
+        e?.message ||
+        "Cập nhật thất bại. Vui lòng thử lại.";
+      const lower = String(raw).toLowerCase();
+
+      // map lỗi email trùng từ backend
+      if (lower.includes("email") && lower.includes("exist")) {
+        setErr("Email đã tồn tại.");
+      } else {
+        setErr(raw);
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
+  if (loading) {
+    return <div style={{ padding: 24 }}>Đang tải thông tin người dùng...</div>;
+  }
 
   return (
     <div
       style={{
         minHeight: "100vh",
         display: "flex",
-        justifyContent: "center",
+        flexDirection: "column",
+        alignItems: "center",
         background: colors.background,
         padding: "36px 20px 56px",
       }}
     >
+      {/* CARD CHÍNH */}
       <form
         onSubmit={onSubmit}
         style={{
           width: 760,
+          maxWidth: "100%",
           background: "#fff",
           borderRadius: 10,
           boxShadow: "0 6px 16px rgba(0,0,0,.08)",
           overflow: "hidden",
         }}
       >
+        {/* HEADER XANH */}
         <div
           style={{
             background: colors.brand,
@@ -119,6 +209,7 @@ export default function TenantEditPage() {
           Thông tin người dùng
         </div>
 
+        {/* NỘI DUNG FORM */}
         <div style={{ padding: 20 }}>
           <Field label="ID">
             <input value={form.id} disabled style={input} />
@@ -158,18 +249,18 @@ export default function TenantEditPage() {
           </Field>
 
           <Field label="Giới tính">
-            <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 16 }}>
               {["Nam", "Nữ", "Khác"].map((g) => (
                 <label
                   key={g}
-                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  style={{ display: "flex", alignItems: "center" }}
                 >
                   <input
                     type="radio"
-                    name="gender"
                     value={g}
                     checked={form.gender === g}
                     onChange={onChange("gender")}
+                    style={{ marginRight: 6 }}
                   />
                   {g}
                 </label>
@@ -178,6 +269,7 @@ export default function TenantEditPage() {
           </Field>
         </div>
 
+        {/* NÚT HÀNH ĐỘNG */}
         <div
           style={{
             display: "flex",
@@ -194,10 +286,12 @@ export default function TenantEditPage() {
         </div>
       </form>
 
+      {/* PANEL LỖI BÊN DƯỚI (MÀU HỒNG GIỐNG HÌNH) */}
       {err && (
         <div
           style={{
             width: 760,
+            maxWidth: "100%",
             marginTop: 12,
             border: "1px solid #fecaca",
             background: "#fee2e2",
@@ -206,13 +300,14 @@ export default function TenantEditPage() {
             padding: 12,
           }}
         >
-          {String(err)}
+          {err}
         </div>
       )}
     </div>
   );
 }
 
+// Field wrapper giữ layout label bên trái, input bên phải (CSS như ban đầu)
 function Field({ label, children }) {
   return (
     <div
@@ -229,6 +324,7 @@ function Field({ label, children }) {
   );
 }
 
+// STYLE INPUT & BUTTONS theo giao diện cũ
 const input = {
   width: "100%",
   height: 40,

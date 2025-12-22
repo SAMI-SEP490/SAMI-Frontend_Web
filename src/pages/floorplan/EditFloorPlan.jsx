@@ -15,7 +15,10 @@ import {
 import "reactflow/dist/style.css";
 
 import { listBuildings } from "../../services/api/building";
-import { createFloorPlan, getFloorPlanDetail } from "../../services/api/floorplan";
+import {
+  createFloorPlan,
+  getFloorPlanDetail,
+} from "../../services/api/floorplan";
 
 /* ---------- helpers vẽ shape ---------- */
 const rectPoints = (W, H) => [
@@ -590,6 +593,7 @@ function FloorplanEdit() {
           position: pos,
           style: { zIndex: 1 },
           data: {
+            room_number: "",
             label: "Phòng",
             w: 4 * pxPerMeter,
             h: 3 * pxPerMeter,
@@ -713,6 +717,11 @@ function FloorplanEdit() {
   );
 
   const selectedNode = nodes.find((n) => n.id === selectedId);
+  const isRoomSelected = !!(
+    selectedNode &&
+    selectedNode.type === "block" &&
+    selectedNode.data?.icon === "room"
+  );
   let lengthM = null;
   let widthM = null;
 
@@ -750,6 +759,27 @@ function FloorplanEdit() {
     }
   };
 
+  const validateRoomNodesBeforeSave = (nodesList) => {
+    const roomNodes = (nodesList || []).filter(
+      (n) => n?.type === "block" && n?.data?.icon === "room"
+    );
+
+    if (roomNodes.length === 0) return null;
+
+    const seen = new Set();
+    for (const n of roomNodes) {
+      const roomNo = String(n?.data?.room_number || "").trim();
+      if (!roomNo) {
+        return "Vui lòng nhập số phòng cho tất cả các phòng trước khi lưu!";
+      }
+      if (seen.has(roomNo)) {
+        return `Số phòng "${roomNo}" đang bị trùng trên canvas. Vui lòng đổi lại trước khi lưu!`;
+      }
+      seen.add(roomNo);
+    }
+    return null;
+  };
+
   const handleSaveToAPI = async () => {
     try {
       if (!activeBuilding) {
@@ -772,9 +802,13 @@ function FloorplanEdit() {
         alert("Số tầng không hợp lệ, hãy nhập lại.");
         return;
       }
+      const roomErr = validateRoomNodesBeforeSave(nodes);
+      if (roomErr) {
+        alert(roomErr);
+        return;
+      }
 
-      const buildingName =
-        activeBuildingObj?.name || `#${String(buildingId)}`;
+      const buildingName = activeBuildingObj?.name || `#${String(buildingId)}`;
 
       const payload = {
         building_id: buildingId,
@@ -783,7 +817,12 @@ function FloorplanEdit() {
         layout: {
           nodes,
           edges,
-          meta: { pxPerMeter, gridGap, editedFrom: planId, savedAt: Date.now() },
+          meta: {
+            pxPerMeter,
+            gridGap,
+            editedFrom: planId,
+            savedAt: Date.now(),
+          },
         },
       };
 
@@ -791,7 +830,7 @@ function FloorplanEdit() {
       alert("Đã lưu layout (phiên bản mới) lên backend!");
     } catch (err) {
       console.error(err);
-      alert(err?.message || "Lỗi khi lưu layout, kiểm tra console!");
+      alert(err?.message || "Lỗi khi lưu layout");
     }
   };
 
@@ -984,9 +1023,7 @@ function FloorplanEdit() {
             }}
           >
             Đang chỉnh sửa layout của{" "}
-            <b>
-              {activeBuildingObj?.name || `Tòa #${activeBuilding || "-"}`}
-            </b>{" "}
+            <b>{activeBuildingObj?.name || `Tòa #${activeBuilding || "-"}`}</b>{" "}
             – <b>Tầng {activeFloor}</b>. Khi nhấn <b>Lưu layout</b>, một phiên
             bản mới sẽ được tạo.
           </div>
@@ -1060,6 +1097,36 @@ function FloorplanEdit() {
                 gap: 10,
               }}
             >
+              {isRoomSelected && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>Số phòng</label>
+                  <input
+                    style={inputStyle}
+                    type="text"
+                    value={selectedNode?.data?.room_number || ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setNodes((nds) =>
+                        nds.map((n) =>
+                          n.id === selectedId
+                            ? {
+                                ...n,
+                                data: {
+                                  ...n.data,
+                                  room_number: v,
+                                  label: v
+                                    ? `Phòng ${v}`
+                                    : n.data?.label || "Phòng",
+                                },
+                              }
+                            : n
+                        )
+                      );
+                    }}
+                    placeholder="VD: 101"
+                  />
+                </div>
+              )}
               <div>
                 <label style={labelStyle}>Dài</label>
                 <input

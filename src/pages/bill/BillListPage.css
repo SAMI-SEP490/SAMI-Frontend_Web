@@ -1,1 +1,37 @@
 @import "../tenant/TenantListPage.css";
+.status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status.draft {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status.published {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status.unpaid {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status.paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.partial {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.status.overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}

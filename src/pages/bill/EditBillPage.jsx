@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { colors } from "../../constants/colors";
 import { ROUTES } from "../../constants/routes";
@@ -6,16 +6,12 @@ import { getBillById, updateDraftBill } from "../../services/api/bills";
 import { http } from "../../services/http";
 import { listUsers } from "../../services/api/users";
 
-/* ================== Helper (giữ nguyên như BillDetailPage) ================== */
+/* ================== Helper ================== */
 function parseDate(d) {
   if (!d) return "";
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return "";
   return dt.toISOString().slice(0, 10);
-}
-function fmtMoney(n) {
-  if (n == null) return "";
-  return Number(n);
 }
 function extractRoomId(detail) {
   return (
@@ -52,6 +48,9 @@ function extractUserId(u) {
 function extractUserName(u) {
   return u?.full_name ?? u?.name ?? u?.username ?? u?.email ?? null;
 }
+function getBillStatus(b) {
+  return String(b?.status || b?.bill_status || "").toLowerCase();
+}
 
 /* ================== EDIT PAGE ================== */
 export default function EditBillPage() {
@@ -64,7 +63,6 @@ export default function EditBillPage() {
 
   const [roomLabel, setRoomLabel] = useState("—");
   const [payerName, setPayerName] = useState("—");
-  const [creatorName, setCreatorName] = useState("—");
 
   const [form, setForm] = useState({
     billing_period_start: "",
@@ -97,9 +95,16 @@ export default function EditBillPage() {
         const detailFromApi = await getBillById(numId);
         const detail = { ...detailFromApi, ...(location?.state?.bill || {}) };
 
+        // ✅ chặn sửa nếu không còn draft
+        const st = getBillStatus(detail);
+        if (st !== "draft") {
+          alert("Hóa đơn đã xuất bản thì không thể chỉnh sửa.");
+          navigate(`/bills/${numId}`);
+          return;
+        }
+
         if (cancelled) return;
 
-        /* ----- LẤY PHÒNG ----- */
         const roomId = extractRoomId(detail);
         if (roomId) {
           try {
@@ -113,7 +118,7 @@ export default function EditBillPage() {
           }
         }
 
-        /* ----- LẤY USERS 1 LẦN ----- */
+        // users map
         let userMap = new Map();
         try {
           const res = await listUsers();
@@ -123,21 +128,15 @@ export default function EditBillPage() {
             const nm = extractUserName(u);
             if (uid && nm) userMap.set(Number(uid), nm);
           });
+          // eslint-disable-next-line no-empty
         } catch {}
 
-        /* ----- TÊN NGƯỜI THANH TOÁN ----- */
         const payerId = extractPayerId(detail);
         payerId &&
           setPayerName(userMap.get(Number(payerId)) || `User #${payerId}`);
 
-        /* ----- TÊN NGƯỜI TẠO ----- */
         const creatorId = extractCreatorId(detail);
-        creatorId &&
-          setCreatorName(
-            userMap.get(Number(creatorId)) || `User #${creatorId}`
-          );
 
-        /* ----- SET FORM ----- */
         setForm({
           billing_period_start: parseDate(detail.billing_period_start),
           billing_period_end: parseDate(detail.billing_period_end),
@@ -160,7 +159,7 @@ export default function EditBillPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, location?.state]);
+  }, [id, location?.state, navigate]);
 
   /* ========== HANDLE INPUT ========== */
   const onChange = (e) => {
@@ -178,8 +177,8 @@ export default function EditBillPage() {
       const numId = Number(id);
       await updateDraftBill(numId, form);
 
-      alert("Cập nhật thành công!");
-      navigate(ROUTES.bills);
+      alert("Cập nhật nháp thành công!");
+      navigate("/bills");
     } catch (e) {
       alert(e?.message || "Lỗi cập nhật");
     } finally {
@@ -198,10 +197,6 @@ export default function EditBillPage() {
       </div>
     );
 
-  /* ================================================================
-     =============== FORM UI GIỐNG HỆT BILL DETAIL ==================
-     ================================================================ */
-
   return (
     <div
       style={{
@@ -215,7 +210,7 @@ export default function EditBillPage() {
     >
       <div style={cardWrap}>
         <div style={cardHeader}>
-          <div style={{ fontWeight: 800 }}>Chỉnh sửa hóa đơn</div>
+          <div style={{ fontWeight: 800 }}>Chỉnh sửa hóa đơn (Nháp)</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               className="btn btn-light"
@@ -230,7 +225,6 @@ export default function EditBillPage() {
         </div>
 
         <div style={cardBody}>
-          {/* Row 1 */}
           <div style={row}>
             <div style={cellLeft}>Phòng:</div>
             <div style={cellRight}>{roomLabel}</div>
@@ -239,7 +233,6 @@ export default function EditBillPage() {
             <div style={cellRight}>{payerName}</div>
           </div>
 
-          {/* Row 2 */}
           <div style={row}>
             <div style={cellLeft}>Bắt đầu kỳ:</div>
             <input
@@ -260,7 +253,6 @@ export default function EditBillPage() {
             />
           </div>
 
-          {/* Row 3 */}
           <div style={row}>
             <div style={cellLeft}>Hạn thanh toán:</div>
             <input
@@ -274,7 +266,6 @@ export default function EditBillPage() {
             <div />
           </div>
 
-          {/* Row 4 */}
           <div style={row}>
             <div style={cellLeft}>Tiền phạt:</div>
             <input
@@ -295,7 +286,6 @@ export default function EditBillPage() {
             />
           </div>
 
-          {/* Description */}
           <div>
             <div style={{ color: "#475569", marginBottom: 6 }}>Mô tả</div>
             <textarea
@@ -318,7 +308,7 @@ export default function EditBillPage() {
   );
 }
 
-/* ================== STYLES COPY Y NGUYÊN ================== */
+/* ================== STYLES ================== */
 const cardWrap = {
   width: 860,
   background: "#fff",

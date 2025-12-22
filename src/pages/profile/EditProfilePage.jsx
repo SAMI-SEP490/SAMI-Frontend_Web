@@ -112,7 +112,7 @@ export default function EditProfilePage() {
           gender: toUiGender(u.gender ?? u.sex),
           avatar_url: u.avatar_url ?? u.avatarUrl ?? "",
         });
-      } catch (e) {
+      } catch {
         setVariant("danger");
         setMessage("Không tải được thông tin hồ sơ.");
       } finally {

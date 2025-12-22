@@ -60,7 +60,7 @@ export default function PrivateLayout() {
             position: "relative",
 
             /* Background image */
-            backgroundImage: "url('/background.png')",
+            backgroundImage: "url('/background2.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",

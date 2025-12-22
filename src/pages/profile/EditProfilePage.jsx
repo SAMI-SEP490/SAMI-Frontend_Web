@@ -41,11 +41,11 @@ function Section({ title, children }) {
       </div>
       <div
         style={{
-          padding: 20,
-          backgroundColor: "#fff",
+          border: "1px solid #ddd",
+          borderTop: "none",
+          padding: 16,
           borderBottomLeftRadius: 8,
           borderBottomRightRadius: 8,
-          border: `1px solid ${colors.border}`,
         }}
       >
         {children}
@@ -54,15 +54,15 @@ function Section({ title, children }) {
   );
 }
 
-function GenderToggle({ value, onChange }) {
-  const options = ["Nam", "Nữ", "Khác"];
+function GenderSelector({ value, onChange }) {
+  const items = ["Nam", "Nữ", "Khác"];
   return (
-    <div style={{ display: "flex", gap: 8 }}>
-      {options.map((g) => (
+    <div style={{ display: "flex", gap: 10 }}>
+      {items.map((g) => (
         <Button
           key={g}
           variant={value === g ? "primary" : "outline-secondary"}
-          size="sm"
+          style={{ borderRadius: 20, padding: "5px 15px" }}
           onClick={() => onChange(g)}
         >
           {g}
@@ -93,12 +93,15 @@ export default function EditProfilePage() {
   const [message, setMessage] = useState("");
   const [variant, setVariant] = useState("success");
 
+
+  // Load profile
   useEffect(() => {
     let mounted = true;
 
     (async () => {
       try {
-        const profile = await getProfile(); // đã normalize trong auth.js
+        const res = await getProfile();
+        const u = res?.user || res?.data?.user || res?.data || res || {};
 
         if (!mounted) return;
 
@@ -151,7 +154,7 @@ export default function EditProfilePage() {
 
     if (!fullName || !email || !phone) {
       setVariant("danger");
-      setMessage("Vui lòng nhập đầy đủ tên, email và số điện thoại.");
+      setMessage("Vui lòng nhập đủ tên, email, SĐT.");
       return;
     }
 
@@ -171,11 +174,7 @@ export default function EditProfilePage() {
 
       setVariant("success");
       setMessage("Cập nhật hồ sơ thành công!");
-
-      // Điều hướng về trang profile sau khi lưu
-      setTimeout(() => {
-        navigate("/profile");
-      }, 800);
+      setTimeout(() => navigate("/profile"), 800);
     } catch (e) {
       setVariant("danger");
       setMessage(e?.response?.data?.message || "Cập nhật hồ sơ thất bại!");
@@ -193,28 +192,28 @@ export default function EditProfilePage() {
         padding: "40px 20px",
         background: colors.background,
         display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
+        justifyContent: "center",
       }}
     >
-      <h2 style={{ marginBottom: 20 }}>Chỉnh sửa hồ sơ</h2>
-
       <div
         style={{
-          width: "70%",
-          maxWidth: 900,
-          backgroundColor: "#fff",
-          borderRadius: 12,
-          padding: 24,
-          boxShadow: "0 4px 12px rgba(15,23,42,0.08)",
+          width: "60%",
+          background: "#fff",
+          borderRadius: 10,
+          padding: 30,
+          boxShadow: "0 2px 6px rgba(0,0,0,.1)",
         }}
       >
+        <h4 style={{ textAlign: "center", color: colors.brand }}>
+          Chỉnh sửa hồ sơ
+        </h4>
+
         {message && (
           <Alert
             variant={variant}
+            className="mt-3"
             onClose={() => setMessage("")}
             dismissible
-            className="mb-3"
           >
             {message}
           </Alert>
@@ -257,7 +256,6 @@ export default function EditProfilePage() {
           </div>
         </Section>
 
-        {/* Thông tin cơ bản */}
         <Section title="Thông tin cơ bản">
           <Form.Group className="mb-3">
             <Form.Label>Tên</Form.Label>
@@ -279,23 +277,12 @@ export default function EditProfilePage() {
             <Form.Label>Ngày sinh</Form.Label>
             <Form.Control
               type="date"
-              value={form.birthday}
+              value={form.birthday || ""}
               onChange={onChange("birthday")}
             />
           </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Label>Giới tính</Form.Label>
-            <div>
-              <GenderToggle
-                value={form.gender}
-                onChange={(g) => setForm((prev) => ({ ...prev, gender: g }))}
-              />
-            </div>
-          </Form.Group>
         </Section>
 
-        {/* Liên hệ */}
         <Section title="Liên hệ">
           <Form.Group className="mb-3">
             <Form.Label>Email</Form.Label>
@@ -304,15 +291,10 @@ export default function EditProfilePage() {
 
           <Form.Group>
             <Form.Label>Số điện thoại</Form.Label>
-            <Form.Control
-              value={form.phone}
-              onChange={onChange("phone")}
-              placeholder="Nhập số điện thoại"
-            />
+            <Form.Control value={form.phone} onChange={onChange("phone")} />
           </Form.Group>
         </Section>
 
-        {/* Nút hành động */}
         <div
           style={{
             display: "flex",

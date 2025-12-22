@@ -80,6 +80,8 @@ import EditRegulationPage from "../pages/regulation/EditRegulationPage";
 import VehicleRegistrationListPage from "../pages/vehicle/VehicleRegistrationListPage";
 import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
 
+import RoomListPage from "@/pages/room/RoomListPage.jsx";
+
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
   !!localStorage.getItem("accessToken");
@@ -206,7 +208,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
- 
+
         <Route
           path={ROUTES.userDetail}
           element={
@@ -232,7 +234,7 @@ export default function AppRoutes() {
               <CreateUserPage />
             </ProtectedRoute>
           }
-        /> 
+        />
         {/* Bills */}
         <Route
           path={ROUTES.bills}
@@ -428,16 +430,17 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        {/* Vehicle Registrations  */}
+        {/* roon */}
         <Route
-          path={ROUTES.vehicleRegistrations}
+          path={ROUTES.rooms}
           element={
             <ProtectedRoute>
-              <VehicleRegistrationListPage />
+              <RoomListPage />
             </ProtectedRoute>
           }
         />
       </Route>
+
       {/* Fallback */}
       <Route path="/" element={<HomeRedirect />} />
       <Route path="*" element={<HomeRedirect />} />

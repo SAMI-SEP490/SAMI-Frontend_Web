@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { colors } from "../../constants/colors";
 import { ROUTES } from "../../constants/routes";
 import "./LoginPage.css";
 import {
@@ -18,29 +17,26 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
-  // URL/State “from” (nếu PrivateRoute chuyển tới login sẽ gắn from)
   const nextURL = useMemo(() => {
     const fromState = location.state?.from;
     const fromQuery = new URLSearchParams(location.search).get("from");
     return fromState || fromQuery || ROUTES.viewTimebaseReport;
   }, [location.state, location.search]);
 
-  // Helper: lấy role từ object user bất kỳ
   const extractRole = (userObj) => {
     if (!userObj || typeof userObj !== "object") return "";
-    const rawRole =
+    return String(
       userObj.role ||
-      userObj.role_name ||
-      userObj.roleName ||
-      userObj.role_code ||
-      userObj.roleCode ||
-      "";
-    return String(rawRole || "")
+        userObj.role_name ||
+        userObj.roleName ||
+        userObj.role_code ||
+        userObj.roleCode ||
+        ""
+    )
       .toLowerCase()
       .trim();
   };
 
-  // Nếu đã login thì tự chuyển về trang chính (nhưng phải check không phải tenant)
   useEffect(() => {
     const access =
       localStorage.getItem("sami:access") ||
@@ -48,35 +44,20 @@ function LoginPage() {
 
     if (!access) return;
 
-    const userStr = localStorage.getItem("sami:user");
-    if (userStr) {
-      try {
-        const savedUser = JSON.parse(userStr);
-        const roleStr = extractRole(savedUser);
-        const isTenant =
-          roleStr === "tenant" ||
-          roleStr === "r_tenant" ||
-          roleStr.includes("tenant");
-
-        // Nếu là tenant thì ko cho auto-redirect, dọn session luôn
-        if (isTenant) {
-          [
-            "sami:access",
-            "accessToken",
-            "sami:refresh",
-            "refreshToken",
-            "sami:user",
-          ].forEach((k) => localStorage.removeItem(k));
-          return;
-        }
-      } catch {
-        // Nếu parse lỗi thì cứ cho qua, không redirect
+    try {
+      const user = JSON.parse(localStorage.getItem("sami:user") || "{}");
+      if (extractRole(user).includes("tenant")) {
+        [
+          "sami:access",
+          "accessToken",
+          "sami:refresh",
+          "refreshToken",
+          "sami:user",
+        ].forEach((k) => localStorage.removeItem(k));
         return;
       }
-    }
-
-    // Không phải tenant -> cho vào hệ thống như cũ
-    navigate(ROUTES.viewTimebaseReport, { replace: true });
+      navigate(ROUTES.viewTimebaseReport, { replace: true });
+    } catch {}
   }, [navigate]);
 
   const handleLogin = async (e) => {
@@ -92,29 +73,18 @@ function LoginPage() {
       setLoading(true);
       const res = await apiLogin({ email: email.trim(), password });
 
-      // Lấy user + role từ response (linh hoạt nhiều dạng BE trả về)
       const rawUser =
         res?.user ||
         res?.data?.user ||
         res?.data ||
-        res ||
         JSON.parse(localStorage.getItem("sami:user") || "{}");
 
-      const roleStr = extractRole(rawUser);
-      const isTenant =
-        roleStr === "tenant" ||
-        roleStr === "r_tenant" ||
-        roleStr.includes("tenant");
-
-      if (isTenant) {
+      if (extractRole(rawUser).includes("tenant")) {
         try {
           await apiLogout();
-        } catch {
-          // ignore lỗi logout
-        }
-
+        } catch {}
         setError(
-          "Tài khoản Tenant không được phép đăng nhập vào hệ thống web. Vui lòng sử dụng ứng dụng dành cho cư dân (Tenant App)."
+          "Tài khoản Tenant không được phép đăng nhập web. Vui lòng sử dụng Tenant App."
         );
         return;
       }
@@ -130,101 +100,75 @@ function LoginPage() {
       navigate(nextURL, { replace: true });
     } catch (err) {
       let msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Đăng nhập thất bại. Vui lòng thử lại.";
-
-      // Nếu sai email/mật khẩu → luôn hiển thị tiếng Việt
-      const status = err?.response?.status;
-      const lower = String(msg || "").toLowerCase();
+        err?.response?.data?.message || err?.message || "Đăng nhập thất bại";
 
       if (
-        status === 401 ||
-        lower.includes("invalid credential") ||
-        lower.includes("unauthorized")
+        err?.response?.status === 401 ||
+        msg.toLowerCase().includes("invalid")
       ) {
         msg = "Thông tin đăng nhập không chính xác";
       }
-
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const gotoForgot = (e) => {
-    e.preventDefault(); // chặn nhảy #
-    navigate(ROUTES.forgotPassword);
-  };
-
   return (
-    <div className="login-container" style={{ backgroundColor: colors.brand }}>
-      <div className="login-box">
-        <h2>Đăng Nhập</h2>
+    <div className="login-wrapper">
+      {/* LEFT */}
+      <div className="login-left" />
 
-        <form onSubmit={handleLogin}>
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              placeholder="Nhập email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="username"
-            />
-          </div>
+      {/* RIGHT */}
+      <div className="login-right">
+        <div className="login-center">
+          {/* LOGO – hòa vào nền */}
+          <img src="/logo1.png" alt="Logo" className="login-logo" />
 
-          <div className="form-group">
-            <label>Mật khẩu</label>
-            <div style={{ position: "relative" }}>
-              <input
-                type={showPw ? "text" : "password"}
-                placeholder="Nhập mật khẩu"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw((v) => !v)}
-                style={{
-                  position: "absolute",
-                  right: 10,
-                  top: 8,
-                  background: "transparent",
-                  border: "none",
-                  color: colors.brand,
-                  cursor: "pointer",
-                }}
-                aria-label={showPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              >
-                {showPw ? "Ẩn" : "Hiện"}
+          {/* LOGIN BOX */}
+          <div className="login-box">
+            <h2>Đăng Nhập</h2>
+
+            <form onSubmit={handleLogin}>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  placeholder="Nhập email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Mật khẩu</label>
+                <div className="pw-wrapper">
+                  <input
+                    type={showPw ? "text" : "password"}
+                    placeholder="Nhập mật khẩu"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="show-pw-btn"
+                    onClick={() => setShowPw((v) => !v)}
+                  >
+                    {showPw ? "Ẩn" : "Hiện"}
+                  </button>
+                </div>
+              </div>
+
+              {error && <p className="error-text">{error}</p>}
+
+              <button type="submit" className="login-btn" disabled={loading}>
+                {loading ? "Đang đăng nhập..." : "Đăng Nhập"}
               </button>
-            </div>
+            </form>
+
+            <span className="forgot-password">Bạn quên mật khẩu?</span>
           </div>
-
-          {error ? <p className="error-text">{error}</p> : null}
-
-          <button
-            type="submit"
-            className="login-btn"
-            style={{
-              backgroundColor: colors.brand,
-              opacity: loading ? 0.8 : 1,
-            }}
-            disabled={loading}
-          >
-            {loading ? "Đang đăng nhập..." : "Đăng Nhập"}
-          </button>
-        </form>
-
-        <a
-          onClick={gotoForgot}
-          className="forgot-password"
-          style={{ color: colors.brand }}
-        >
-          Bạn quên mật khẩu?
-        </a>
+        </div>
       </div>
     </div>
   );

@@ -1,84 +1,124 @@
-.login-container {
+/* Wrapper */
+.login-wrapper {
+  display: flex;
   height: 100vh;
+  font-family: "Segoe UI", sans-serif;
+}
+
+/* LEFT */
+.login-left {
+  flex: 8;
+  background-image: url("/background.png");
+  background-size: cover; /* phủ kín khung */
+  background-position: center; /* canh giữa ảnh */
+  background-repeat: no-repeat; /* không lặp */
+}
+
+/* RIGHT */
+.login-right {
+  flex: 4;
+  background: #0f3d8a;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-/* Khung trắng giữa */
-.login-box {
-  background-color: white;
-  padding: 40px 50px;
-  border-radius: 15px;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+/* Center content */
+.login-center {
+  width: 100%;
+  max-width: 360px;
   text-align: center;
-  width: 380px;
 }
 
-/* Tiêu đề */
+/* LOGO – hòa nền */
+.login-logo {
+  width: 300px;
+  margin-bottom: 24px;
+  object-fit: contain;
+}
+
+/* LOGIN BOX */
+.login-box {
+  background: #ffffff;
+  padding: 28px 26px;
+  border-radius: 14px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
+}
+
 .login-box h2 {
-  margin-bottom: 25px;
-  color: #000;
-  font-size: 18px;
+  margin-bottom: 20px;
+  color: #0f3d8a;
 }
 
-/* Nhóm input */
+/* Form */
 .form-group {
+  margin-bottom: 14px;
   text-align: left;
-  margin-bottom: 20px;
 }
 
 .form-group label {
-  display: block;
-  font-weight: bold;
+  font-size: 14px;
+  font-weight: 500;
   margin-bottom: 6px;
-  color: #333;
+  display: block;
 }
 
 .form-group input {
   width: 100%;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid #ddd;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
   font-size: 14px;
-  outline: none;
 }
 
 .form-group input:focus {
-  border-color: #0F3D8A; /* màu brand */
+  outline: none;
+  border-color: #0f3d8a;
 }
 
-/* Nút đăng nhập */
-.login-btn {
-  width: 100%;
-  color: white;
-  padding: 12px;
+/* Password */
+.pw-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.show-pw-btn {
+  margin-left: 8px;
   border: none;
-  border-radius: 10px;
+  background: transparent;
+  color: #0f3d8a;
+  font-size: 13px;
   cursor: pointer;
-  font-weight: bold;
-  transition: background 0.3s;
 }
 
-.login-btn:hover {
-  opacity: 0.9;
-}
-
-/* Text quên mật khẩu */
-.forgot-password {
-  display: inline-block;
-  margin-top: 15px;
-  font-weight: bold;
-  text-decoration: none;
-}
-
-.forgot-password:hover {
-  text-decoration: underline;
-}
-
-/* Thông báo lỗi */
+/* Error */
 .error-text {
-  color: red;
+  color: #d32f2f;
   font-size: 13px;
   margin-bottom: 10px;
+}
+
+/* Button */
+.login-btn {
+  width: 100%;
+  padding: 11px;
+  border-radius: 8px;
+  border: none;
+  background: #0f3d8a;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-btn:disabled {
+  opacity: 0.7;
+}
+
+/* Forgot */
+.forgot-password {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #0f3d8a;
+  cursor: pointer;
 }

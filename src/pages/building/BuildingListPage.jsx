@@ -74,8 +74,8 @@ export default function BuildingListPage() {
     <div className="container">
       <h2 className="title">Danh sách Tòa Nhà</h2>
 
-      {/* FILTER */}
-      <div className="filter-bar">
+      {/* FILTER + ACTION */}
+      <div className="filter-bar grid">
         <input
           type="text"
           placeholder="🔎 Tìm kiếm theo tên tòa nhà..."
@@ -93,6 +93,13 @@ export default function BuildingListPage() {
           <option value="active">Đang hoạt động</option>
           <option value="inactive">Ngừng hoạt động</option>
         </select>
+
+        <button
+          className="btn add"
+          onClick={() => navigate("/buildings/create")}
+        >
+          + Thêm Tòa Nhà
+        </button>
       </div>
 
       {/* TABLE */}
@@ -166,16 +173,6 @@ export default function BuildingListPage() {
         {filtered.length === 0 && (
           <p className="no-data">Không có tòa nhà nào.</p>
         )}
-      </div>
-
-      {/* ADD BUTTON */}
-      <div className="add-button">
-        <button
-          className="btn add"
-          onClick={() => navigate("/buildings/create")}
-        >
-          + Thêm Tòa Nhà
-        </button>
       </div>
     </div>
   );

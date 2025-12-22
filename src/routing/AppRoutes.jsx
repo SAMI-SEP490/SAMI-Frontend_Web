@@ -382,6 +382,16 @@ export default function AppRoutes() {
           }
         />
 
+        {/* vehicle registrations*/}
+        <Route
+          path={ROUTES.vehicleRegistrations}
+          element={
+            <ProtectedRoute>
+              <VehicleRegistrationListPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Floorplan (lazy with Suspense) */}
         <Route
           path={ROUTES.floorplanCreate}

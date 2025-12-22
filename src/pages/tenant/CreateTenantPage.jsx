@@ -268,8 +268,8 @@ export default function CreateTenantPage() {
       // 5. Gọi /user/change-to-tenant
       await changeManagerToTenant({
         userId,
-        roomId,
         idNumber,
+        roomId,
         emergencyContactPhone: onlyDigits(formData.phone).slice(0, 11),
         note: room ? `Phòng: ${room.label}` : "",
       });

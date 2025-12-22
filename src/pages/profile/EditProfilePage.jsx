@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { colors } from "../../constants/colors";
 import { Form, Button, Alert, Image } from "react-bootstrap";
-import { getProfile, updateProfile } from "../../services/api/auth";
+import { getProfile } from "../../services/api/auth";
+import { updateProfile } from "../../services/api/users";
 
 // Chuẩn hóa date string về dạng YYYY-MM-DD cho input[type="date"]
 const toInputDate = (v) => {
@@ -73,6 +74,7 @@ function GenderToggle({ value, onChange }) {
 
 export default function EditProfilePage() {
   const navigate = useNavigate();
+  const fileRef = useRef();
 
   const [form, setForm] = useState({
     full_name: "",
@@ -82,6 +84,9 @@ export default function EditProfilePage() {
     gender: "",
     avatar_url: "",
   });
+
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,23 +103,17 @@ export default function EditProfilePage() {
 
         if (!mounted) return;
 
-        setForm((prev) => ({
-          ...prev,
-          full_name: profile.full_name ?? "",
-          email: profile.email ?? "",
-          phone: profile.phone ?? "",
-          birthday: toInputDate(profile.birthday),
-          gender: toUiGender(profile.gender),
-          avatar_url: profile.avatar_url ?? "",
-        }));
+        setForm({
+          full_name: u.full_name ?? "",
+          email: u.email ?? "",
+          phone: u.phone ?? "",
+          birthday: toInputDate(u.birthday ?? u.dob),
+          gender: toUiGender(u.gender ?? u.sex),
+          avatar_url: u.avatar_url ?? u.avatarUrl ?? "",
+        });
       } catch (e) {
-        if (!mounted) return;
         setVariant("danger");
-        setMessage(
-          e?.response?.data?.message ||
-            e?.message ||
-            "Không tải được thông tin hồ sơ."
-        );
+        setMessage("Không tải được thông tin hồ sơ.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -131,11 +130,19 @@ export default function EditProfilePage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleChangeAvatar = () => {
-    const url = window.prompt("Nhập URL ảnh đại diện mới:", form.avatar_url);
-    if (url !== null) {
-      setForm((prev) => ({ ...prev, avatar_url: url.trim() }));
+  // ✅ chọn ảnh
+  const onSelectAvatar = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setVariant("danger");
+      setMessage("Vui lòng chọn file ảnh.");
+      return;
     }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
   const onSave = async () => {
@@ -149,65 +156,18 @@ export default function EditProfilePage() {
       return;
     }
 
-    // ✅ EMAIL
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setVariant("danger");
-      setMessage("Email không đúng định dạng.");
-      return;
-    }
-
-    // ✅ SĐT: 10–11 số, bắt đầu bằng 0
-    const phoneRegex = /^0\d{9,10}$/;
-    if (!phoneRegex.test(phone)) {
-      setVariant("danger");
-      setMessage("Số điện thoại phải có ít nhất 10 chữ số và bắt đầu bằng 0.");
-      return;
-    }
-
-    // ✅ NGÀY SINH: trước hiện tại, >= 18 tuổi, <= 100 tuổi
-    if (form.birthday) {
-      const birth = new Date(form.birthday);
-      if (Number.isNaN(birth.getTime())) {
-        setVariant("danger");
-        setMessage("Ngày sinh không hợp lệ.");
-        return;
-      }
-
-      const today = new Date();
-      if (birth > today) {
-        setVariant("danger");
-        setMessage("Ngày sinh phải trước thời gian hiện tại.");
-        return;
-      }
-
-      const hundredYearsAgo = new Date();
-      hundredYearsAgo.setFullYear(hundredYearsAgo.getFullYear() - 100);
-      if (birth < hundredYearsAgo) {
-        setVariant("danger");
-        setMessage("Ngày sinh không hợp lệ.");
-        return;
-      }
-
-      const eighteenYearsAgo = new Date();
-      eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
-      if (birth > eighteenYearsAgo) {
-        setVariant("danger");
-        setMessage("Bạn phải ít nhất 18 tuổi.");
-        return;
-      }
-    }
-
     try {
       setSaving(true);
       setMessage("");
 
-      // updateProfile trong auth.js đã tự map gender, birthday, avatar_url
+      // ✅ GỬI avatar + data cùng lúc (multipart/form-data)
       await updateProfile({
-        ...form,
         full_name: fullName,
         email,
         phone,
+        birthday: form.birthday,
+        gender: form.gender,
+        avatar: avatarFile, // 👈 QUAN TRỌNG
       });
 
       setVariant("success");
@@ -219,9 +179,7 @@ export default function EditProfilePage() {
       }, 800);
     } catch (e) {
       setVariant("danger");
-      setMessage(
-        e?.response?.data?.message || e?.message || "Cập nhật hồ sơ thất bại!"
-      );
+      setMessage(e?.response?.data?.message || "Cập nhật hồ sơ thất bại!");
     } finally {
       setSaving(false);
     }
@@ -263,38 +221,40 @@ export default function EditProfilePage() {
           </Alert>
         )}
 
-        {/* Avatar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            marginBottom: 24,
-          }}
-        >
-          <Image
-            src={
-              form.avatar_url ||
-              "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
-                encodeURIComponent(form.full_name || "User")
-            }
-            roundedCircle
-            style={{ width: 96, height: 96, objectFit: "cover" }}
-            alt="Avatar"
-          />
-          <div>
-            <div style={{ fontWeight: 600 }}>{form.full_name || "—"}</div>
-            <div style={{ fontSize: 14, color: colors.muted }}>
-              {form.email || "—"}
+        {/* ===== AVATAR ===== */}
+        <Section title="Ảnh đại diện">
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <Image
+              src={
+                avatarPreview ||
+                form.avatar_url ||
+                "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
+                  encodeURIComponent(form.full_name || "User")
+              }
+              roundedCircle
+              width={72}
+              height={72}
+            />
+
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600 }}>{form.full_name}</div>
+              <div style={{ color: "#666", fontSize: 13 }}>{form.email}</div>
             </div>
+
             <Button
               variant="outline-primary"
-              size="sm"
-              className="mt-2"
-              onClick={handleChangeAvatar}
+              onClick={() => fileRef.current.click()}
             >
-              <i className="bi bi-camera"></i> Đổi ảnh
+              <i className="bi bi-camera" /> Đổi ảnh
             </Button>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={onSelectAvatar}
+            />
           </div>
         </div>
 
@@ -309,7 +269,7 @@ export default function EditProfilePage() {
             />
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group>
             <Form.Label>Ngày sinh</Form.Label>
             <Form.Control
               type="date"
@@ -333,15 +293,10 @@ export default function EditProfilePage() {
         <Section title="Liên hệ">
           <Form.Group className="mb-3">
             <Form.Label>Email</Form.Label>
-            <Form.Control
-              type="email"
-              value={form.email}
-              onChange={onChange("email")}
-              placeholder="Nhập email"
-            />
+            <Form.Control value={form.email} disabled />
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group>
             <Form.Label>Số điện thoại</Form.Label>
             <Form.Control
               value={form.phone}

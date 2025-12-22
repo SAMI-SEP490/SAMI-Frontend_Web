@@ -1,3 +1,6 @@
+/* ===============================
+   CONTAINER
+================================ */
 .container {
     max-width: 1200px;
     margin: 40px auto;
@@ -7,6 +10,9 @@
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
+/* ===============================
+   TITLE
+================================ */
 .title {
     font-size: 28px;
     font-weight: bold;
@@ -16,6 +22,9 @@
     margin-bottom: 20px;
 }
 
+/* ===============================
+   FILTER BAR
+================================ */
 .filter-bar {
     display: flex;
     gap: 10px;
@@ -30,6 +39,9 @@
     border: 1px solid #ccc;
 }
 
+/* ===============================
+   TABLE
+================================ */
 .table-wrapper {
     overflow-x: auto;
 }
@@ -59,19 +71,15 @@ tr:hover {
     background-color: #f9fafb;
 }
 
-.tag {
-    padding: 3px 8px;
-    background: #dbeafe;
-    color: #1e3a8a;
-    border-radius: 6px;
-    font-size: 13px;
-}
-
+/* ===============================
+   STATUS TAG
+================================ */
 .status {
-    padding: 3px 8px;
+    padding: 3px 10px;
     border-radius: 12px;
     font-size: 13px;
     font-weight: 500;
+    display: inline-block;
 }
 
 .status.published {
@@ -79,19 +87,16 @@ tr:hover {
     color: #065f46;
 }
 
-.status.draft {
-    background: #fef3c7;
-    color: #92400e;
-}
-
 .status.archived {
-    background: #e5e7eb;
-    color: #374151;
+    background: #fee2e2;
+    color: #b91c1c;
 }
 
-/* ACTION COLUMN */
+/* ===============================
+   ACTION COLUMN
+================================ */
 .action-col {
-    min-width: 300px;
+    min-width: 260px;
 }
 
 .action-buttons {
@@ -102,6 +107,9 @@ tr:hover {
     flex-wrap: nowrap;
 }
 
+/* ===============================
+   BUTTONS
+================================ */
 .btn {
     padding: 6px 10px;
     border-radius: 6px;
@@ -124,27 +132,14 @@ tr:hover {
     color: #92400e;
 }
 
-.btn.edit.disabled {
-    background: #e5e7eb;
-    color: #9ca3af;
-    cursor: not-allowed;
-}
-
-.btn.publish {
-    background: #d1fae5;
-    color: #065f46;
-}
-
-.btn.archive {
-    background: #f3f4f6;
-    color: #374151;
-}
-
 .btn.delete {
     background: #fee2e2;
     color: #b91c1c;
 }
 
+/* ===============================
+   ADD BUTTON
+================================ */
 .add-button {
     display: flex;
     justify-content: flex-end;
@@ -157,6 +152,9 @@ tr:hover {
     padding: 8px 16px;
 }
 
+/* ===============================
+   STATES
+================================ */
 .loading-text,
 .no-data {
     text-align: center;

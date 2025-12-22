@@ -30,8 +30,8 @@ export default function RegulationListPage() {
       const res = await listRegulations();
       setRegulations(res.data || res);
     } catch (err) {
-      console.error("Fetch error:", err);
-      alert("❌ Lấy dữ liệu thất bại. Vui lòng thử lại.");
+      console.error(err);
+      alert("❌ Lấy dữ liệu thất bại.");
     } finally {
       setLoading(false);
     }
@@ -54,14 +54,14 @@ export default function RegulationListPage() {
       fetchData();
     } catch (err) {
       console.error(err);
-      alert("❌ Xóa thất bại. Vui lòng thử lại.");
+      alert("❌ Xóa thất bại.");
     }
   }
 
   async function handlePublish(id) {
     try {
       await publishRegulation(id);
-      alert("✅ Quy định đã được xuất bản.");
+      alert("✅ Đã xuất bản.");
       fetchData();
     } catch (err) {
       console.error(err);
@@ -72,7 +72,7 @@ export default function RegulationListPage() {
   async function handleArchive(id) {
     try {
       await unpublishRegulation(id);
-      alert("✅ Quy định đã được hủy xuất bản / lưu trữ.");
+      alert("✅ Đã hủy xuất bản.");
       fetchData();
     } catch (err) {
       console.error(err);
@@ -100,6 +100,7 @@ export default function RegulationListPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="search-input"
         />
+
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -108,7 +109,6 @@ export default function RegulationListPage() {
           <option value="">Tất cả trạng thái</option>
           <option value="draft">Nháp</option>
           <option value="published">Đã xuất bản</option>
-          <option value="archived">Lưu trữ</option>
         </select>
       </div>
 
@@ -116,38 +116,54 @@ export default function RegulationListPage() {
         <table>
           <thead>
             <tr>
-              <th>Tiêu đề</th>
-              <th>Đối tượng áp dụng</th>
-              <th>Ngày hiệu lực</th>
-              <th>Người tạo</th>
-              <th>Ngày tạo</th>
-              <th>Cập nhật</th>
-              <th>Trạng thái</th>
-              <th>Hành động</th>
+              <th className="center">#</th>
+              <th className="center">Tiêu đề</th>
+              <th className="center">Đối tượng áp dụng</th>
+              <th className="center">Ngày hiệu lực</th>
+              <th className="center">Người tạo</th>
+              <th className="center">Ngày tạo</th>
+              <th className="center">Cập nhật</th>
+              <th className="center">Trạng thái</th>
+              <th className="center action-col">Hành động</th>
             </tr>
           </thead>
+
           <tbody>
-            {filtered.map((reg) => (
+            {filtered.map((reg, index) => (
               <tr key={reg.regulation_id}>
+                <td className="center">{index + 1}</td>
+
                 <td>{reg.title}</td>
-                <td className="tag">
-                  {reg.target === "all"
-                    ? "Tất cả"
-                    : reg.target === "management"
-                    ? "Quản lý"
-                    : reg.target === "tenants"
-                    ? "Khách thuê"
-                    : "Không rõ"}
+
+                <td className="center">
+                  <span className="tag">
+                    {reg.target === "all"
+                      ? "Tất cả"
+                      : reg.target === "management"
+                      ? "Quản lý"
+                      : reg.target === "tenants"
+                      ? "Khách thuê"
+                      : "Không rõ"}
+                  </span>
                 </td>
-                <td>
+
+                <td className="center">
                   {reg.effective_date
                     ? new Date(reg.effective_date).toLocaleDateString("vi-VN")
                     : "—"}
                 </td>
+
                 <td>{reg.created_by?.full_name}</td>
-                <td>{new Date(reg.created_at).toLocaleDateString("vi-VN")}</td>
-                <td>{new Date(reg.updated_at).toLocaleDateString("vi-VN")}</td>
-                <td>
+
+                <td className="center">
+                  {new Date(reg.created_at).toLocaleDateString("vi-VN")}
+                </td>
+
+                <td className="center">
+                  {new Date(reg.updated_at).toLocaleDateString("vi-VN")}
+                </td>
+
+                <td className="center">
                   <span
                     className={`status ${
                       reg.status === "published"
@@ -164,50 +180,50 @@ export default function RegulationListPage() {
                       : "Lưu trữ"}
                   </span>
                 </td>
+
                 <td className="action-buttons">
                   <button
-                    onClick={() =>
-                      navigate(`/regulations/${reg.regulation_id}/`)
-                    }
                     className="btn view"
+                    onClick={() =>
+                      navigate(`/regulations/${reg.regulation_id}`)
+                    }
                   >
-                    <Eye size={16} /> Xem
+                    <Eye size={14} /> Xem
                   </button>
 
                   <button
+                    className={`btn edit ${
+                      reg.status === "published" ? "disabled" : ""
+                    }`}
                     disabled={reg.status === "published"}
                     onClick={() =>
                       navigate(`/regulations/${reg.regulation_id}/edit`)
                     }
-                    className={`btn edit ${
-                      reg.status === "published" ? "disabled" : ""
-                    }`}
                   >
-                    <Pencil size={16} /> Sửa
+                    <Pencil size={14} /> Sửa
                   </button>
 
                   {reg.status !== "published" ? (
                     <button
-                      onClick={() => handlePublish(reg.regulation_id)}
                       className="btn publish"
+                      onClick={() => handlePublish(reg.regulation_id)}
                     >
-                      <CloudArrowUp size={16} />
-                      Xuất bản
+                      <CloudArrowUp size={14} /> Xuất bản
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleArchive(reg.regulation_id)}
                       className="btn archive"
+                      onClick={() => handleArchive(reg.regulation_id)}
                     >
-                      <Archive size={16} /> Hủy xuất bản
+                      <Archive size={14} /> Hủy xuất bản
                     </button>
                   )}
 
                   <button
-                    onClick={() => handleDelete(reg.regulation_id, reg.status)}
                     className="btn delete"
+                    onClick={() => handleDelete(reg.regulation_id, reg.status)}
                   >
-                    <Trash size={16} /> Xóa
+                    <Trash size={14} /> Xóa
                   </button>
                 </td>
               </tr>
@@ -222,8 +238,8 @@ export default function RegulationListPage() {
 
       <div className="add-button">
         <button
-          onClick={() => navigate("/regulations/create")}
           className="btn add"
+          onClick={() => navigate("/regulations/create")}
         >
           + Thêm Quy Định
         </button>

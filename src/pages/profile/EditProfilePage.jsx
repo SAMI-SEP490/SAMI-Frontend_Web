@@ -93,7 +93,6 @@ export default function EditProfilePage() {
   const [message, setMessage] = useState("");
   const [variant, setVariant] = useState("success");
 
-  // Load profile
   useEffect(() => {
     let mounted = true;
 

@@ -1,9 +1,8 @@
 import { http, unwrap } from "../http";
 
-/* ======================================================
-   🏢 BUILDING APIs
-====================================================== */
-
+/* Danh sách building */
+export const getBuildings = () =>
+  http.get("/building").then(unwrap);
 /** 🏢 CREATE - Tạo tòa nhà mới (owner) */
 export async function createBuilding(payload) {
   if (!payload) throw new Error("payload is required");
@@ -86,17 +85,11 @@ export async function assignManager(buildingId, payload) {
 }
 
 /** 🔄 UPDATE - Cập nhật assignment của manager */
-export async function updateManagerAssignment(buildingId, userId, payload) {
-  if (!buildingId) throw new Error("buildingId is required");
-  if (!userId) throw new Error("userId is required");
-  if (!payload) throw new Error("payload is required");
-
-  const { data } = await http.put(
+export const updateManagerAssignment = (buildingId, userId, payload) =>
+  http.put(
     `/building/${buildingId}/managers/${userId}`,
     payload
-  );
-  return unwrap(data);
-}
+  ).then(unwrap);
 
 /** ❌ DELETE - Xóa manager khỏi tòa nhà */
 export async function removeManager(buildingId, userId) {

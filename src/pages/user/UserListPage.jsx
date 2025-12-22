@@ -166,14 +166,14 @@ export default function UserListPage() {
                   >
                     <Eye size={14} /> Xem
                   </button>
-
+{(String(u.role).toLowerCase() === "manager" && 
                   <button
                     className="btn edit"
                     onClick={() => navigate(`/users/${u.id}/edit`)}
                   >
                     <Pencil size={14} /> Sửa
                   </button>
-
+)}
                   {u.status === "inactive" || u.status === "Inactive" ? (
                     <button
                       className="btn publish"

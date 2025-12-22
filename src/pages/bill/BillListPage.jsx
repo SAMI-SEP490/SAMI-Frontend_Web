@@ -1,12 +1,16 @@
-// src/pages/bill/BillListPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, Trash } from "react-bootstrap-icons";
-import { listBills, deleteOrCancelBill } from "../../services/api/bills";
-import { http } from "../../services/http";
+import { Eye, Trash, Pencil, Send } from "react-bootstrap-icons";
+import {
+  listBills,
+  listDraftBills,
+  deleteOrCancelBill,
+  updateDraftBill,
+} from "../../services/api/bills";
+import { http, unwrap as un } from "../../services/http";
 import "./BillListPage.css";
 
-/* ================= Helpers (GIỮ NGUYÊN) ================= */
+/* ================= Helpers ================= */
 function parseDate(d) {
   if (!d) return null;
   const dt = new Date(d);
@@ -51,35 +55,24 @@ const getCreatedAt = (b) =>
   b.created_at || b.createdAt || b.created_date || b.created || b.createdOn;
 
 const getRoomId = (b) => b.room_id ?? b.roomId ?? b.room?.id ?? b.room?.room_id;
+const getRoomLabel = (bill, roomsMap) => {
+  const roomId = getRoomId(bill);
+  if (!roomId) return "—";
+  return roomsMap.get(Number(roomId)) || "Phòng ?";
+};
 
-const getBillId = (b) => b.id ?? b.bill_id ?? b.billId ?? b?.bill?.id;
+const getBillId = (b) => b.id ?? b.bill_id ?? b.billId;
 
-function getRoomLabel(roomsMap, bill) {
-  const id = getRoomId(bill);
-  if (id == null) return "—";
-  return roomsMap.get(Number(id)) || `Phòng ${id}`;
-}
+/* ====== CHỈ 3 TRẠNG THÁI UI ====== */
+function renderStatusBadge(bill) {
+  const status = String(bill?.status || "").toLowerCase();
 
-function getPaidInfo(b) {
-  const status = String(
-    b.status || b.bill_status || b.payment_status || ""
-  ).toLowerCase();
+  if (status === "draft") return <span className="status draft">Nháp</span>;
+  if (status === "paid")
+    return <span className="status paid">Đã thanh toán</span>;
 
-  const flag =
-    Boolean(b.is_paid ?? b.paid ?? b.isPaid) ||
-    ["paid", "completed", "settled"].includes(status);
-
-  const totalPaid = Number(b.total_paid ?? b.amount_paid ?? 0);
-  const totalAmt = Number(b.total_amount ?? b.amount ?? 0);
-
-  const isPaid =
-    flag ||
-    (Number.isFinite(totalPaid) &&
-      Number.isFinite(totalAmt) &&
-      totalAmt > 0 &&
-      totalPaid >= totalAmt);
-
-  return { isPaid, label: isPaid ? "Đã thanh toán" : "Chưa thanh toán" };
+  // issued / overdue / partially_paid
+  return <span className="status unpaid">Chưa thanh toán</span>;
 }
 
 /* ================= Page ================= */
@@ -95,34 +88,67 @@ export default function BillListPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  const [selected, setSelected] = useState(new Set());
-
   /* ================= Fetch ================= */
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
         setLoading(true);
+        setError("");
 
-        const list = await listBills();
-        setBills(Array.isArray(list) ? list : []);
+        const [issuedRes, draftRes] = await Promise.allSettled([
+          listBills(),
+          listDraftBills(),
+        ]);
 
-        const res = await http.get("/room/all", {
-          validateStatus: () => true,
-        });
+        const issued = issuedRes.status === "fulfilled" ? issuedRes.value : [];
+        const drafts = draftRes.status === "fulfilled" ? draftRes.value : [];
+
+        if (issuedRes.status === "rejected" && draftRes.status === "rejected") {
+          throw new Error("Không tải được danh sách hóa đơn.");
+        }
 
         const map = new Map();
-        (res?.data || []).forEach((r) => {
-          const id = Number(r.id ?? r.room_id);
-          const label = r.room_number ?? r.name ?? `Phòng ${id}`;
-          if (Number.isFinite(id)) map.set(id, label);
+        [...drafts, ...issued].forEach((b) => {
+          const id = getBillId(b);
+          if (id != null) map.set(String(id), b);
         });
-        setRoomsMap(map);
-      } catch {
-        setError("Không tải được danh sách hóa đơn.");
+
+        if (!cancelled) setBills([...map.values()]);
+
+        // load rooms (fail cũng không phá list)
+        try {
+          let res = await http.get("/room", { validateStatus: () => true });
+          let data = un(res);
+          let items = Array.isArray(data) ? data : data?.items ?? data?.data;
+
+          if (!items) {
+            res = await http.get("/room/all", { validateStatus: () => true });
+            data = un(res);
+            items = Array.isArray(data) ? data : data?.items ?? data?.data;
+          }
+
+          const roomMap = new Map();
+          (items || []).forEach((r) => {
+            const id = Number(r.id ?? r.room_id);
+            const label = r.room_number ?? r.name ?? `Phòng ${id}`;
+            if (Number.isFinite(id)) roomMap.set(id, label);
+          });
+          if (!cancelled) setRoomsMap(roomMap);
+          // eslint-disable-next-line no-empty
+        } catch {}
+      } catch (e) {
+        if (!cancelled)
+          setError(e?.message || "Không tải được danh sách hóa đơn.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /* ================= Filter ================= */
@@ -140,18 +166,20 @@ export default function BillListPage() {
     });
   }, [bills, roomFilter, fromDate, toDate]);
 
-  const toggleAll = (checked) =>
-    setSelected(checked ? new Set(filteredBills.map(getBillId)) : new Set());
+  async function onPublish(id) {
+    const ok = window.confirm(
+      "Bạn có chắc muốn xuất bản hóa đơn này?\nSau khi xuất bản sẽ không thể chỉnh sửa."
+    );
+    if (!ok) return;
 
-  const toggleOne = (id) =>
-    setSelected((s) => {
-      const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+    await updateDraftBill(id, { status: "issued" });
+    setBills((prev) =>
+      prev.map((b) => (getBillId(b) === id ? { ...b, status: "issued" } : b))
+    );
+  }
 
   async function onDelete(id) {
-    if (!window.confirm("Xóa hóa đơn này?")) return;
+    if (!window.confirm("Xóa hóa đơn nháp này?")) return;
     await deleteOrCancelBill(id);
     setBills((prev) => prev.filter((b) => getBillId(b) !== id));
   }
@@ -162,7 +190,6 @@ export default function BillListPage() {
     <div className="container">
       <h2 className="title">Danh sách hóa đơn</h2>
 
-      {/* FILTER + ACTION */}
       <div className="filter-bar grid">
         <select
           className="status-select"
@@ -191,38 +218,32 @@ export default function BillListPage() {
           onChange={(e) => setToDate(e.target.value)}
         />
 
-        <button className="btn add" onClick={() => navigate("/bills/create")}>
+        <button
+          type="button"
+          className="btn add"
+          onClick={() => navigate("/bills/create")}
+        >
           + Tạo hóa đơn
         </button>
       </div>
 
-      {/* TABLE */}
       <div className="table-wrapper">
         <table>
           <thead>
             <tr>
-              <th className="center">
-                <input
-                  type="checkbox"
-                  checked={
-                    selected.size > 0 && selected.size === filteredBills.length
-                  }
-                  onChange={(e) => toggleAll(e.target.checked)}
-                />
-              </th>
-              <th className="center">#</th>
-              <th className="center">Phòng</th>
+              <th>#</th>
+              <th>Phòng</th>
               <th>Tên hóa đơn</th>
-              <th className="center">Ngày tạo</th>
-              <th className="center">Trạng thái</th>
-              <th className="center action-col">Hành động</th>
+              <th>Ngày tạo</th>
+              <th>Trạng thái</th>
+              <th>Hành động</th>
             </tr>
           </thead>
 
           <tbody>
-            {error && (
+            {error && filteredBills.length === 0 && (
               <tr>
-                <td colSpan={7} className="center">
+                <td colSpan={6} className="center">
                   {error}
                 </td>
               </tr>
@@ -230,48 +251,62 @@ export default function BillListPage() {
 
             {filteredBills.map((b, i) => {
               const id = getBillId(b);
-              const paid = getPaidInfo(b);
+              const status = String(b.status || "").toLowerCase();
 
               return (
                 <tr key={id}>
-                  <td className="center">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(id)}
-                      onChange={() => toggleOne(id)}
-                    />
-                  </td>
                   <td className="center">{i + 1}</td>
-                  <td className="center">{getRoomLabel(roomsMap, b)}</td>
+
+                  {/* ✅ PHÒNG: dùng room_number, không dùng room_id */}
+                  <td className="center">{getRoomLabel(b, roomsMap)}</td>
+
                   <td>
                     {monthLabelFromPeriod(
                       b.billing_period_start,
                       b.billing_period_end
                     )}
                   </td>
-                  <td className="center">
-                    {fmtVN(parseDate(getCreatedAt(b)))}
-                  </td>
-                  <td className="center">
-                    <span
-                      className={`status ${
-                        paid.isPaid ? "published" : "archived"
-                      }`}
-                    >
-                      {paid.label}
-                    </span>
-                  </td>
+
+                  <td>{fmtVN(parseDate(getCreatedAt(b)))}</td>
+
+                  <td>{renderStatusBadge(b)}</td>
+
                   <td className="action-buttons">
                     <button
+                      type="button"
                       className="btn view"
                       onClick={() => navigate(`/bills/${id}`)}
                     >
                       <Eye size={14} /> Xem
                     </button>
 
-                    <button className="btn delete" onClick={() => onDelete(id)}>
-                      <Trash size={14} /> Xóa
-                    </button>
+                    {status === "draft" && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn edit"
+                          onClick={() => navigate(`/bills/${id}/edit`)}
+                        >
+                          <Pencil size={14} /> Sửa
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn publish"
+                          onClick={() => onPublish(id)}
+                        >
+                          <Send size={14} /> Xuất bản
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn delete"
+                          onClick={() => onDelete(id)}
+                        >
+                          <Trash size={14} /> Xóa
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               );
@@ -279,7 +314,7 @@ export default function BillListPage() {
           </tbody>
         </table>
 
-        {filteredBills.length === 0 && (
+        {filteredBills.length === 0 && !error && (
           <p className="no-data">Không có hóa đơn nào.</p>
         )}
       </div>

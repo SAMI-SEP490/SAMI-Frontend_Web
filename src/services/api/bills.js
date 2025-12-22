@@ -135,6 +135,11 @@ function buildBillPayload(form = {}) {
   if (form.total_amount ?? form.totalAmount !== undefined)
     payload.total_amount = toAmount(form.total_amount ?? form.totalAmount ?? 0);
 
+  // ✅ Bill status (draft/issued/paid/overdue/cancelled...)
+  if (form.status !== undefined && form.status !== null) {
+    payload.status = String(form.status);
+  }
+
   return payload;
 }
 
@@ -146,6 +151,7 @@ export async function listBills() {
   const data = un(res);
   return Array.isArray(data) ? data : data?.items ?? [];
 }
+
 export async function listDraftBills() {
   const res = await http.get("/bill/draft", { validateStatus: () => true });
   if (res?.status >= 400)
@@ -153,6 +159,7 @@ export async function listDraftBills() {
   const data = un(res);
   return Array.isArray(data) ? data : data?.items ?? [];
 }
+
 export async function listDeletedBills() {
   const res = await http.get("/bill/deleted", { validateStatus: () => true });
   if (res?.status >= 400)
@@ -160,6 +167,7 @@ export async function listDeletedBills() {
   const data = un(res);
   return Array.isArray(data) ? data : data?.items ?? [];
 }
+
 export async function getBillById(billId) {
   const id = Number(billId);
   const res = await http.get(`/bill/detail/${id}`, {
@@ -173,21 +181,19 @@ export async function getBillById(billId) {
 /* ========== B) CREATE ========== */
 export async function createDraftBill(form = {}) {
   const payload = buildBillPayload(form);
-  // eslint-disable-next-line no-console
   console.debug("[Bill][createDraft] payload =>", payload);
   const res = await http.post("/bill/create/draft", payload, {
     validateStatus: () => true,
   });
   if (res?.status >= 400) {
-    // eslint-disable-next-line no-console
     console.debug("[Bill][createDraft] response error =>", res?.data);
     throw new Error(extractServerError(res));
   }
   return un(res);
 }
+
 export async function createIssuedBill(form = {}) {
   const payload = buildBillPayload(form);
-  // eslint-disable-next-line no-console
   console.debug("[Bill][createIssued] payload =>", payload);
   const res = await http.post("/bill/create/issue", payload, {
     validateStatus: () => true,
@@ -195,7 +201,6 @@ export async function createIssuedBill(form = {}) {
   if (res?.status === 409)
     throw new Error(res?.data?.message || "Phòng đã có hóa đơn cho kỳ này");
   if (res?.status >= 400) {
-    // eslint-disable-next-line no-console
     console.debug("[Bill][createIssued] response error =>", res?.data);
     throw new Error(extractServerError(res));
   }
@@ -212,6 +217,7 @@ export async function updateDraftBill(billId, form = {}) {
   if (res?.status >= 400) throw new Error(extractServerError(res));
   return un(res);
 }
+
 export async function updateIssuedBill(billId, form = {}) {
   const id = Number(billId);
   const payload = buildBillPayload(form);
@@ -231,6 +237,7 @@ export async function deleteOrCancelBill(billId) {
   if (res?.status >= 400) throw new Error(extractServerError(res));
   return un(res);
 }
+
 export async function restoreBill(billId) {
   const id = Number(billId);
   const res = await http.post(`/bill/restore/${id}`, null, {
@@ -252,6 +259,7 @@ export async function getUnbilledRooms(periodStart) {
   const data = un(res);
   return Array.isArray(data) ? data : data?.items ?? [];
 }
+
 export async function precheckDuplicateBill(roomId, periodStart) {
   const rooms = await getUnbilledRooms(periodStart);
   const id = String(roomId);

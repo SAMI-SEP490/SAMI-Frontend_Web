@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-// NOTE: điều chỉnh đường dẫn import bên dưới cho đúng cấu trúc dự án của bạn
-import { createIssuedBill, precheckDuplicateBill } from "@/services/api/bills";
+// ✅ tạo bill luôn là nháp
+import { createDraftBill, precheckDuplicateBill } from "@/services/api/bills";
 import { http, unwrap as un } from "@/services/http";
 
 // ======= Helpers =======
@@ -49,7 +49,7 @@ export default function CreateBillPage() {
     return base + pen;
   }, [baseAmount, penaltyAmount]);
 
-  // ======= Load Rooms (with robust fallback) =======
+  // ======= Load Rooms =======
   useEffect(() => {
     let cancelled = false;
     async function loadRooms() {
@@ -107,7 +107,7 @@ export default function CreateBillPage() {
             res?.data?.message || "Không lấy được thông tin phòng"
           );
         const room = un(res);
-        // Try multiple common keys for tenants collection
+
         let tenants =
           room?.tenants ||
           room?.occupants ||
@@ -115,7 +115,7 @@ export default function CreateBillPage() {
           room?.room_tenants ||
           [];
 
-        // If backend doesn't embed tenants -> fallback to /tenant/all and filter (best-effort)
+        // If backend doesn't embed tenants -> fallback to /tenant/all and filter
         if (!Array.isArray(tenants) || tenants.length === 0) {
           const resTen = await http.get("/tenant/all", {
             validateStatus: () => true,
@@ -195,7 +195,7 @@ export default function CreateBillPage() {
     return errors;
   }
 
-  // ======= Submit =======
+  // ======= Submit (SAVE DRAFT) =======
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
@@ -229,19 +229,24 @@ export default function CreateBillPage() {
         due_date: toISODate(dueDate),
         penalty_amount: toNum(penaltyAmount, 0),
         total_amount: toNum(baseAmount, 0) + toNum(penaltyAmount, 0),
+
+        // ✅ ép draft (kể cả khi BE auto default)
+        status: "draft",
       };
 
-      const created = await createIssuedBill(payload);
-      alert("Tạo hoá đơn thành công.");
+      const created = await createDraftBill(payload);
+      alert("Lưu hoá đơn nháp thành công.");
+
       const id =
         created?.bill_id ??
         created?.id ??
         created?.data?.bill_id ??
         created?.data?.id;
-      if (id) nav(`/admin/billing/${id}`);
-      else nav(-1);
+
+      if (id) nav(`/bills/${id}/edit`);
+      else nav("/bills");
     } catch (e) {
-      setError(e?.message || "Tạo hoá đơn thất bại");
+      setError(e?.message || "Lưu hoá đơn nháp thất bại");
     } finally {
       setSubmitting(false);
     }
@@ -251,7 +256,7 @@ export default function CreateBillPage() {
   return (
     <div className="container py-3">
       <div className="d-flex align-items-center justify-content-between mb-3">
-        <h3 className="m-0">Tạo hoá đơn</h3>
+        <h3 className="m-0">Tạo hoá đơn (Nháp)</h3>
         <div className="d-flex gap-2">
           <button className="btn btn-outline-secondary" onClick={() => nav(-1)}>
             Huỷ
@@ -261,7 +266,7 @@ export default function CreateBillPage() {
             onClick={onSubmit}
             disabled={submitting}
           >
-            {submitting ? "Đang lưu..." : "Lưu"}
+            {submitting ? "Đang lưu..." : "Lưu nháp"}
           </button>
         </div>
       </div>
@@ -302,7 +307,7 @@ export default function CreateBillPage() {
           </select>
         </div>
 
-        {/* TENANT (only after room chosen) */}
+        {/* TENANT */}
         <div className="col-md-4">
           <label className="form-label">
             Người thanh toán <span className="text-danger">*</span>
@@ -429,7 +434,7 @@ export default function CreateBillPage() {
             className="btn btn-primary"
             disabled={submitting}
           >
-            {submitting ? "Đang lưu..." : "Lưu"}
+            {submitting ? "Đang lưu..." : "Lưu nháp"}
           </button>
         </div>
       </form>

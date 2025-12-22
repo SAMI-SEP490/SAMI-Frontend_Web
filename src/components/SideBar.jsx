@@ -14,101 +14,107 @@ const SideBar = () => {
   return (
     <div
       style={{
-        width: "250px",
+        width: "240px",
         height: "100vh",
-        backgroundColor: colors.brand,
         display: "flex",
         flexDirection: "column",
         gap: 6,
-        padding: "16px 12px",
+        padding: "18px 14px",
         color: "#fff",
+
+        /* 👇 glass sidebar */
+        backgroundColor: "rgba(26, 115, 232, 0.85)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+
         position: "sticky",
         top: 0,
         left: 0,
+        boxShadow: "2px 0 14px rgba(0,0,0,0.1)",
       }}
     >
-      {/* <h3 style={{ margin: 0, marginBottom: 8, fontWeight: 800 }}>SAMI</h3> */}
-      <div style={{ marginTop: 6, fontSize: 18, color: "yellow" }}>
-        <b>Thống kê</b>
-      </div>
+      <Section title="Thống kê" />
 
-      <button
+      <MenuButton
+        label="Thống kê tổng hợp tài chính"
+        active={isActive("/dashboard/timebase-report")}
         onClick={() => navigate("/dashboard/timebase-report")}
-        style={buttonStyle}
-      >
-        Thống kê tổng hợp tài chính
-      </button>
+      />
 
-      <button
+      <MenuButton
+        label="Thống kê tổng hợp người thuê"
+        active={isActive("/dashboard/tenant-aggregates")}
         onClick={() => navigate("/dashboard/tenant-aggregates")}
-        style={buttonStyle}
-      >
-        Thống kê tổng hợp người thuê
-      </button>
+      />
 
-      <div style={{ marginTop: 6, fontSize: 18, color: "yellow" }}>
-        <b>Quản lý</b>
-      </div>
+      <Section title="Quản lý" />
 
-      <button onClick={() => navigate("/contracts")} style={buttonStyle}>
-        Danh sách hợp đồng
-      </button>
-
-      <button onClick={() => navigate("/tenants")} style={buttonStyle}>
-        Danh sách người thuê
-      </button>
-      <button onClick={() => navigate("/users")} style={buttonStyle}>
-        Danh sách người dùng
-      </button>
-      <button onClick={() => navigate("/bills")} style={buttonStyle}>
-        Danh sách hóa đơn
-      </button>
-
-      <button onClick={() => navigate("/receive-guest")} style={buttonStyle}>
-        Danh sách đăng ký khách tạm trú
-      </button>
-
-      <button onClick={() => navigate("/notifications")} style={buttonStyle}>
-        Danh sách thông báo
-      </button>
-
-      <button onClick={() => navigate("/regulations")} style={buttonStyle}>
-        Danh sách quy định
-      </button>
-
-      <button
+      <MenuButton
+        label="Danh sách hợp đồng"
+        active={isActive("/contracts")}
+        onClick={() => navigate("/contracts")}
+      />
+      <MenuButton
+        label="Danh sách người thuê"
+        active={isActive("/tenants")}
+        onClick={() => navigate("/tenants")}
+      />
+      <MenuButton
+        label="Danh sách người dùng"
+        active={isActive("/users")}
+        onClick={() => navigate("/users")}
+      />
+      <MenuButton
+        label="Danh sách hóa đơn"
+        active={isActive("/bills")}
+        onClick={() => navigate("/bills")}
+      />
+      <MenuButton
+        label="Khách tạm trú"
+        active={isActive("/receive-guest")}
+        onClick={() => navigate("/receive-guest")}
+      />
+      <MenuButton
+        label="Thông báo"
+        active={isActive("/notifications")}
+        onClick={() => navigate("/notifications")}
+      />
+      <MenuButton
+        label="Quy định"
+        active={isActive("/regulations")}
+        onClick={() => navigate("/regulations")}
+      />
+      <MenuButton
+        label="Bảo trì"
+        active={isActive("/maintaince-requests")}
         onClick={() => navigate("/maintaince-requests")}
-        style={buttonStyle}
-      >
-        Danh sách bảo trì
-      </button>
-
-      <button
+      />
+      <MenuButton
+        label="Đăng ký xe"
+        active={isActive("/vehicle-registrations")}
         onClick={() => navigate("/vehicle-registrations")}
-        style={buttonStyle}
-      >
-        Danh sách đăng ký xe
-      </button>
+      />
 
-      <div style={{ marginTop: 6, fontSize: 18, color: "yellow" }}>
-        <b>Tòa nhà và sơ đồ</b>
-      </div>
+      <Section title="Tòa nhà & Sơ đồ" />
 
-      {/* ✅ Chỉ hiện khi role là OWNER */}
       {role === "OWNER" && (
-        <button onClick={() => navigate("/buildings")} style={buttonStyle}>
-          Danh sách tòa nhà
-        </button>
+        <MenuButton
+          label="Danh sách tòa nhà"
+          active={isActive("/buildings")}
+          onClick={() => navigate("/buildings")}
+        />
       )}
 
-      <button onClick={() => navigate("/rooms")} style={buttonStyle}>
-        Danh sách phòng
-      </button>
-
-      {/* ===== Floor plan (mới) ===== */}
-      <button onClick={() => navigate("/floorplan/view")} style={buttonStyle}>
-        Xem sơ đồ tầng
-      </button>
+      <MenuButton
+        label="Danh sách phòng"
+        active={isActive("/rooms")}
+        onClick={() => navigate("/rooms")}
+      />
+      <MenuButton
+        label="Sơ đồ tầng"
+        active={isActive("/floorplan/view")}
+        onClick={() => navigate("/floorplan/view")}
+      />
     </div>
   );
 };

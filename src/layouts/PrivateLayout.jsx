@@ -22,7 +22,6 @@ export default function PrivateLayout() {
       {!hideLayout && (
         <div
           style={{
-            marginBottom: 10,
             position: "sticky",
             top: 0,
             zIndex: 1000,
@@ -57,9 +56,14 @@ export default function PrivateLayout() {
           style={{
             flex: 1,
             padding: "30px",
-            backgroundColor: colors.background,
             overflowY: "auto",
-            transition: "margin-left 0.3s",
+            position: "relative",
+
+            /* Background image */
+            backgroundImage: "url('/background.png')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
           }}
         >
           <Outlet />

@@ -1,11 +1,15 @@
 import React from "react";
 import { colors } from "../constants/colors";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const SideBar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const user = JSON.parse(localStorage.getItem("sami:user"));
   const role = user?.role;
+
+  const isActive = (path) => location.pathname.startsWith(path);
 
   return (
       <div
@@ -110,13 +114,46 @@ const SideBar = () => {
   );
 };
 
-const buttonStyle = {
-  margin: "6px 0",
-  background: "none",
-  border: "none",
-  color: "#fff",
-  cursor: "pointer",
-  textAlign: "left",
-};
+const Section = ({ title }) => (
+  <div
+    style={{
+      marginTop: 12,
+      marginBottom: 4,
+      fontSize: 14,
+      fontWeight: 700,
+      letterSpacing: 0.5,
+      color: "#FFE082",
+      textTransform: "uppercase",
+    }}
+  >
+    {title}
+  </div>
+);
+
+const MenuButton = ({ label, onClick, active }) => (
+  <button
+    onClick={onClick}
+    style={{
+      padding: "10px 12px",
+      backgroundColor: active ? "rgba(255,255,255,0.2)" : "transparent",
+      border: "none",
+      borderRadius: 8,
+      color: "#fff",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: active ? 600 : 400,
+      transition: "all 0.2s ease",
+    }}
+    onMouseEnter={(e) => {
+      if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+    }}
+    onMouseLeave={(e) => {
+      if (!active) e.currentTarget.style.background = "transparent";
+    }}
+  >
+    {label}
+  </button>
+);
 
 export default SideBar;

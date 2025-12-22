@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { colors } from "../constants/colors";
-import { Badge } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { getProfile, logout as apiLogout } from "../services/api/auth";
 
 export default function Header({ onToggleSidebar, isSidebarOpen }) {
-  // cache tạm để không trắng tên
   const [user, setUser] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("sami:user") || "null");
@@ -24,9 +22,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
         const u = data?.data || data;
         if (alive) setUser(u);
         localStorage.setItem("sami:user", JSON.stringify(u));
-      } catch {
-        // không chặn render
-      }
+      } catch {}
     })();
     return () => {
       alive = false;
@@ -38,8 +34,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
   const handleLogout = async () => {
     try {
       await apiLogout();
-    } catch (err) {
-      console.warn("Logout API failed:", err);
+    } catch {
     } finally {
       [
         "sami:access",
@@ -57,63 +52,76 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
       style={{
         backgroundColor: colors.brand,
         color: "#fff",
+        height: "80px", // ⬆️ cao hơn
         display: "flex",
-        justifyContent: "space-between",
         alignItems: "center",
         padding: "0 20px",
-        height: "50px",
         position: "sticky",
         top: 0,
         zIndex: 1000,
       }}
     >
-      {/* Nút mở/đóng Sidebar */}
-      <button
-        onClick={onToggleSidebar}
-        style={{
-          background: "none",
-          border: "none",
-          color: "#fff",
-          fontSize: 24,
-          cursor: "pointer",
-          marginRight: 10,
-        }}
-        title={isSidebarOpen ? "Đóng Sidebar" : "Mở Sidebar"}
-      >
-        {isSidebarOpen ? "☰" : "☰"} {/* Bạn có thể đổi icon khác */}
-      </button>
-
-      <strong style={{ fontSize: "16px" }}>SAMI</strong>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-        <span style={{ fontSize: 14 }}>Xin chào {displayName}!</span>
-
-        {/* <div
-          style={{ position: "relative", cursor: "pointer" }}
-          title="Thông báo"
+      {/* LEFT – Toggle sidebar */}
+      <div style={{ flex: 1 }}>
+        <button
+          onClick={onToggleSidebar}
+          title={isSidebarOpen ? "Đóng Sidebar" : "Mở Sidebar"}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#fff",
+            fontSize: 22,
+            cursor: "pointer",
+          }}
         >
-          <span style={{ fontSize: 18 }}>🔔</span>
-          <Badge
-            bg="danger"
-            pill
-            style={{ position: "absolute", top: -5, right: -8, fontSize: 10 }}
-          >
-            1
-          </Badge>
-        </div> */}
+          ☰
+        </button>
+      </div>
+
+      {/* CENTER – Logo */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <img
+          src="/logo2.png"
+          alt="Logo"
+          style={{
+            height: "80px",
+            objectFit: "contain",
+          }}
+        />
+      </div>
+
+      {/* RIGHT – User actions */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 18,
+          fontSize: 14,
+        }}
+      >
+        <span>Xin chào {displayName}!</span>
 
         <span
           onClick={() => navigate("/profile")}
-          style={{ cursor: "pointer", fontSize: 18 }}
           title="Hồ sơ"
+          style={{ cursor: "pointer", fontSize: 18 }}
         >
           👤
         </span>
 
         <span
           onClick={handleLogout}
-          style={{ cursor: "pointer", fontSize: 18 }}
           title="Đăng xuất"
+          style={{ cursor: "pointer", fontSize: 18 }}
         >
           ↩️
         </span>

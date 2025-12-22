@@ -117,6 +117,7 @@ if (u?.status == "Deleted") return "Đã xóa";
             alert("Kích hoạt người dùng thất bại");
         }
     };
+    
     return (
         <div className="contracts-container">
             <style>{`
@@ -192,7 +193,8 @@ if (u?.status == "Deleted") return "Đã xóa";
                                 <td>{statusLabel(u)}</td>
                                 <td>
                                     <button type="button" className="btn-link" onClick={() => navigate(`/users/${u.id}`)}>Xem</button>
-                                    <button type="button"className="btn-link" onClick={() => navigate(`/users/${u.id}/edit`)}>Sửa</button>
+                                    
+                                     {String(u.role).toLowerCase() === "manager" && (<button type="button"className="btn-link" onClick={() => navigate(`/users/${u.id}/edit`)}>Sửa</button>)}
                                     {u.status === "Inactive" ? (
                                         <button type="button" className="btn-link" onClick={() => handleActivate(u.id)}>Kích hoạt</button>
                                     ) : (

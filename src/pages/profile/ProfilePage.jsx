@@ -1,72 +1,87 @@
 import React, { useEffect, useState } from "react";
-import { colors } from "../../constants/colors";
-import { Button } from "react-bootstrap";
+import { Button, Spinner } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
+import { colors } from "../../constants/colors";
 import { getProfile } from "../../services/api/auth";
+
+/* ================== Helpers ================== */
 
 // Format DD/MM/YYYY (không kèm giờ)
 function formatDateOnly(v) {
   if (!v) return "—";
+
   const s = String(v);
   const base = s.includes("T") ? s.split("T")[0] : s;
   const d = new Date(s);
+
   if (!Number.isNaN(d.getTime())) {
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const yyyy = d.getFullYear();
     return `${dd}/${mm}/${yyyy}`;
   }
+
   if (/^\d{4}-\d{2}-\d{2}$/.test(base)) {
     const [yyyy, mm, dd] = base.split("-");
     return `${dd}/${mm}/${yyyy}`;
   }
+
   return s;
 }
 
-// === VIETNAMIZE helpers ===
+// Vietnamize
 const GENDER_VI = { male: "Nam", female: "Nữ", other: "Khác" };
-function viGender(g) {
-  if (!g) return "—";
-  const key = String(g).toLowerCase();
-  return GENDER_VI[key] || g;
-}
-
 const ROLE_VI = { owner: "Chủ trọ", manager: "Quản lý", tenant: "Người thuê" };
-function viRole(r) {
-  if (!r) return "—";
-  const key = String(r).toLowerCase();
-  return ROLE_VI[key] || r;
-}
+
+const viGender = (g) => (g ? GENDER_VI[String(g).toLowerCase()] || g : "—");
+
+const viRole = (r) => (r ? ROLE_VI[String(r).toLowerCase()] || r : "—");
+
+/* ================== Component ================== */
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await getProfile(); // /auth/profile
+        const data = await getProfile(); // GET /auth/profile
         setProfile(data);
       } catch (e) {
-        setErr(e?.response?.data?.message || "Không tải được hồ sơ");
+        setError(e?.response?.data?.message || "Không tải được hồ sơ");
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  if (loading) return <div className="p-3">Đang tải...</div>;
-  if (!profile || err)
+  if (loading) {
     return (
-      <div className="p-3">
-        <p>Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.</p>
+      <div className="p-4 text-center">
+        <Spinner animation="border" />
       </div>
     );
+  }
+
+  if (!profile || error) {
+    return (
+      <div className="p-4 text-center text-danger">
+        Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.
+      </div>
+    );
+  }
 
   const { avatar_url, full_name, birthday, gender, role, email, phone } =
     profile;
+
+  const avatarSrc =
+    avatar_url ||
+    `https://ui-avatars.com/api/?background=0D8ABC&color=fff&size=256&name=${encodeURIComponent(
+      full_name || "User"
+    )}`;
 
   return (
     <div
@@ -89,18 +104,26 @@ export default function ProfilePage() {
           border: "1px solid #E5E7EB",
           marginBottom: 30,
           overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
         }}
+        title="Chỉnh sửa hồ sơ"
+        onClick={() => navigate("/edit-profile")}
       >
-        {avatar_url ? (
-          <img
-            src={avatar_url}
-            alt="Avatar"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : null}
+        <img
+          src={avatarSrc}
+          alt="Avatar"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
       </div>
 
-      {/* Card: Thông tin cơ bản */}
+      {/* Thông tin cơ bản */}
       <div
         style={{
           width: "60%",
@@ -116,7 +139,7 @@ export default function ProfilePage() {
             backgroundColor: colors.brand,
             color: "#fff",
             padding: "10px 20px",
-            fontWeight: "bold",
+            fontWeight: 600,
           }}
         >
           Thông tin cơ bản
@@ -137,7 +160,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Card: Thông tin liên hệ */}
+      {/* Thông tin liên hệ */}
       <div
         style={{
           width: "60%",
@@ -153,7 +176,7 @@ export default function ProfilePage() {
             backgroundColor: colors.brand,
             color: "#fff",
             padding: "10px 20px",
-            fontWeight: "bold",
+            fontWeight: 600,
           }}
         >
           Thông tin liên hệ
@@ -174,24 +197,20 @@ export default function ProfilePage() {
           display: "flex",
           justifyContent: "center",
           gap: 20,
-          marginBottom: 30,
         }}
       >
         <Button
-          type="button"
-          onClick={() => navigate("/change-password")}
           variant="outline-primary"
+          onClick={() => navigate("/change-password")}
         >
           Thay đổi mật khẩu
         </Button>
-        <Button
-          type="button"
-          onClick={() => navigate("/edit-profile")}
-          variant="primary"
-        >
+
+        <Button variant="primary" onClick={() => navigate("/edit-profile")}>
           Sửa
         </Button>
-        <Button onClick={() => navigate(-1)} variant="outline-secondary">
+
+        <Button variant="outline-secondary" onClick={() => navigate(-1)}>
           Quay lại
         </Button>
       </div>

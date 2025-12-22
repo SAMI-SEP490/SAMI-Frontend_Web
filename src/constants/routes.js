@@ -66,4 +66,10 @@ export const ROUTES = {
 
   //vehicle registrations
   vehicleRegistrations: "/vehicle-registrations",
+
+  // Rooms
+    rooms: "/rooms",
+    roomDetail: "/rooms/:id",
+    roomEdit: "/rooms/:id/edit",
+    roomCreate: "/rooms/create",
 };

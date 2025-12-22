@@ -67,9 +67,7 @@ const SideBar = () => {
         <button onClick={() => navigate("/notifications")} style={buttonStyle}>
           Danh sách thông báo
         </button>
-        <button onClick={() => navigate("/rooms")} style={buttonStyle}>
-          Danh sách phòng
-        </button>
+
         <button onClick={() => navigate("/regulations")} style={buttonStyle}>
           Danh sách quy định
         </button>

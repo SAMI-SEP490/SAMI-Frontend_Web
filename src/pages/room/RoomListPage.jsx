@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Table, Form, Button, Modal, Spinner } from "react-bootstrap";
 import {
   listRooms,
@@ -10,23 +10,23 @@ import {
 import { getAccessToken } from "../../services/http";
 import "./RoomListPage.css";
 
-export default function RoomListPage() {
+function RoomListPage() {
   const [rooms, setRooms] = useState([]);
   const [userRole, setUserRole] = useState("");
-
-  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [loadingIds, setLoadingIds] = useState([]);
 
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
+
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editRoom, setEditRoom] = useState(null);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-  /* ===================== INIT ===================== */
+  // ===== EXTRACT ROLE FROM JWT =====
   useEffect(() => {
     try {
       const token = getAccessToken();
@@ -34,83 +34,110 @@ export default function RoomListPage() {
         const decoded = JSON.parse(atob(token.split(".")[1]));
         const role = decoded.role || decoded.userRole || "";
         setUserRole(role.toUpperCase());
+        console.log("🔑 User Role from JWT:", role.toUpperCase());
       }
-    } catch (err) {
-      console.error("❌ Parse JWT error:", err);
+    } catch (error) {
+      console.error("❌ Error parsing JWT:", error);
     }
   }, []);
 
+  // ===== LOAD DATA =====
   useEffect(() => {
-    loadRooms();
+    async function fetchData() {
+      try {
+        const data = await listRooms();
+        setRooms(Array.isArray(data) ? data : data?.items ?? []);
+      } catch (error) {
+        alert("❌ Lỗi khi tải dữ liệu phòng!");
+        console.error(error);
+      }
+    }
+    fetchData();
   }, []);
 
-  const loadRooms = async () => {
-    try {
-      const data = await listRooms();
-      setRooms(Array.isArray(data) ? data : data?.items ?? []);
-    } catch (err) {
-      alert("❌ Lỗi khi tải danh sách phòng");
-      console.error(err);
-    }
-  };
-
-  /* ===================== UTILS ===================== */
-  const getStatusLabel = (status) =>
-    ({
+  // ===== UTILS =====
+  const getStatusLabel = (status) => {
+    const statusMap = {
       available: "Sẵn sàng",
       occupied: "Đã cho thuê",
       maintenance: "Bảo trì",
       inactive: "Không hoạt động",
-    }[status] || status);
-
-  const renderStatus = (status) => {
-    const map = {
-      available: "active",
-      occupied: "occupied",
-      maintenance: "maintenance",
-      inactive: "inactive",
     };
-    return (
-      <span className={`status ${map[status] || ""}`}>
-        {getStatusLabel(status)}
-      </span>
-    );
+    return statusMap[status] || status;
   };
 
-  /* ===================== HANDLERS ===================== */
-  const handleToggleActive = async (room) => {
-    const id = room.room_id;
-    try {
-      setLoadingIds((p) => [...p, id]);
-      room.is_active ? await deactivateRoom(id) : await activateRoom(id);
-      setRooms((prev) =>
-        prev.map((r) =>
-          r.room_id === id ? { ...r, is_active: !r.is_active } : r
-        )
-      );
-    } catch (err) {
-      alert("❌ Lỗi thay đổi trạng thái");
-    } finally {
-      setLoadingIds((p) => p.filter((x) => x !== id));
+  const renderStatus = (status) => {
+    switch (status) {
+      case "available":
+        return <span className="status active">✓ {getStatusLabel(status)}</span>;
+      case "occupied":
+        return <span className="status occupied">👤 {getStatusLabel(status)}</span>;
+      case "maintenance":
+        return <span className="status maintenance">⚙ {getStatusLabel(status)}</span>;
+      case "inactive":
+        return <span className="status inactive">✗ {getStatusLabel(status)}</span>;
+      default:
+        return <span className="status">Không xác định</span>;
     }
   };
 
+  // ===== HANDLERS =====
+  const handleViewDetails = async (room) => {
+    setSelectedRoom(room);
+    setShowDetailModal(true);
+  };
+
+
   const handleSaveEdit = async () => {
-    if (!editRoom?.room_id) return;
-    const id = editRoom.room_id;
+    if (!editRoom?.room_id) {
+      alert("ID phòng không hợp lệ!");
+      return;
+    }
+
     try {
-      setLoadingIds((p) => [...p, id]);
-      await updateRoom(id, {
+      const roomId = editRoom.room_id;
+      setLoadingIds((p) => [...p, roomId]);
+
+      const updatedData = {
         room_number: editRoom.room_number,
         floor: editRoom.floor,
         size: editRoom.size,
-      });
-      setRooms((prev) => prev.map((r) => (r.room_id === id ? editRoom : r)));
+      };
+
+      await updateRoom(roomId, updatedData);
+      setRooms((prev) =>
+          prev.map((r) => (r.room_id === roomId ? editRoom : r))
+      );
       setShowEditModal(false);
-    } catch (err) {
-      alert("❌ Lỗi cập nhật phòng");
+    } catch (error) {
+      alert("❌ Lỗi khi cập nhật phòng!");
+      console.error(error);
     } finally {
-      setLoadingIds((p) => p.filter((x) => x !== id));
+      setLoadingIds((p) => p.filter((i) => i !== editRoom.room_id));
+    }
+  };
+
+  const handleToggleStatus = async (room) => {
+    const roomId = room.room_id;
+    try {
+      setLoadingIds((p) => [...p, roomId]);
+
+      if (room.is_active) {
+        await deactivateRoom(roomId);
+      } else {
+        await activateRoom(roomId);
+      }
+
+      setRooms((prev) =>
+          prev.map((r) =>
+              r.room_id === roomId ? { ...r, is_active: !r.is_active } : r
+          )
+      );
+    } catch (error) {
+      alert("❌ Lỗi khi thay đổi trạng thái phòng!");
+      console.error(error);
+    } finally {
+      setLoadingIds((p) => p.filter((i) => i !== roomId));
     }
   };
 
@@ -120,148 +147,250 @@ export default function RoomListPage() {
       await hardDeleteRoom(deleteId);
       setRooms((prev) => prev.filter((r) => r.room_id !== deleteId));
       setShowDeleteModal(false);
-    } catch (err) {
-      alert("❌ Lỗi xóa phòng");
+    } catch (error) {
+      alert("❌ Lỗi khi xóa phòng!");
+      console.error(error);
     } finally {
-      setLoadingIds((p) => p.filter((x) => x !== deleteId));
+      setLoadingIds((p) => p.filter((i) => i !== deleteId));
     }
   };
 
-  /* ===================== FILTER ===================== */
-  const filteredRooms = rooms.filter((r) => {
-    const matchStatus = statusFilter ? r.status === statusFilter : true;
-    const matchSearch = String(r.room_number || "")
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    return matchStatus && matchSearch;
+  // ===== FILTER =====
+  const filteredRooms = rooms.filter((room) => {
+    const matchesStatus = statusFilter ? room.status === statusFilter : true;
+    const term = searchTerm.toLowerCase();
+    const roomNumber = String(room.room_number || "").toLowerCase();
+
+    return matchesStatus && roomNumber.includes(term);
   });
 
-  /* ===================== RENDER ===================== */
   return (
-    <div className="container">
-      <h2 className="title">📋 Quản lý Phòng</h2>
+      <div className="container">
+        <h2 className="title">📋 Quản lý Phòng</h2>
 
-      {/* FILTER */}
-      <div className="filter-bar">
-        <input
-          className="search-input"
-          placeholder="🔎 Tìm theo số phòng..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        {/* FILTER */}
+        <div className="filter-bar">
+          <input
+              className="search-input"
+              placeholder="🔎 Tìm theo số phòng..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+          />
 
-        <select
-          className="status-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="available">Sẵn sàng</option>
-          <option value="occupied">Đã cho thuê</option>
-          <option value="maintenance">Bảo trì</option>
-          <option value="inactive">Không hoạt động</option>
-        </select>
-      </div>
+          <select
+              className="status-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="available">Sẵn sàng</option>
+            <option value="occupied">Đã cho thuê</option>
+            <option value="maintenance">Bảo trì</option>
+            <option value="inactive">Không hoạt động</option>
+          </select>
+        </div>
 
-      {/* TABLE */}
-      <div className="table-wrapper">
-        <Table hover responsive>
-          <thead>
+        {/* TABLE */}
+        <div className="table-wrapper">
+          <Table bordered hover responsive>
+            <thead>
             <tr>
               <th>#</th>
               <th>Tòa nhà</th>
               <th>Số phòng</th>
               <th>Tầng</th>
-              <th>Diện tích</th>
+              <th>Diện tích (m²)</th>
               <th>Trạng thái</th>
               <th>Người ở</th>
               <th>Hợp đồng</th>
               <th>Hành động</th>
             </tr>
-          </thead>
-          <tbody>
+            </thead>
+
+            <tbody>
             {filteredRooms.length === 0 && (
-              <tr>
-                <td colSpan={9} className="no-data">
-                  Không có phòng phù hợp
-                </td>
-              </tr>
-            )}
-
-            {filteredRooms.map((room, idx) => {
-              const loading = loadingIds.includes(room.room_id);
-              return (
-                <tr key={room.room_id}>
-                  <td>{idx + 1}</td>
-                  <td>{room.building_name || "N/A"}</td>
-                  <td>
-                    <strong>{room.room_number}</strong>
-                  </td>
-                  <td>{room.floor}</td>
-                  <td>{room.size}</td>
-                  <td>{renderStatus(room.status)}</td>
-                  <td>{room.tenant_count || 0}</td>
-                  <td>{room.active_contracts || 0}</td>
-                  <td className="action-buttons">
-                    <Button
-                      size="sm"
-                      className="btn view"
-                      onClick={() => {
-                        setSelectedRoom(room);
-                        setShowDetailModal(true);
-                      }}
-                    >
-                      👁 Xem
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      className="btn edit"
-                      onClick={() => {
-                        setEditRoom({ ...room });
-                        setShowEditModal(true);
-                      }}
-                    >
-                      ✏️ Sửa
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      className={`btn ${room.is_active ? "delete" : "publish"}`}
-                      disabled={loading}
-                      onClick={() => handleToggleActive(room)}
-                    >
-                      {loading ? (
-                        <Spinner size="sm" />
-                      ) : room.is_active ? (
-                        "⊘ Tắt"
-                      ) : (
-                        "✓ Bật"
-                      )}
-                    </Button>
-
-                    {userRole === "OWNER" && (
-                      <Button
-                        size="sm"
-                        className="btn danger"
-                        onClick={() => {
-                          setDeleteId(room.room_id);
-                          setShowDeleteModal(true);
-                        }}
-                      >
-                        🗑️ Xóa
-                      </Button>
-                    )}
+                <tr>
+                  <td colSpan={9} className="no-data">
+                    Không có phòng phù hợp
                   </td>
                 </tr>
+            )}
+
+            {filteredRooms.map((room, index) => {
+              const roomId = room.room_id;
+              const loading = loadingIds.includes(roomId);
+
+              return (
+                  <tr key={roomId}>
+                    <td>{index + 1}</td>
+                    <td>{room.building_name || "N/A"}</td>
+                    <td><strong>{room.room_number || "N/A"}</strong></td>
+                    <td>{room.floor || "N/A"}</td>
+                    <td>{room.size || "N/A"}</td>
+                    <td>{renderStatus(room.status)}</td>
+                    <td>{room.tenant_count || 0}</td>
+                    <td>{room.active_contracts || 0}</td>
+
+                    <td className="action-buttons">
+                      <Button
+                          size="sm"
+                          className="btn view"
+                          disabled={loading}
+                          onClick={() => handleViewDetails(room)}
+                      >
+                        👁 Xem
+                      </Button>
+
+
+
+                      <Button
+                          size="sm"
+                          className={room.is_active ? "btn delete" : "btn publish"}
+                          disabled={loading}
+                          onClick={() => handleToggleStatus(room)}
+                      >
+                        {loading ? (
+                            <Spinner size="sm" animation="border" />
+                        ) : room.is_active ? (
+                            "⊘ Tắt"
+                        ) : (
+                            "✓ Bật"
+                        )}
+                      </Button>
+
+                      {userRole === "OWNER" && (
+                          <Button
+                              size="sm"
+                              className="btn danger"
+                              disabled={loading}
+                              onClick={() => {
+                                setDeleteId(roomId);
+                                setShowDeleteModal(true);
+                              }}
+                          >
+                            🗑️ Xóa
+                          </Button>
+                      )}
+                    </td>
+                  </tr>
               );
             })}
-          </tbody>
-        </Table>
-      </div>
+            </tbody>
+          </Table>
+        </div>
 
-      {/* ===== MODALS (giữ nguyên logic, chỉ gọn lại) ===== */}
-      {/* Chi tiết / Sửa / Xóa giữ nguyên như file cũ */}
-    </div>
+        {/* MODAL VIEW DETAILS */}
+        <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} size="lg">
+          <Modal.Header closeButton>
+            <Modal.Title>📌 Chi tiết phòng {selectedRoom?.room_number}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {selectedRoom && (
+                <div className="detail-content">
+                  <p><strong>Tòa nhà:</strong> {selectedRoom.building_name || "N/A"}</p>
+                  <p><strong>Số phòng:</strong> {selectedRoom.room_number}</p>
+                  <p><strong>Tầng:</strong> {selectedRoom.floor || "N/A"}</p>
+                  <p><strong>Diện tích:</strong> {selectedRoom.size || "N/A"} m²</p>
+                  <p><strong>Trạng thái:</strong> {getStatusLabel(selectedRoom.status)}</p>
+                  <p><strong>Trạng thái hoạt động:</strong> {selectedRoom.is_active ? "Hoạt động" : "Không hoạt động"}</p>
+                  <p><strong>Số người ở:</strong> {selectedRoom.tenant_count || 0}</p>
+                  <p><strong>Bảo trì đang chờ:</strong> {selectedRoom.pending_maintenance || 0}</p>
+                  {selectedRoom.primary_tenant && (
+                      <>
+                        <p><strong>Người ở chính:</strong> {selectedRoom.primary_tenant.full_name}</p>
+                        <p><strong>Điện thoại:</strong> {selectedRoom.primary_tenant.phone || "N/A"}</p>
+                      </>
+                  )}
+                  <p><strong>Ngày tạo:</strong> {selectedRoom.created_at ? new Date(selectedRoom.created_at).toLocaleDateString("vi-VN") : "N/A"}</p>
+                </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowDetailModal(false)}>
+              Đóng
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* MODAL EDIT */}
+        <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="lg">
+          <Modal.Header closeButton>
+            <Modal.Title>✏️ Chỉnh sửa phòng</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {editRoom && (
+                <Form>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Tòa nhà</Form.Label>
+                    <Form.Control type="text" value={editRoom.building_name || ""} disabled />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Số phòng</Form.Label>
+                    <Form.Control
+                        type="text"
+                        value={editRoom.room_number || ""}
+                        onChange={(e) =>
+                            setEditRoom({ ...editRoom, room_number: e.target.value })
+                        }
+                    />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Tầng</Form.Label>
+                    <Form.Control
+                        type="number"
+                        value={editRoom.floor || ""}
+                        onChange={(e) =>
+                            setEditRoom({ ...editRoom, floor: parseInt(e.target.value) })
+                        }
+                    />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Diện tích (m²)</Form.Label>
+                    <Form.Control
+                        type="number"
+                        step="0.01"
+                        value={editRoom.size || ""}
+                        onChange={(e) =>
+                            setEditRoom({ ...editRoom, size: parseFloat(e.target.value) })
+                        }
+                    />
+                  </Form.Group>
+                </Form>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowEditModal(false)}>
+              Hủy
+            </Button>
+            <Button variant="primary" onClick={handleSaveEdit}>
+              Lưu thay đổi
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* MODAL DELETE CONFIRM */}
+        <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+          <Modal.Header closeButton>
+            <Modal.Title>⚠️ Xác nhận xóa</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            Bạn có chắc chắn muốn xóa vĩnh viễn phòng này không? <br />
+            <strong>Hành động này không thể hoàn tác!</strong>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+              Hủy
+            </Button>
+            <Button variant="danger" onClick={handleDeleteRoom}>
+              Xóa
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      </div>
   );
 }
+
+export default RoomListPage;

@@ -58,7 +58,7 @@ export default function TenantListPage() {
           ? data.items
           : [];
         setTenants(items.map(normalizeTenant));
-      } catch (e) {
+      } catch {
         setError("Không tải được danh sách người thuê.");
       } finally {
         setLoading(false);

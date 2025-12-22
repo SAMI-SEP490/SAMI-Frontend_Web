@@ -57,6 +57,7 @@ function LoginPage() {
         return;
       }
       navigate(ROUTES.viewTimebaseReport, { replace: true });
+    // eslint-disable-next-line no-empty
     } catch {}
   }, [navigate]);
 
@@ -82,6 +83,7 @@ function LoginPage() {
       if (extractRole(rawUser).includes("tenant")) {
         try {
           await apiLogout();
+        // eslint-disable-next-line no-empty
         } catch {}
         setError(
           "Tài khoản Tenant không được phép đăng nhập web. Vui lòng sử dụng Tenant App."

@@ -175,3 +175,26 @@ export async function getAllTenants() {
   const data = res?.data?.data ?? res?.data ?? res;
   return Array.isArray(data) ? data : data?.items ?? [];
 }
+export async function deleteTenantByUserId(userId) {
+  if (!userId) {
+    throw new Error("Thiếu ID người thuê.");
+  }
+
+  // Gọi API soft delete user
+  const res = await http.delete(`/user/delete/${userId}`, {
+    validateStatus: () => true,
+  });
+
+  if (!res) {
+    throw new Error("Không kết nối được tới máy chủ.");
+  }
+
+  if (res.status >= 400) {
+    const d = res.data;
+    const msg =
+      d?.message || d?.error || "Không thể xóa người thuê. Vui lòng thử lại.";
+    throw new Error(msg);
+  }
+
+  return un(res); // dùng helper un đã có ở đầu file
+}

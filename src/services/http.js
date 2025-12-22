@@ -12,11 +12,10 @@ export const http = axios.create({
 });
 
 // ---- helpers lấy/lưu token, hỗ trợ nhiều key cũ của bạn
-const getAccessToken = () =>
-  localStorage.getItem("accessToken") ||
-  localStorage.getItem("samiaccess") ||
-  localStorage.getItem("sami:access");
-
+export const getAccessToken = () =>
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("samiaccess") ||
+    localStorage.getItem("sami:access");
 const getRefreshToken = () =>
   localStorage.getItem("refreshToken") ||
   localStorage.getItem("samirefresh") ||

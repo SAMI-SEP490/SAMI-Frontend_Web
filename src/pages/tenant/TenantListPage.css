@@ -1,0 +1,11 @@
+@import "../regulation/RegulationListPage.css";
+
+/* bổ sung riêng cho tenant */
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+}

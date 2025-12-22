@@ -391,7 +391,12 @@ function FloorplanEditor() {
   const [selectedId, setSelectedId] = useState(null);
 
   const nodeTypes = useMemo(
-    () => ({ building: BuildingNode, block: BlockNode, small: SmallNode }),
+    () => ({
+      building: BuildingNode,
+      block: BlockNode,
+      small: SmallNode,
+      roomNode: BlockNode,
+    }),
     []
   );
 
@@ -491,11 +496,25 @@ function FloorplanEditor() {
               ...n.data,
               onChangeLabel: (txt) =>
                 setNodes((curr) =>
-                  curr.map((m) =>
-                    m.id === n.id
-                      ? { ...m, data: { ...m.data, label: txt } }
-                      : m
-                  )
+                  curr.map((m) => {
+                    if (m.id !== n.id) return m;
+
+                    // 🔥 NẾU LÀ PHÒNG → label chính là room_number
+                    if (m.type === "block" && m.data?.icon === "room") {
+                      return {
+                        ...m,
+                        data: {
+                          ...m.data,
+                          label: txt,
+                          room_number: txt,
+                        },
+                      };
+                    }
+                    return {
+                      ...m,
+                      data: { ...m.data, label: txt },
+                    };
+                  })
                 ),
             },
           };
@@ -602,6 +621,7 @@ function FloorplanEditor() {
           position: pos,
           style: { zIndex: 1 },
           data: {
+            room_number: "",
             label: "Phòng",
             w: 4 * pxPerMeter,
             h: 3 * pxPerMeter,
@@ -725,6 +745,11 @@ function FloorplanEditor() {
   );
 
   const selectedNode = nodes.find((n) => n.id === selectedId);
+  const isRoomSelected = !!(
+    selectedNode &&
+    selectedNode.type === "block" &&
+    selectedNode.data?.icon === "room"
+  );
   let lengthM = null;
   let widthM = null;
 
@@ -762,6 +787,27 @@ function FloorplanEditor() {
     }
   };
 
+  const validateRoomNodesBeforeSave = (nodesList) => {
+    const roomNodes = (nodesList || []).filter(
+      (n) => n?.type === "block" && n?.data?.icon === "room"
+    );
+
+    if (roomNodes.length === 0) return null;
+
+    const seen = new Set();
+    for (const n of roomNodes) {
+      const roomNo = String(n?.data?.room_number || "").trim();
+      if (!roomNo) {
+        return "Vui lòng nhập số phòng cho tất cả các phòng trước khi lưu!";
+      }
+      if (seen.has(roomNo)) {
+        return `Số phòng "${roomNo}" đang bị trùng trên canvas. Vui lòng đổi lại trước khi lưu!`;
+      }
+      seen.add(roomNo);
+    }
+    return null;
+  };
+
   const handleSaveToAPI = async () => {
     try {
       if (!activeBuilding) {
@@ -785,6 +831,12 @@ function FloorplanEditor() {
         return;
       }
 
+      const roomErr = validateRoomNodesBeforeSave(nodes);
+      if (roomErr) {
+        alert(roomErr);
+        return;
+      }
+
       const buildingName = activeBuildingObj?.name || `#${String(buildingId)}`;
 
       const payload = {
@@ -799,10 +851,28 @@ function FloorplanEditor() {
       };
 
       await createFloorPlan(payload);
-      alert("Đã lưu layout lên backend!");
+      alert("Đã lưu layout lên hệ thống!");
     } catch (err) {
       console.error(err);
-      alert(err?.message || "Lỗi khi lưu layout, kiểm tra console!");
+
+      const rawMessage =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Đã xảy ra lỗi khi lưu sơ đồ tầng.";
+
+      let displayMessage = rawMessage;
+
+      if (
+        rawMessage.includes("Floor plan already exists") ||
+        rawMessage.includes("already exists for building")
+      ) {
+        const match = rawMessage.match(/floor\s+(\d+)/i);
+        const floor = match ? match[1] : activeFloor;
+
+        displayMessage = `Tầng ${floor} đã có sơ đồ. Vui lòng chuyển sang chức năng chỉnh sửa sơ đồ tầng.`;
+      }
+
+      alert(displayMessage);
     }
   };
   const paletteItems = [
@@ -1062,6 +1132,36 @@ function FloorplanEditor() {
                 gap: 10,
               }}
             >
+              {isRoomSelected && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>Số phòng</label>
+                  <input
+                    style={inputStyle}
+                    type="text"
+                    value={selectedNode?.data?.room_number || ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setNodes((nds) =>
+                        nds.map((n) =>
+                          n.id === selectedId
+                            ? {
+                                ...n,
+                                data: {
+                                  ...n.data,
+                                  room_number: v,
+                                  label: v
+                                    ? `Phòng ${v}`
+                                    : n.data?.label || "Phòng",
+                                },
+                              }
+                            : n
+                        )
+                      );
+                    }}
+                    placeholder="VD: 101"
+                  />
+                </div>
+              )}
               <div>
                 <label style={labelStyle}>Dài</label>
                 <input

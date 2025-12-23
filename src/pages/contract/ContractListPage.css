@@ -1,1 +1,154 @@
-@import "../regulation/RegulationListPage.css";
+/* src/pages/contract/ContractListPage.css */
+
+/* Container chính */
+.container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 20px 30px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    font-family: Arial, sans-serif;
+}
+
+/* Header & Title */
+.title {
+    font-size: 28px;
+    color: #1e3a8a;
+    font-weight: bold;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #1e90ff;
+    padding-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Filter Bar */
+.filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.search-input,
+.status-select,
+.date-input {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 200px;
+}
+.search-input:focus, .status-select:focus, .date-input:focus {
+    outline: none;
+    border-color: #1e90ff;
+    box-shadow: 0 0 3px #1e90ff;
+}
+
+.btn-reset {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: 0.2s;
+}
+.btn-reset:hover { background-color: #fde68a; }
+
+/* Table Styling */
+.table-wrapper {
+    overflow-x: auto;
+}
+.table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.table-wrapper table thead {
+    background: #f4f4f4;
+}
+.table-wrapper table th,
+.table-wrapper table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #ddd;
+    font-size: 14px;
+    text-align: left;
+    vertical-align: middle;
+}
+.table-wrapper table thead th {
+    font-weight: 600;
+    color: #333;
+}
+.table-wrapper table tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+/* Status Badges */
+.status {
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-block;
+    text-align: center;
+    white-space: nowrap;
+}
+.status.active { background-color: #d1fae5; color: #065f46; } /* Xanh lá */
+.status.pending { background-color: #fef3c7; color: #92400e; } /* Vàng */
+.status.expired { background-color: #f3f4f6; color: #374151; } /* Xám */
+.status.terminated { background-color: #fee2e2; color: #b91c1c; } /* Đỏ */
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 6px;
+}
+.btn-custom {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: 0.2s;
+}
+.btn-view { background-color: #dbeafe; color: #1e3a8a; border-color: #93c5fd; }
+.btn-view:hover { background-color: #bfdbfe; }
+
+.btn-download { background-color: #d1fae5; color: #065f46; border-color: #10b981; }
+.btn-download:hover { background-color: #a7f3d0; }
+
+.btn-delete { background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+.btn-delete:hover { background-color: #fecaca; }
+
+.no-data {
+    text-align: center;
+    padding: 30px;
+    font-style: italic;
+    color: #666;
+}
+
+/* Detail Modal Content */
+.detail-content p {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+}
+.detail-content strong {
+    color: #1e3a8a;
+}

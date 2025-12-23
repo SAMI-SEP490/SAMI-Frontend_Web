@@ -1,159 +1,143 @@
 // src/services/api/contracts.js
-import { http } from "../http";
+import { http, unwrap } from "../http";
 
-const un = (res) => res?.data?.data ?? res?.data ?? res;
-const FILE_FIELD = "contract_file"; // <-- khớp Multer ở BE
+const FILE_FIELD = "contract_file";
+const ADDENDUM_URL = "/addendum";
 
-/** ===== LIST: không phân trang (tạm) ===== */
-export async function listContracts() {
-  try {
-    const res = await http.get("/contract/", {
-      validateStatus: () => true,
-    });
-    if (res.status >= 200 && res.status < 300) {
-      const data = un(res);
-      const items =
-        data?.items ??
-        (Array.isArray(data?.data) ? data.data : undefined) ??
-        (Array.isArray(data) ? data : undefined) ??
-        [];
-      return { items, total: items.length, _status: res.status };
-    }
-    return { items: [], total: 0, _status: res.status };
-  } catch {
-    return { items: [], total: 0, _status: "network_error" };
-  }
+/* ==========================================================================
+// helpers
+   ========================================================================== */
+
+function _toISODate(d) {
+  if (!d) return "";
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-/** ===== DETAIL ===== */
-export async function getContract(id) {
-  if (!id) throw new Error("Missing contract id");
-  const res = await http.get(`/contract/${id}`);
-  return un(res);
-}
-
-/** ===== CREATE (multipart) =====
- * form: {
- *  roomId, tenantUserId, startDate, endDate,
- *  rentAmount?, depositAmount?, status?, note?, file?(File)
- * }
- */
-export async function createContract(form = {}) {
+function _buildContractFormData(form) {
   const fd = new FormData();
-
-  // map camelCase -> snake_case; chỉ append khi có giá trị
-  if (form.roomId) fd.append("room_id", Number(form.roomId));
-  if (form.tenantUserId) fd.append("tenant_user_id", Number(form.tenantUserId));
-  if (form.startDate) fd.append("start_date", toISODate(form.startDate));
-  if (form.endDate) fd.append("end_date", toISODate(form.endDate));
-  if (form.rentAmount) fd.append("rent_amount", String(form.rentAmount));
-  if (form.depositAmount)
-    fd.append("deposit_amount", String(form.depositAmount));
-  // default status 'pending' nếu không truyền từ form
-  fd.append("status", String(form.status ?? "pending"));
-  if (form.note) fd.append("note", String(form.note));
-
-  // file: BE yêu cầu 'contract_file'
+  if (form.roomId) fd.append("room_id", form.roomId);
+  if (form.tenantUserId) fd.append("tenant_user_id", form.tenantUserId);
+  if (form.startDate) fd.append("start_date", _toISODate(form.startDate));
+  if (form.endDate) fd.append("end_date", _toISODate(form.endDate));
+  if (form.rentAmount !== undefined && form.rentAmount !== "") fd.append("rent_amount", form.rentAmount);
+  if (form.depositAmount !== undefined && form.depositAmount !== "") fd.append("deposit_amount", form.depositAmount);
+  if (form.status) fd.append("status", form.status);
+  if (form.note !== undefined) fd.append("note", form.note);
   if (form.file instanceof File) {
     fd.append(FILE_FIELD, form.file);
   }
-
-  const res = await http.post("/contract", fd, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return un(res);
+  return fd;
 }
 
-/** ===== UPDATE (multipart nếu có file) ===== */
-export async function updateContract(id, form = {}) {
-  if (!id) throw new Error("Missing contract id");
-  const hasFile = form.file instanceof File || form.file instanceof Blob;
+/* ==========================================================================
+// CONTRACTS API
+   ========================================================================== */
 
-  if (hasFile) {
-    const fd = new FormData();
-    if (form.startDate) fd.append("start_date", toISODate(form.startDate));
-    if (form.endDate) fd.append("end_date", toISODate(form.endDate));
-    if (form.rentAmount) fd.append("rent_amount", String(form.rentAmount));
-    if (form.depositAmount)
-      fd.append("deposit_amount", String(form.depositAmount));
-    if (form.status) fd.append("status", String(form.status));
-    if (form.note) fd.append("note", String(form.note));
-    fd.append(FILE_FIELD, form.file); // <-- tên field file khi update
-
-    const res = await http.put(`/contract/${id}`, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    return un(res);
-  }
-
-  const body = {
-    ...(form.startDate ? { start_date: toISODate(form.startDate) } : {}),
-    ...(form.endDate ? { end_date: toISODate(form.endDate) } : {}),
-    ...(form.rentAmount ? { rent_amount: String(form.rentAmount) } : {}),
-    ...(form.depositAmount
-      ? { deposit_amount: String(form.depositAmount) }
-      : {}),
-    ...(form.status ? { status: String(form.status) } : {}),
-    ...(form.note ? { note: String(form.note) } : {}),
-  };
-
-  const res = await http.put(`/contract/${id}`, body);
-  return un(res);
-}
-
-/** ===== DELETE ===== */
-export async function deleteContract(id) {
-  if (!id) throw new Error("Missing contract id");
-  const res = await http.delete(`/contract/${id}`);
-  return un(res);
-}
-
-/** ===== DOWNLOADS ===== */
-export async function getDownloadUrl(id) {
-  if (!id) throw new Error("Missing contract id");
+/** Lấy danh sách hợp đồng */
+export async function listContracts() {
   try {
-    const res = await http.get(`/contract/${id}/download`);
-    const data = un(res);
-    const url = data?.url ?? data?.downloadUrl ?? data?.data?.url;
-    return { url: url || null };
-  } catch {
-    return { url: null };
+    const response = await http.get("/contract", { });
+    return unwrap(response);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách hợp đồng:", error);
+    return [];
   }
 }
 
-export async function downloadContractDirect(id, returnBlob = false) {
-  if (!id) throw new Error("Missing contract id");
-
-  const res = await http.get(`/contract/${id}/download/direct`, {
-    responseType: "blob",
-  });
-
-  const contentType = res?.headers?.["content-type"] || "application/pdf";
-  const blob = new Blob([res.data], { type: contentType });
-
-  // nếu FE cần lấy blob → trả về để FE xử lý tiếp
-  if (returnBlob) return { blob };
-
-  // mặc định: tải trực tiếp
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `contract-${id}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+export async function getContractById(id) {
+  try {
+    const response = await http.get(`/contract/${id}`);
+    return unwrap(response);
+  } catch (error) {
+    console.error(`Lỗi khi lấy hợp đồng ${id}:`, error);
+    throw error;
+  }
 }
 
-/** ===== Helpers ===== */
-function toISODate(v) {
-  if (!v) return "";
-  if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0, 10);
-  const m = String(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) {
-    const d = m[1].padStart(2, "0");
-    const mo = m[2].padStart(2, "0");
-    return `${m[3]}-${mo}-${d}`;
+export async function createContract(contractData) {
+  try {
+    const fd = _buildContractFormData(contractData);
+    const response = await http.post("/contract", fd);
+    return unwrap(response);
+  } catch (error) {
+    console.error("Lỗi khi tạo hợp đồng:", error);
+    throw error;
   }
-  return String(v).slice(0, 10);
+}
+
+export async function updateContract(id, contractData) {
+  try {
+    const fd = _buildContractFormData(contractData);
+    const response = await http.put(`/contract/${id}`, fd);
+    return unwrap(response);
+  } catch (error) {
+    console.error(`Lỗi khi cập nhật hợp đồng ${id}:`, error);
+    throw error;
+  }
+}
+
+export async function deleteContract(id) {
+  try {
+    const response = await http.delete(`/contract/${id}`);
+    return unwrap(response);
+  } catch (error) {
+    console.error(`Lỗi khi xóa hợp đồng ${id}:`, error);
+    throw error;
+  }
+}
+
+/** Tải file trực tiếp (vẫn giữ hành vi tải) */
+export async function downloadContractDirect(id, fileName = "contract.pdf") {
+  try {
+    const res = await http.get(`/contract/${id}/download/direct`, {
+      responseType: "blob",
+    });
+
+    const blob = new Blob([res.data], { type: res.data.type || "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (error) {
+    console.error(`Lỗi khi tải file hợp đồng ${id}:`, error);
+    throw error;
+  }
+}
+
+/** Lấy blob của file hợp đồng để preview (image/pdf/...) */
+export async function fetchContractFileBlob(id) {
+  try {
+    const res = await http.get(`/contract/${id}/download/direct`, {
+      responseType: "blob",
+    });
+    // trả về res.data (Blob)
+    return res.data;
+  } catch (error) {
+    console.error(`Lỗi khi fetch blob file hợp đồng ${id}:`, error);
+    throw error;
+  }
+}
+
+/* ==========================================================================
+// ADDENDUMS (PHỤ LỤC)
+   ========================================================================== */
+export async function getAddendumsByContractId(contractId) {
+  try {
+    const response = await http.get(`${ADDENDUM_URL}/contract/${contractId}`);
+    return unwrap(response) || [];
+  } catch (error) {
+    return [];
+  }
 }

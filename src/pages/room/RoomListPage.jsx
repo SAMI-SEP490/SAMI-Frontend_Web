@@ -14,6 +14,8 @@ function RoomListPage() {
   const [rooms, setRooms] = useState([]);
   const [userRole, setUserRole] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [buildingFilter, setBuildingFilter] = useState("");
+  const [floorFilter, setFloorFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [loadingIds, setLoadingIds] = useState([]);
 
@@ -24,7 +26,7 @@ function RoomListPage() {
   const [editRoom, setEditRoom] = useState(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
+
 
   // ===== EXTRACT ROLE FROM JWT =====
   useEffect(() => {
@@ -66,7 +68,21 @@ function RoomListPage() {
     return statusMap[status] || status;
   };
 
-  const renderStatus = (status) => {
+  const getUniqueBuildings = () => {
+    const buildings = [...new Set(rooms.map(r => r.building_name).filter(Boolean))];
+    return buildings.sort();
+  };
+
+  const getUniqueFloors = () => {
+    const floors = [...new Set(rooms.map(r => r.floor).filter(f => f !== null && f !== undefined))];
+    return floors.sort((a, b) => a - b);
+  };
+
+  const renderStatus = (status, isActive) => {
+    if (!isActive) {
+      return <span className="status inactive-disabled">⊗ Không hoạt động</span>;
+    }
+
     switch (status) {
       case "available":
         return <span className="status active">✓ {getStatusLabel(status)}</span>;
@@ -87,6 +103,10 @@ function RoomListPage() {
     setShowDetailModal(true);
   };
 
+  const handleEditRoom = (room) => {
+    setEditRoom({ ...room });
+    setShowEditModal(true);
+  };
 
   const handleSaveEdit = async () => {
     if (!editRoom?.room_id) {
@@ -155,14 +175,33 @@ function RoomListPage() {
     }
   };
 
+  const handleResetFilters = () => {
+    setStatusFilter("");
+    setBuildingFilter("");
+    setFloorFilter("");
+    setSearchTerm("");
+  };
+
   // ===== FILTER =====
   const filteredRooms = rooms.filter((room) => {
-    const matchesStatus = statusFilter ? room.status === statusFilter : true;
+    const matchesStatus = statusFilter ?
+        (statusFilter === "inactive" ? !room.is_active : room.status === statusFilter && room.is_active)
+        : true;
+
+    const matchesBuilding = buildingFilter ? room.building_name === buildingFilter : true;
+    const matchesFloor = floorFilter ? room.floor === parseInt(floorFilter) : true;
+
     const term = searchTerm.toLowerCase();
     const roomNumber = String(room.room_number || "").toLowerCase();
 
-    return matchesStatus && roomNumber.includes(term);
+    return matchesStatus && matchesBuilding && matchesFloor && roomNumber.includes(term);
   });
+
+  const canToggleStatus = (room) => {
+    return room.status === "available" || room.status === "inactive";
+  };
+
+  const hasActiveFilters = statusFilter || buildingFilter || floorFilter || searchTerm;
 
   return (
       <div className="container">
@@ -183,11 +222,49 @@ function RoomListPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">Tất cả trạng thái</option>
-            <option value="available">Sẵn sàng</option>
-            <option value="occupied">Đã cho thuê</option>
-            <option value="maintenance">Bảo trì</option>
-            <option value="inactive">Không hoạt động</option>
+            <option value="available">✓ Sẵn sàng</option>
+            <option value="occupied">👤 Đã cho thuê</option>
+            <option value="maintenance">⚙ Bảo trì</option>
+            <option value="inactive">⊗ Không hoạt động</option>
           </select>
+
+          <select
+              className="status-select"
+              value={floorFilter}
+              onChange={(e) => setFloorFilter(e.target.value)}
+          >
+            <option value="">Tất cả tầng</option>
+            {getUniqueFloors().map((floor) => (
+                <option key={floor} value={floor}>
+                  Tầng {floor}
+                </option>
+            ))}
+          </select>
+
+          {userRole === "OWNER" && (
+              <select
+                  className="status-select"
+                  value={buildingFilter}
+                  onChange={(e) => setBuildingFilter(e.target.value)}
+              >
+                <option value="">Tất cả tòa nhà</option>
+                {getUniqueBuildings().map((building) => (
+                    <option key={building} value={building}>
+                      {building}
+                    </option>
+                ))}
+              </select>
+          )}
+
+          {hasActiveFilters && (
+              <Button
+                  className="btn-reset"
+                  onClick={handleResetFilters}
+                  size="sm"
+              >
+                🔄 Xóa bộ lọc
+              </Button>
+          )}
         </div>
 
         {/* TABLE */}
@@ -196,13 +273,12 @@ function RoomListPage() {
             <thead>
             <tr>
               <th>#</th>
-              <th>Tòa nhà</th>
+              {userRole === "OWNER" && <th>Tòa nhà</th>}
               <th>Số phòng</th>
               <th>Tầng</th>
               <th>Diện tích (m²)</th>
               <th>Trạng thái</th>
               <th>Người ở</th>
-              <th>Hợp đồng</th>
               <th>Hành động</th>
             </tr>
             </thead>
@@ -210,7 +286,7 @@ function RoomListPage() {
             <tbody>
             {filteredRooms.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="no-data">
+                  <td colSpan={userRole === "OWNER" ? 8 : 7} className="no-data">
                     Không có phòng phù hợp
                   </td>
                 </tr>
@@ -219,17 +295,17 @@ function RoomListPage() {
             {filteredRooms.map((room, index) => {
               const roomId = room.room_id;
               const loading = loadingIds.includes(roomId);
+              const rowClassName = !room.is_active ? "inactive-row" : "";
 
               return (
-                  <tr key={roomId}>
+                  <tr key={roomId} className={rowClassName}>
                     <td>{index + 1}</td>
-                    <td>{room.building_name || "N/A"}</td>
+                    {userRole === "OWNER" && <td>{room.building_name || "N/A"}</td>}
                     <td><strong>{room.room_number || "N/A"}</strong></td>
                     <td>{room.floor || "N/A"}</td>
                     <td>{room.size || "N/A"}</td>
-                    <td>{renderStatus(room.status)}</td>
+                    <td>{renderStatus(room.status, room.is_active)}</td>
                     <td>{room.tenant_count || 0}</td>
-                    <td>{room.active_contracts || 0}</td>
 
                     <td className="action-buttons">
                       <Button
@@ -241,36 +317,24 @@ function RoomListPage() {
                         👁 Xem
                       </Button>
 
-
-
-                      <Button
-                          size="sm"
-                          className={room.is_active ? "btn delete" : "btn publish"}
-                          disabled={loading}
-                          onClick={() => handleToggleStatus(room)}
-                      >
-                        {loading ? (
-                            <Spinner size="sm" animation="border" />
-                        ) : room.is_active ? (
-                            "⊘ Tắt"
-                        ) : (
-                            "✓ Bật"
-                        )}
-                      </Button>
-
-                      {userRole === "OWNER" && (
+                      {canToggleStatus(room) && (
                           <Button
                               size="sm"
-                              className="btn danger"
+                              className={room.is_active ? "btn delete" : "btn publish"}
                               disabled={loading}
-                              onClick={() => {
-                                setDeleteId(roomId);
-                                setShowDeleteModal(true);
-                              }}
+                              onClick={() => handleToggleStatus(room)}
                           >
-                            🗑️ Xóa
+                            {loading ? (
+                                <Spinner size="sm" animation="border" />
+                            ) : room.is_active ? (
+                                "⊘ Tắt"
+                            ) : (
+                                "✓ Bật"
+                            )}
                           </Button>
                       )}
+
+
                     </td>
                   </tr>
               );
@@ -287,14 +351,37 @@ function RoomListPage() {
           <Modal.Body>
             {selectedRoom && (
                 <div className="detail-content">
-                  <p><strong>Tòa nhà:</strong> {selectedRoom.building_name || "N/A"}</p>
+                  {userRole === "OWNER" && (
+                      <p><strong>Tòa nhà:</strong> {selectedRoom.building_name || "N/A"}</p>
+                  )}
                   <p><strong>Số phòng:</strong> {selectedRoom.room_number}</p>
                   <p><strong>Tầng:</strong> {selectedRoom.floor || "N/A"}</p>
                   <p><strong>Diện tích:</strong> {selectedRoom.size || "N/A"} m²</p>
                   <p><strong>Trạng thái:</strong> {getStatusLabel(selectedRoom.status)}</p>
-                  <p><strong>Trạng thái hoạt động:</strong> {selectedRoom.is_active ? "Hoạt động" : "Không hoạt động"}</p>
+                  <p>
+                    <strong>Trạng thái hoạt động:</strong>
+                    {selectedRoom.is_active ? (
+                        <span className="status-active-badge"> ✓ Hoạt động</span>
+                    ) : (
+                        <span className="status-inactive-badge"> ⊗ Không hoạt động</span>
+                    )}
+                  </p>
                   <p><strong>Số người ở:</strong> {selectedRoom.tenant_count || 0}</p>
                   <p><strong>Bảo trì đang chờ:</strong> {selectedRoom.pending_maintenance || 0}</p>
+
+                  {selectedRoom.tenants && selectedRoom.tenants.length > 0 && (
+                      <div>
+                        <p><strong>Danh sách người ở:</strong></p>
+                        <ul>
+                          {selectedRoom.tenants.map((tenant, idx) => (
+                              <li key={idx}>
+                                {tenant.full_name} - {tenant.phone || "N/A"}
+                              </li>
+                          ))}
+                        </ul>
+                      </div>
+                  )}
+
                   {selectedRoom.primary_tenant && (
                       <>
                         <p><strong>Người ở chính:</strong> {selectedRoom.primary_tenant.full_name}</p>

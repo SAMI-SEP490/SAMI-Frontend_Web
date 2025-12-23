@@ -1,5 +1,5 @@
 // src/services/api/tenants.js
-import { http } from "../http";
+import { http, unwrap } from "../http";
 
 // unwrap các kiểu response {data:{data}} | {data} | data
 const un = (res) => res?.data?.data ?? res?.data ?? res;
@@ -91,61 +91,17 @@ export async function listTenants(params = {}) {
   return arr.filter((u) => isTenantOrNullRole(u) && !u?.deleted_at);
 }
 
-/* ---------------- C) Lấy tenants theo phòng (TENANT | NULL) ---------------- */
-export async function listTenantsByRoom(roomQuery) {
-  // roomQuery có thể là roomId hoặc object { roomId | room_id | roomCode | room_number }
-  const isObj = typeof roomQuery === "object" && roomQuery !== null;
-  const roomId =
-    (isObj && (roomQuery.roomId ?? roomQuery.room_id ?? roomQuery.room)) ||
-    (!isObj && roomQuery) ||
-    null;
-  const roomCode = isObj ? roomQuery.roomCode ?? roomQuery.room_number : null;
-
-  // 1) Gọi list-users (không truyền role) + filter ở FE
+export async function getTenantsByRoomId (roomId, params = {}) {
   try {
-    const res = await http.get("/user/list-users", {
-      params: {
-        // KHÔNG truyền role để không mất user role=null
-        room_id: roomId ?? undefined,
-        room: roomCode ?? undefined,
-      },
-      validateStatus: () => true,
-    });
-    if (res?.status < 400) {
-      const data = un(res);
-      const arr = Array.isArray(data) ? data : [];
-      return arr
-        .filter((u) => isTenantOrNullRole(u))
-        .filter((u) => {
-          if (!roomId && !roomCode) return true;
-          const rid =
-            u?.room_id ?? u?.roomId ?? u?.room?.room_id ?? u?.room?.id;
-          const rcode = u?.room?.room_number ?? u?.room_number ?? u?.room?.code;
-          const okId = roomId ? String(rid) === String(roomId) : true;
-          const okCode = roomCode
-            ? String(rcode || "").toLowerCase() ===
-              String(roomCode).toLowerCase()
-            : true;
-          return okId && okCode;
-        });
-    }
-  } catch {
-    /* ignore, sẽ fallback */
+    const response = await http.get(`/tenant/room/${roomId}`, { params });
+    // SỬA: Dùng hàm 'un' thay vì 'unwrap' để đảm bảo lấy đúng mảng data
+    return un(response);
+  } catch (error) {
+    console.error(`Lỗi khi lấy danh sách phòng của tòa nhà ${roomId}:`, error);
+    throw error;
   }
-
-  // 2) Fallback: lấy tất cả rồi lọc
-  const all = await listTenants({ take: 500 });
-  if (!roomId && !roomCode) return all;
-  return all.filter((u) => {
-    const rid = u?.room_id ?? u?.roomId ?? u?.room?.room_id ?? u?.room?.id;
-    const rcode = u?.room?.room_number ?? u?.room_number ?? u?.room?.code;
-    const okId = roomId ? String(rid) === String(roomId) : true;
-    const okCode = roomCode
-      ? String(rcode || "").toLowerCase() === String(roomCode).toLowerCase()
-      : true;
-    return okId && okCode;
-  });
 }
+
 
 /* ---------------- D) Lấy chi tiết user ---------------- */
 export async function getUserById(userId) {

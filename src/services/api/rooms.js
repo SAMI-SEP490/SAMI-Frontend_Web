@@ -62,7 +62,7 @@ export async function getRoomById(id) {
   }
 }
 /** Lấy danh sách phòng theo building ID */
-export async function listRoomsByBuilding(buildingId, params = {}) {
+export async function getRoomsByBuildingId(buildingId, params = {}) {
   try {
     // Sửa đường dẫn từ /room/${id} thành /room/building/${id}
     // Thêm params để hỗ trợ phân trang hoặc lọc (page, limit, status...)

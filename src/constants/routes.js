@@ -39,7 +39,6 @@ export const ROUTES = {
   // Notifications
   notifications: "/notifications",
   createNotification: "/notifications/create",
-  editNotification: "/notifications/:id/edit",
 
   //regulations
   regulations: "/regulations",
@@ -68,8 +67,8 @@ export const ROUTES = {
   vehicleRegistrations: "/vehicle-registrations",
 
   // Rooms
-    rooms: "/rooms",
-    roomDetail: "/rooms/:id",
-    roomEdit: "/rooms/:id/edit",
-    roomCreate: "/rooms/create",
+  rooms: "/rooms",
+  roomDetail: "/rooms/:id",
+  roomEdit: "/rooms/:id/edit",
+  roomCreate: "/rooms/create",
 };

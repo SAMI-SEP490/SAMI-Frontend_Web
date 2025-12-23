@@ -16,3 +16,12 @@ export async function sendBroadcastNotification({ title, body, payload = {} }) {
   });
   return unwrap(data);
 }
+
+/**
+ * 📩 Lấy danh sách thông báo đã gửi (Outbox)
+ * Backend: GET /api/notifications/sent
+ */
+export async function getSentNotifications() {
+  const { data } = await http.get("/notifications/sent");
+  return unwrap(data);
+}

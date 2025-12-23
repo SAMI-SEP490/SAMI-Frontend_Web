@@ -49,16 +49,17 @@ const SideBar = () => {
         active={isActive("/contracts")}
         onClick={() => navigate("/contracts")}
       />
-      <MenuButton
+      {(String(user.role).toLowerCase() === "manager" && <MenuButton
         label="Danh sách người thuê"
         active={isActive("/tenants")}
         onClick={() => navigate("/tenants")}
-      />
+      />)}
+      {(String(user.role).toLowerCase() === "owner" && 
       <MenuButton
         label="Danh sách người dùng"
         active={isActive("/users")}
         onClick={() => navigate("/users")}
-      />
+      />)}
       <MenuButton
         label="Danh sách hóa đơn"
         active={isActive("/bills")}

@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, Trash, Pencil, Send } from "react-bootstrap-icons";
+import { Eye, Trash, Pencil, Send, CashStack } from "react-bootstrap-icons";
 import {
   listBills,
   listDraftBills,
   deleteOrCancelBill,
   updateDraftBill,
+  createCashPayment,
 } from "../../services/api/bills";
 import { http, unwrap as un } from "../../services/http";
 import "./BillListPage.css";
@@ -167,17 +168,38 @@ export default function BillListPage() {
   }, [bills, roomFilter, fromDate, toDate]);
 
   async function onPublish(id) {
-    const ok = window.confirm(
-      "Bạn có chắc muốn xuất bản hóa đơn này?\nSau khi xuất bản sẽ không thể chỉnh sửa."
-    );
-    if (!ok) return;
+    const bill = bills.find((b) => getBillId(b) === id);
+    if (!bill) return;
 
-    await updateDraftBill(id, { status: "issued" });
+    await updateDraftBill(id, {
+      status: "issued",
+      room_id: bill.room_id,
+      tenant_user_id: bill.tenant_user_id,
+      billing_period_start: bill.billing_period_start,
+      billing_period_end: bill.billing_period_end,
+      due_date: bill.due_date,
+      total_amount: bill.total_amount,
+      description: bill.description,
+      penalty_amount: bill.penalty_amount,
+    });
+
     setBills((prev) =>
       prev.map((b) => (getBillId(b) === id ? { ...b, status: "issued" } : b))
     );
   }
 
+  async function onCashPay(id) {
+    const ok = window.confirm(
+      "Bạn có chắc chắn muốn xác nhận hóa đơn này đã được thanh toán bằng TIỀN MẶT không?"
+    );
+    if (!ok) return;
+
+    await createCashPayment(id);
+
+    // reload lại bill từ server cho CHUẨN
+    const updated = await listBills();
+    setBills(updated);
+  }
   async function onDelete(id) {
     if (!window.confirm("Xóa hóa đơn nháp này?")) return;
     await deleteOrCancelBill(id);
@@ -272,6 +294,7 @@ export default function BillListPage() {
                   <td>{renderStatusBadge(b)}</td>
 
                   <td className="action-buttons">
+                    {/* Xem luôn có */}
                     <button
                       type="button"
                       className="btn view"
@@ -280,6 +303,7 @@ export default function BillListPage() {
                       <Eye size={14} /> Xem
                     </button>
 
+                    {/* BILL NHÁP */}
                     {status === "draft" && (
                       <>
                         <button
@@ -306,6 +330,17 @@ export default function BillListPage() {
                           <Trash size={14} /> Xóa
                         </button>
                       </>
+                    )}
+
+                    {/* BILL CHƯA THANH TOÁN → TIỀN MẶT */}
+                    {(status === "issued" || status === "overdue") && (
+                      <button
+                        type="button"
+                        className="btn cash"
+                        onClick={() => onCashPay(id)}
+                      >
+                        <CashStack size={14} /> Thanh toán tiền mặt
+                      </button>
                     )}
                   </td>
                 </tr>

@@ -265,3 +265,17 @@ export async function precheckDuplicateBill(roomId, periodStart) {
   const id = String(roomId);
   return rooms.some((r) => String(r?.room_id ?? r?.id) === id);
 }
+
+export async function createCashPayment(billId) {
+  const res = await http.post(
+    "/payments/cash",
+    { bill_ids: [Number(billId)] }, // ✅ đúng format
+    { validateStatus: () => true }
+  );
+
+  if (res?.status >= 400) {
+    throw new Error(res?.data?.message || "Không thể thanh toán tiền mặt");
+  }
+
+  return un(res);
+}

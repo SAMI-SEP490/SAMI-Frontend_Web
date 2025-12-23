@@ -35,3 +35,10 @@
   background: #fee2e2;
   color: #991b1b;
 }
+.btn.cash {
+  background: #16a34a;
+  color: #fff;
+}
+.btn.cash:hover {
+  background: #15803d;
+}

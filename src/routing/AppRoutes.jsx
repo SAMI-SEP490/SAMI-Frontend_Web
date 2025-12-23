@@ -50,7 +50,6 @@ import ReceiveGuestRegistrationPage from "../pages/guest/ReceiveGuestRegistratio
 // ===== Notifications =====
 import NotificationListPage from "../pages/notification/NotificationListPage";
 import CreateNotificationPage from "../pages/notification/CreateNotificationPage";
-import EditNotificationPage from "../pages/notification/EditNotificationPage";
 
 // ===== Maintenance =====
 import MaintenanceListPage from "../pages/maintenance/MaintenanceListPage";
@@ -62,8 +61,8 @@ import CreateBuildingPage from "../pages/building/CreateBuildingPage";
 import ViewBuildingDetail from "../pages/building/ViewBuildingDetail";
 
 // ===== Floorplan (lazy) =====
-const CreateFloorPlan = lazy(() =>
-  import("@/pages/floorplan/CreateFloorPlan.jsx")
+const CreateFloorPlan = lazy(
+  () => import("@/pages/floorplan/CreateFloorPlan.jsx"),
 );
 const ViewFloorPlan = lazy(() => import("@/pages/floorplan/ViewFloorPlan.jsx"));
 const EditFloorPlan = lazy(() => import("@/pages/floorplan/EditFloorPlan.jsx"));
@@ -158,13 +157,13 @@ export default function AppRoutes() {
         {/*  }*/}
         {/*/>*/}
 
-          <Route
-              path={ROUTES.editContract}
-              element={
-                  <ProtectedRoute>
-                      <EditContractPage />
-                  </ProtectedRoute>
-              }
+        <Route
+          path={ROUTES.editContract}
+          element={
+            <ProtectedRoute>
+              <EditContractPage />
+            </ProtectedRoute>
+          }
         />
         {/* Tenants */}
         <Route
@@ -295,14 +294,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path={ROUTES.editNotification}
-          element={
-            <ProtectedRoute>
-              <EditNotificationPage />
-            </ProtectedRoute>
-          }
-        />
+
         {/* regulation  */}
         <Route
           path={ROUTES.regulations}

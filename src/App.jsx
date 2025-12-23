@@ -4,9 +4,5 @@ import SideBar from "./components/SideBar";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 export default function App() {
-  return (
-    <div>
-      <AppRoutes />;
-    </div>
-  );
+  return <AppRoutes />;
 }

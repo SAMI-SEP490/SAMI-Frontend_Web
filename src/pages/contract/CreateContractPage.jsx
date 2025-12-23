@@ -5,6 +5,7 @@ import { createContract } from "../../services/api/contracts";
 import { listBuildings, listAssignedBuildings } from "@/services/api/building.js";
 import { Button, Spinner } from "react-bootstrap";
 import "./CreateContractPage.css";
+import {getAccessToken} from "@/services/http.js";
 
 function CreateContractPage() {
     const navigate = useNavigate();
@@ -28,17 +29,18 @@ function CreateContractPage() {
         file: null
     });
 
+    // --- GET ROLE FROM JWT ---
     useEffect(() => {
-        // get role from token if available
         try {
-            const token = localStorage.getItem("access_token") || "";
+            const token = getAccessToken();
             if (token) {
                 const decoded = JSON.parse(atob(token.split(".")[1]));
                 const role = decoded.role || decoded.userRole || "";
                 setUserRole(role.toUpperCase());
+                console.log("🔑 User Role from JWT:", role.toUpperCase());
             }
-        } catch (err) {
-            // ignore
+        } catch (error) {
+            console.error("❌ Error parsing JWT:", error);
         }
     }, []);
 
@@ -48,13 +50,16 @@ function CreateContractPage() {
             try {
                 // If manager, use assigned list; else get full list
                 if (userRole === "MANAGER") {
-                    const assigned = await listAssignedBuildings();
-                    // assigned is expected array like you described
-                    if (Array.isArray(assigned) && assigned.length > 0) {
-                        // choose first (or let user change if multiple assigned? requirement says fixed)
-                        const b = assigned[0];
+                    const res = await listAssignedBuildings();
+                    const assignedList = Array.isArray(res) ? res : res?.data;
+
+                    if (Array.isArray(assignedList) && assignedList.length > 0) {
+                        const b = assignedList[0];
                         setAssignedBuilding(b);
-                        setForm(prev => ({ ...prev, building_id: b.building_id }));
+                        setForm(prev => ({
+                            ...prev,
+                            building_id: b.building_id
+                        }));
                     } else {
                         setAssignedBuilding(null);
                     }
@@ -168,7 +173,6 @@ function CreateContractPage() {
                         <select name="status" className="form-control" value={form.status} onChange={handleChange}>
                             <option value="pending">Chờ duyệt</option>
                             <option value="active">Hiệu lực</option>
-                            <option value="expired">Hết hạn</option>
                             <option value="terminated">Đã hủy</option>
                         </select>
                     </div>

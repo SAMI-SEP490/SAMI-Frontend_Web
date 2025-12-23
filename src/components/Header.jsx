@@ -106,11 +106,14 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
 
                 {/* Logo */}
                 <div
+                    onClick={() => navigate("/")}
                     style={{
                         display: "flex",
                         alignItems: "center",
                         gap: 12,
+                        cursor: "pointer",
                     }}
+                    title="Về trang chủ"
                 >
                     <img
                         src="/logo2.png"

@@ -5,6 +5,7 @@ import { getContractById, updateContract, fetchContractFileBlob } from "../../se
 import { listBuildings, listAssignedBuildings } from "@/services/api/building.js";
 import { Button, Spinner } from "react-bootstrap";
 import "./EditContractPage.css";
+import {getAccessToken} from "@/services/http.js";
 
 function EditContractPage() {
     const { id } = useParams();
@@ -31,22 +32,25 @@ function EditContractPage() {
         file: null
     });
 
+    // --- GET ROLE FROM JWT ---
     useEffect(() => {
         try {
-            const token = localStorage.getItem("access_token") || "";
+            const token = getAccessToken();
             if (token) {
                 const decoded = JSON.parse(atob(token.split(".")[1]));
                 const role = decoded.role || decoded.userRole || "";
                 setUserRole(role.toUpperCase());
+                console.log("🔑 User Role from JWT:", role.toUpperCase());
             }
-        } catch (err) {
-            // ignore
+        } catch (error) {
+            console.error("❌ Error parsing JWT:", error);
         }
     }, []);
 
     useEffect(() => {
         async function init() {
             setLoading(true);
+
             try {
                 const data = await getContractById(id);
                 setContract(data);
@@ -186,7 +190,6 @@ function EditContractPage() {
                     <select name="status" className="form-control" value={form.status} onChange={handleChange}>
                         <option value="pending">Chờ duyệt</option>
                         <option value="active">Hiệu lực</option>
-                        <option value="expired">Hết hạn</option>
                         <option value="terminated">Đã hủy</option>
                     </select>
                 </div>

@@ -322,7 +322,7 @@ function ContractListPage() {
               {userRole === "OWNER" && <th>Tòa nhà</th>}
               <th>Khách thuê / Phòng</th>
               <th>Thời hạn</th>
-              <th>Giá trị (VNĐ)</th>
+              <th>Tiền thuê (VNĐ)</th>
               <th>Trạng thái</th>
               <th style={{width: '280px'}}>Hành động</th>
             </tr>

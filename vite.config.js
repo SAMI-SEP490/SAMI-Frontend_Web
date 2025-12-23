@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://works-commonly-relating-camera.trycloudflare.com/",
+        target: "https://vcr-naturals-surplus-caribbean.trycloudflare.com/",
         changeOrigin: true,
         secure: false,
       },

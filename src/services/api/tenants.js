@@ -80,7 +80,7 @@ export async function listTenants(params = {}) {
     const msg =
       d?.message ||
       d?.error ||
-      (Array.isArray(d?.errors) && d.errors[0]?.message) ||
+      (Array.isArray(d?.errors) && d?.errors[0]?.message) ||
       "Không lấy được danh sách người dùng";
     throw new Error(msg);
   }
@@ -91,17 +91,37 @@ export async function listTenants(params = {}) {
   return arr.filter((u) => isTenantOrNullRole(u) && !u?.deleted_at);
 }
 
-export async function getTenantsByRoomId (roomId, params = {}) {
+/**
+ * Dùng cho CREATE CONTRACT:
+ * GET /tenant/room/:roomId -> chỉ tenant CHƯA có contract
+ */
+export async function getTenantsByRoomId(roomId, params = {}) {
   try {
     const response = await http.get(`/tenant/room/${roomId}`, { params });
-    // SỬA: Dùng hàm 'un' thay vì 'unwrap' để đảm bảo lấy đúng mảng data
     return un(response);
   } catch (error) {
-    console.error(`Lỗi khi lấy danh sách phòng của tòa nhà ${roomId}:`, error);
+    console.error(
+      `Lỗi khi lấy danh sách tenant (lọc chưa có HĐ) của room ${roomId}:`,
+      error
+    );
     throw error;
   }
 }
 
+/**
+ * ✅ Dùng cho CREATE BILL:
+ * GET /tenant/moor/:roomId -> lấy TẤT CẢ tenant trong phòng
+ * (Backend route đã có: /moor/:roomId) :contentReference[oaicite:4]{index=4}
+ */
+export async function getAllTenantsByRoomId(roomId, params = {}) {
+  try {
+    const response = await http.get(`/tenant/moor/${roomId}`, { params });
+    return un(response);
+  } catch (error) {
+    console.error(`Lỗi khi lấy TẤT CẢ tenant của room ${roomId}:`, error);
+    throw error;
+  }
+}
 
 /* ---------------- D) Lấy chi tiết user ---------------- */
 export async function getUserById(userId) {
@@ -131,12 +151,12 @@ export async function getAllTenants() {
   const data = res?.data?.data ?? res?.data ?? res;
   return Array.isArray(data) ? data : data?.items ?? [];
 }
+
 export async function deleteTenantByUserId(userId) {
   if (!userId) {
     throw new Error("Thiếu ID người thuê.");
   }
 
-  // Gọi API soft delete user
   const res = await http.delete(`/user/delete/${userId}`, {
     validateStatus: () => true,
   });
@@ -152,5 +172,5 @@ export async function deleteTenantByUserId(userId) {
     throw new Error(msg);
   }
 
-  return un(res); // dùng helper un đã có ở đầu file
+  return un(res);
 }

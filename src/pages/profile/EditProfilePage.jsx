@@ -171,6 +171,14 @@ export default function EditProfilePage() {
         avatar: avatarFile, // 👈 QUAN TRỌNG
       });
 
+      console.log({
+        full_name: fullName,
+        email,
+        phone,
+        birthday: form.birthday,
+        gender: form.gender,
+        avatar: avatarFile,
+      });
       setVariant("success");
       setMessage("Cập nhật hồ sơ thành công!");
       setTimeout(() => navigate("/profile"), 800);

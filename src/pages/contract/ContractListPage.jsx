@@ -240,7 +240,7 @@ function ContractListPage() {
   return (
       <div className="container">
         <div className="title">
-          <span>📜 Quản lý Hợp đồng</span>
+          <span> Quản lý Hợp đồng</span>
           <Button
               variant="primary"
               className="d-flex align-items-center gap-2"

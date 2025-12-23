@@ -14,22 +14,17 @@ const SideBar = () => {
   return (
     <div
       style={{
-        width: "240px",
-        height: "100vh",
+        width: "100%",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
         gap: 6,
         padding: "18px 14px",
         color: "#fff",
+        overflowY: "auto",
 
-        /* 👇 glass sidebar */
-        backgroundColor: "rgba(26, 115, 232, 0.85)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+        backgroundColor: colors.brand,
 
-        position: "sticky",
-        top: 0,
-        left: 0,
         boxShadow: "2px 0 14px rgba(0,0,0,0.1)",
       }}
     >
@@ -54,16 +49,17 @@ const SideBar = () => {
         active={isActive("/contracts")}
         onClick={() => navigate("/contracts")}
       />
-      <MenuButton
+      {(String(user.role).toLowerCase() === "manager" && <MenuButton
         label="Danh sách người thuê"
         active={isActive("/tenants")}
         onClick={() => navigate("/tenants")}
-      />
+      />)}
+      {(String(user.role).toLowerCase() === "owner" && 
       <MenuButton
         label="Danh sách người dùng"
         active={isActive("/users")}
         onClick={() => navigate("/users")}
-      />
+      />)}
       <MenuButton
         label="Danh sách hóa đơn"
         active={isActive("/bills")}

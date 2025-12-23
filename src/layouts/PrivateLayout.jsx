@@ -38,11 +38,10 @@ export default function PrivateLayout() {
           isSidebarOpen && ( // <<< kiểm tra mở/đóng
             <div
               style={{
-                width: "220px",
+                width: "240px",
                 backgroundColor: colors.brand,
                 color: "white",
                 height: "100%",
-                borderRadius: "0 10px 10px 0",
                 flexShrink: 0,
                 transition: "width 0.3s",
               }}
@@ -59,14 +58,12 @@ export default function PrivateLayout() {
             overflowY: "auto",
             position: "relative",
 
-            /* Background image */
-            backgroundImage: "url('/background2.jpg')",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
+            backgroundColor: colors.background,
           }}
         >
-          <Outlet />
+          <div style={{ maxWidth: "1440px", margin: "0 auto", width: "100%" }}>
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>

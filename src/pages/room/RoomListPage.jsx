@@ -205,7 +205,7 @@ function RoomListPage() {
 
   return (
       <div className="container">
-        <h2 className="title">📋 Quản lý Phòng</h2>
+        <h2 className="title">Quản lý Phòng</h2>
 
         {/* FILTER */}
         <div className="filter-bar">

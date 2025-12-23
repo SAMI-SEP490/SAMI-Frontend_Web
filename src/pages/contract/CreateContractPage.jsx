@@ -26,9 +26,9 @@ function CreateContractPage() {
 
     const [form, setForm] = useState({
         building_id: "",
-        room_number: "", // Lưu số phòng để gửi backend
-        room_id: "",     // Lưu ID phòng để fetch tenants
-        tenant_name: "",
+        room_number: "",
+        room_id: "",
+        tenant_user_id: "", // [FIX 1] Đổi tenant_name thành tenant_user_id
         start_date: "",
         end_date: "",
         rent_amount: "",
@@ -112,29 +112,25 @@ function CreateContractPage() {
     // Khi chọn Phòng -> Load Khách
     const handleRoomChange = async (e) => {
         const rId = e.target.value;
-
-        // SỬA: Tìm object phòng bao gồm cả check room_id
         const selectedRoom = rooms.find(r => (r.id || r._id || r.room_id) == rId);
 
         setForm(prev => ({
             ...prev,
             room_id: rId,
             room_number: selectedRoom ? selectedRoom.room_number : "",
-            tenant_name: ""
+            tenant_user_id: "" // [FIX 2] Reset ID khách khi đổi phòng
         }));
         setTenants([]);
 
         if (rId) {
             try {
                 const res = await getTenantsByRoomId(rId);
-                // SỬA: Service đã unwrap, chỉ cần check mảng
                 setTenants(Array.isArray(res) ? res : []);
             } catch (err) {
                 console.error("Lỗi tải khách thuê:", err);
             }
         }
     };
-
     const handleChange = (e) => {
         const { name, value, files } = e.target;
         if (name === "file") {
@@ -148,7 +144,8 @@ function CreateContractPage() {
         e.preventDefault();
         setSubmitting(true);
         try {
-            if (!form.room_number || !form.tenant_name || !form.start_date) {
+            // [FIX 3] Validate tenant_user_id thay vì tenant_name
+            if (!form.room_number || !form.tenant_user_id || !form.start_date) {
                 alert("Vui lòng điền đủ thông tin bắt buộc.");
                 setSubmitting(false);
                 return;
@@ -158,7 +155,8 @@ function CreateContractPage() {
             navigate("/contracts");
         } catch (error) {
             console.error("Create error:", error);
-            alert("Tạo hợp đồng thất bại: " + (error?.message || ""));
+            // Hiển thị message lỗi rõ ràng hơn từ backend trả về
+            alert("Tạo hợp đồng thất bại: " + (error?.response?.data?.message || error?.message || "Lỗi không xác định"));
         } finally {
             setSubmitting(false);
         }
@@ -207,24 +205,24 @@ function CreateContractPage() {
                         </select>
                     </div>
 
-                    {/* 3. CHỌN KHÁCH THUÊ (Lọc theo phòng) */}
+                    { /* 3. CHỌN KHÁCH THUÊ (Lọc theo phòng) */}
                     <div className="form-row">
                         <label>Tên khách thuê</label>
                         <select
-                            name="tenant_name"
+                            name="tenant_user_id" // [FIX 4] name phải khớp với key trong state
                             className="form-control"
-                            value={form.tenant_name}
+                            value={form.tenant_user_id} // [FIX 5] value lấy từ state tenant_user_id
                             onChange={handleChange}
                             required
                             disabled={!form.room_id}
                         >
                             <option value="">-- Chọn khách trong phòng --</option>
                             {tenants.map((t, idx) => (
-                                // SỬA: Sử dụng t.user_id làm key (theo API trả về)
                                 <option
                                     key={t.user_id || t.id || idx}
-                                    value={t.full_name || t.name}
+                                    value={t.user_id} // [FIX 6] Giá trị gửi đi phải là ID (user_id)
                                 >
+                                    {/* Hiển thị tên cho người dùng thấy */}
                                     {t.full_name || t.name} - {t.phone}
                                 </option>
                             ))}

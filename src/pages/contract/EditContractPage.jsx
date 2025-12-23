@@ -28,8 +28,8 @@ function EditContractPage() {
     const [form, setForm] = useState({
         building_id: "",
         room_number: "",
-        room_id: "", // Cần thêm field này để quản lý dropdown
-        tenant_name: "",
+        room_id: "",
+        tenant_user_id: "", // [FIX 1] Dùng tenant_user_id thay vì tenant_name
         start_date: "",
         end_date: "",
         rent_amount: "",
@@ -55,16 +55,18 @@ function EditContractPage() {
         async function init() {
             setLoading(true);
             try {
-                // 1. Load Contract
                 const data = await getContractById(id);
                 setContract(data);
 
                 const currentBuildingId = data.building_id ?? data.buildingId ?? data.building?.id ?? "";
                 const currentRoomNum = data.room_number ?? data.room ?? "";
 
+                // [FIX 2] Lấy tenant_user_id từ dữ liệu API trả về
+                // Lưu ý: formatContractResponse trả về tenant_user_id, kiểm tra kỹ log nếu null
+                const currentTenantId = data.tenant_user_id ?? "";
+
                 let tempRooms = [];
                 let foundRoomId = "";
-
                 // 2. Load Buildings (Logic Manager/Admin)
                 if (userRole === "MANAGER") {
                     const assigned = await listAssignedBuildings();
@@ -77,32 +79,30 @@ function EditContractPage() {
                     setBuildings(items.map(x => ({ id: x.id ?? x.building_id, name: x.name ?? x.building_name })));
                 }
 
-                // 3. Load Rooms for the current building
+                // 3. Load Rooms
                 if (currentBuildingId) {
                     const rRes = await getRoomsByBuildingId(currentBuildingId);
                     tempRooms = Array.isArray(rRes) ? rRes : rRes.data || [];
                     setRooms(tempRooms);
 
-                    // Tìm ID của phòng dựa trên số phòng (vì contract trả về số phòng)
                     const matchRoom = tempRooms.find(r => r.room_number == currentRoomNum);
                     if (matchRoom) {
-                        // SỬA: Thêm matchRoom.room_id vào đây
                         foundRoomId = matchRoom.id || matchRoom._id || matchRoom.room_id;
                     }
                 }
 
-                // 4. Load Tenants for the current room
+                // 4. Load Tenants
                 if (foundRoomId) {
                     const tRes = await getTenantsByRoomId(foundRoomId);
-                    // Service đã xử lý unwrap, tRes chính là mảng tenants
                     setTenants(Array.isArray(tRes) ? tRes : []);
                 }
+
                 // 5. Set Form
                 setForm({
                     building_id: currentBuildingId,
                     room_number: currentRoomNum,
-                    room_id: foundRoomId, // set ID để dropdown hiển thị đúng
-                    tenant_name: data.tenant_name ?? "",
+                    room_id: foundRoomId,
+                    tenant_user_id: currentTenantId, // [FIX 3] Set ID vào form
                     start_date: data.start_date ? data.start_date.slice(0,10) : "",
                     end_date: data.end_date ? data.end_date.slice(0,10) : "",
                     rent_amount: data.rent_amount ?? "",
@@ -119,7 +119,7 @@ function EditContractPage() {
                 setLoading(false);
             }
         }
-        if(userRole || userRole === "") init(); // Chạy khi role đã xác định
+        if(userRole || userRole === "") init();
     }, [id, userRole]);
 
     // Xử lý thay đổi Building (giống trang Create)
@@ -134,16 +134,15 @@ function EditContractPage() {
         }
     };
 
-    // Xử lý thay đổi Room
+// Handle Room Change
     const handleRoomChange = async (e) => {
         const rId = e.target.value;
-        // SỬA: Thêm so sánh với r.room_id
         const selectedRoom = rooms.find(r => (r.id || r._id || r.room_id) == rId);
         setForm(prev => ({
             ...prev,
             room_id: rId,
             room_number: selectedRoom ? selectedRoom.room_number : "",
-            tenant_name: ""
+            tenant_user_id: "" // [FIX 4] Reset ID khách khi đổi phòng
         }));
         setTenants([]);
         if (rId) {
@@ -151,7 +150,6 @@ function EditContractPage() {
             setTenants(Array.isArray(res) ? res : []);
         }
     };
-
     const handleChange = (e) => {
         const { name, value, files } = e.target;
         if (name === "file") setForm(prev => ({ ...prev, file: files?.[0] ?? null }));
@@ -225,28 +223,27 @@ function EditContractPage() {
                 <div className="form-row">
                     <label>Tên khách thuê</label>
                     <select
-                        name="tenant_name"
+                        name="tenant_user_id" // [FIX 5] Name khớp state
                         className="form-control"
-                        value={form.tenant_name}
+                        value={form.tenant_user_id} // [FIX 6] Value khớp state
                         onChange={handleChange}
                         required
                     >
                         <option value="">-- Chọn khách trong phòng --</option>
                         {tenants.map((t, idx) => (
-                            // SỬA: API trả về 'user_id' và 'full_name'
-                            // Sử dụng t.user_id làm key
-                            // Sử dụng t.full_name để hiển thị và làm value
                             <option
                                 key={t.user_id || t.id || idx}
-                                value={t.full_name || t.name || ""}
+                                value={t.user_id} // [FIX 7] Value là ID
                             >
-                                {t.full_name || t.name} - {t.phone} {/* Thêm sđt để dễ phân biệt nếu muốn */}
+                                {t.full_name || t.name} - {t.phone}
                             </option>
                         ))}
 
-                        {/* Fallback nếu danh sách rỗng nhưng form đang có dữ liệu cũ */}
-                        {tenants.length === 0 && form.tenant_name && (
-                            <option value={form.tenant_name}>{form.tenant_name} (Hiện tại)</option>
+                        {/* Fallback option để hiển thị tên cũ nếu danh sách tenants load lỗi hoặc khách cũ đã chuyển đi */}
+                        {tenants.length === 0 && contract?.tenant_name && (
+                            <option value={contract.tenant_user_id} disabled>
+                                {contract.tenant_name} (Hiện tại - Không thay đổi)
+                            </option>
                         )}
                     </select>
                 </div>

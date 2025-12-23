@@ -17,13 +17,22 @@ export async function listBuildings(params = {}) {
 }
 export async function listAssignedBuildings() {
   try {
-    const { data } = await http.get("/building/manager/assigned");
-    return unwrap(data);
+    const res = await http.get("/building/manager/assigned");
+    console.log("DEBUG API Response:", res); // <--- Thêm dòng này để xem nó in ra gì
+
+    // Nếu res có cấu trúc { data: { data: [...] } } (Axios chuẩn)
+    if (res.data && res.data.data) return res.data.data;
+
+    // Nếu res có cấu trúc { data: [...] } (đã qua interceptor)
+    if (res.data && Array.isArray(res.data)) return res.data;
+
+    return [];
   } catch (error) {
-    console.error("Lỗi khi lấy danh sách tòa nhà được phân công:", error);
+    console.error("Lỗi:", error);
     throw error;
   }
 }
+
 
 /** 🔍 READ - Lấy thông tin tòa nhà theo ID */
 export async function getBuildingById(buildingId) {

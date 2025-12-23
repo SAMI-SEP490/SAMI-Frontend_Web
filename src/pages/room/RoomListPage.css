@@ -217,3 +217,56 @@
     min-width: 150px;
     display: inline-block;
 }
+/* Inactive row styling */
+.inactive-row {
+    background-color: #f5f5f5;
+    opacity: 0.8;
+}
+
+.inactive-row td {
+    color: #666;
+}
+
+/* Inactive status badges */
+.status.inactive-disabled {
+    background-color: #e8e8e8;
+    color: #444;
+    font-weight: 600;
+}
+
+/* Status badges for modal */
+.status-active-badge {
+    background-color: #d1fae5;
+    color: #065f46;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.status-inactive-badge {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+.btn-reset {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: 0.2s;
+}
+
+.btn-reset:hover {
+    background-color: #fde68a;
+}
+
+.btn-reset:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

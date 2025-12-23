@@ -61,7 +61,18 @@ export async function getRoomById(id) {
     throw error;
   }
 }
-
+/** Lấy danh sách phòng theo building ID */
+export async function listRoomsByBuilding(buildingId, params = {}) {
+  try {
+    // Sửa đường dẫn từ /room/${id} thành /room/building/${id}
+    // Thêm params để hỗ trợ phân trang hoặc lọc (page, limit, status...)
+    const response = await http.get(`/room/building/${buildingId}`, { params });
+    return unwrap(response);
+  } catch (error) {
+    console.error(`Lỗi khi lấy danh sách phòng của tòa nhà ${buildingId}:`, error);
+    throw error;
+  }
+}
 /** Lấy phòng của user theo userID */
 export async function getRoomsByUserId(userId) {
   try {

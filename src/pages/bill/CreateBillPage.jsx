@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-// ✅ tạo bill luôn là nháp
 import { createDraftBill, precheckDuplicateBill } from "@/services/api/bills";
+import { listAssignedBuildings, listBuildings } from "@/services/api/building";
+import { listRoomsByBuilding } from "@/services/api/rooms";
 import { http, unwrap as un } from "@/services/http";
 
-// ======= Helpers =======
+// ===== Helpers =====
 function toISODate(v) {
   if (!v) return "";
   const s = String(v);
@@ -21,8 +22,11 @@ const toNum = (v, d = 0) => {
 
 export default function CreateBillPage() {
   const nav = useNavigate();
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const role = user?.role;
 
-  // Form state
+  // ===== Form state =====
+  const [buildingId, setBuildingId] = useState("");
   const [roomId, setRoomId] = useState("");
   const [tenantUserId, setTenantUserId] = useState("");
   const [periodStart, setPeriodStart] = useState("");
@@ -32,191 +36,146 @@ export default function CreateBillPage() {
   const [penaltyAmount, setPenaltyAmount] = useState("0");
   const [dueDate, setDueDate] = useState("");
 
-  // Data sources
+  // ===== Data =====
+  const [buildings, setBuildings] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [tenantsInRoom, setTenantsInRoom] = useState([]);
 
-  // UX state
-  const [loadingRooms, setLoadingRooms] = useState(true);
+  // ===== UX =====
+  const [loadingBuilding, setLoadingBuilding] = useState(true);
+  const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTenants, setLoadingTenants] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [warn, setWarn] = useState("");
 
-  const totalAmount = useMemo(() => {
-    const base = toNum(baseAmount, 0);
-    const pen = toNum(penaltyAmount, 0);
-    return base + pen;
-  }, [baseAmount, penaltyAmount]);
+  const totalAmount = useMemo(
+    () => toNum(baseAmount, 0) + toNum(penaltyAmount, 0),
+    [baseAmount, penaltyAmount]
+  );
 
-  // ======= Load Rooms =======
+  // ===== LOAD BUILDING (Y HỆT CREATE CONTRACT) =====
   useEffect(() => {
     let cancelled = false;
-    async function loadRooms() {
-      setLoadingRooms(true);
-      setError("");
+
+    async function loadBuildings() {
+      setLoadingBuilding(true);
       try {
-        // Try primary route
-        let res = await http.get("/room", { validateStatus: () => true });
-        if (
-          res?.status >= 400 ||
-          !Array.isArray(res?.data?.data ?? res?.data)
-        ) {
-          // Fallback route
-          res = await http.get("/room/all", { validateStatus: () => true });
+        if (role === "MANAGER") {
+          const res = await listAssignedBuildings();
+          const list = Array.isArray(res) ? res : res?.data;
+          if (!list || list.length === 0)
+            throw new Error("Tài khoản quản lý chưa được gán tòa nhà");
+
+          const b = list[0];
+          const buildingIdValue = b.building_id || b.id;
+
+          if (!cancelled) {
+            setBuildings([b]);
+            setBuildingId(buildingIdValue);
+          }
         }
-        if (res?.status >= 400)
-          throw new Error(
-            res?.data?.message || "Không tải được danh sách phòng"
-          );
-        const data = un(res);
-        const items = Array.isArray(data)
-          ? data
-          : data?.items ?? data?.data ?? [];
-        if (!cancelled) setRooms(items);
+
+        if (role === "OWNER") {
+          const res = await listBuildings();
+          const list = Array.isArray(res) ? res : res?.data;
+          if (!cancelled) setBuildings(list || []);
+        }
       } catch (e) {
-        if (!cancelled) setError(e?.message || "Không tải được phòng");
+        if (!cancelled)
+          setError(e?.message || "Không tải được danh sách tòa nhà");
+      } finally {
+        if (!cancelled) setLoadingBuilding(false);
+      }
+    }
+
+    loadBuildings();
+    return () => (cancelled = true);
+  }, [role]);
+
+  // ===== LOAD ROOMS THEO BUILDING (KHÔNG FILTER CHAY) =====
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRooms() {
+      if (!buildingId) {
+        setRooms([]);
+        return;
+      }
+      setLoadingRooms(true);
+      try {
+        // ✅ FIX: truyền đúng params
+        const res = await listRoomsByBuilding({ building_id: buildingId });
+        const list = Array.isArray(res) ? res : res?.data;
+        if (!cancelled) setRooms(list || []);
+      } catch (e) {
+        if (!cancelled)
+          setError(e?.message || "Không tải được danh sách phòng");
       } finally {
         if (!cancelled) setLoadingRooms(false);
       }
     }
-    loadRooms();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
-  // ======= When Room changes -> load tenants in that room =======
+    loadRooms();
+    return () => (cancelled = true);
+  }, [buildingId]);
+
+  // ===== LOAD TENANT TRONG PHÒNG (GIỮ NGUYÊN LOGIC CŨ) =====
   useEffect(() => {
     let cancelled = false;
-    async function loadTenants(roomIdVal) {
+
+    async function loadTenants() {
       setLoadingTenants(true);
-      setWarn("");
       setTenantUserId("");
       try {
-        if (!roomIdVal) {
+        if (!roomId) {
           setTenantsInRoom([]);
           return;
         }
-        // Prefer GET /room/:id (expects tenants embedded)
-        let res = await http.get(`/room/${roomIdVal}`, {
-          validateStatus: () => true,
-        });
-        if (res?.status >= 400)
-          throw new Error(
-            res?.data?.message || "Không lấy được thông tin phòng"
-          );
+        const res = await http.get(`/room/${roomId}`);
         const room = un(res);
-
-        let tenants =
+        const tenants =
           room?.tenants ||
           room?.occupants ||
           room?.currentTenants ||
           room?.room_tenants ||
           [];
 
-        // If backend doesn't embed tenants -> fallback to /tenant/all and filter
-        if (!Array.isArray(tenants) || tenants.length === 0) {
-          const resTen = await http.get("/tenant/all", {
-            validateStatus: () => true,
-          });
-          if (resTen?.status < 400) {
-            const all = un(resTen);
-            const arr = Array.isArray(all)
-              ? all
-              : all?.items ?? all?.data ?? [];
-            tenants = arr.filter((t) => {
-              const rid = String(
-                t?.room_id ??
-                  t?.current_room_id ??
-                  t?.room?.room_id ??
-                  t?.current_room?.room_id ??
-                  ""
-              );
-              return rid && rid === String(roomIdVal);
-            });
-          }
-        }
-
-        // Normalize to {user_id, full_name}
-        const normalized = (tenants || [])
+        const normalized = tenants
           .map((t) => ({
-            user_id: t?.user_id ?? t?.id ?? t?.user?.user_id ?? t?.user?.id,
-            full_name:
-              t?.full_name ??
-              t?.name ??
-              t?.user?.full_name ??
-              t?.user?.name ??
-              "(Chưa rõ tên)",
+            user_id: t?.user_id ?? t?.id ?? t?.user?.user_id,
+            full_name: t?.full_name ?? t?.user?.full_name ?? "(Không tên)",
           }))
           .filter((x) => x.user_id);
 
         if (!cancelled) setTenantsInRoom(normalized);
-      } catch (e) {
-        if (!cancelled) {
-          setTenantsInRoom([]);
-          setWarn(e?.message || "Không lấy được người thuê của phòng này");
-        }
+      } catch {
+        if (!cancelled) setWarn("Không lấy được người thuê của phòng");
       } finally {
         if (!cancelled) setLoadingTenants(false);
       }
     }
-    loadTenants(roomId);
-    return () => {
-      cancelled = true;
-    };
+
+    loadTenants();
+    return () => (cancelled = true);
   }, [roomId]);
 
-  // ======= Validation =======
-  function validateForm() {
-    const errors = [];
-    if (!roomId) errors.push("Vui lòng chọn Phòng");
-    if (!tenantUserId) errors.push("Vui lòng chọn Người thanh toán");
-    if (!periodStart)
-      errors.push("Vui lòng nhập Ngày bắt đầu kỳ (billing_period_start)");
-    if (!periodEnd)
-      errors.push("Vui lòng nhập Ngày tạo kỳ (billing_period_end)");
-    if (
-      periodStart &&
-      periodEnd &&
-      toISODate(periodEnd) < toISODate(periodStart)
-    ) {
-      errors.push("Ngày tạo kỳ phải >= Ngày bắt đầu kỳ");
-    }
-    if (!dueDate) errors.push("Vui lòng chọn Hạn thanh toán");
-    if (dueDate && periodEnd && toISODate(dueDate) < toISODate(periodEnd)) {
-      errors.push("Hạn thanh toán phải >= Ngày tạo kỳ");
-    }
-    const base = toNum(baseAmount, NaN);
-    if (Number.isNaN(base) || base < 0)
-      errors.push("Tổng tiền tháng không hợp lệ");
-    const pen = toNum(penaltyAmount, NaN);
-    if (Number.isNaN(pen) || pen < 0) errors.push("Tiền phạt không hợp lệ");
-    return errors;
-  }
-
-  // ======= Submit (SAVE DRAFT) =======
+  // ===== SUBMIT =====
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
     setWarn("");
 
-    const errs = validateForm();
-    if (errs.length) {
-      setError(errs.join("\n"));
+    if (!roomId || !tenantUserId || !periodStart || !periodEnd || !dueDate) {
+      setError("Vui lòng nhập đầy đủ thông tin bắt buộc");
       return;
     }
 
     try {
       setSubmitting(true);
-
-      // Optional pre-check duplicate
       const ok = await precheckDuplicateBill(roomId, periodStart);
       if (!ok) {
-        setSubmitting(false);
-        setWarn(
-          "Phòng này có thể đã có hoá đơn cho kỳ bắt đầu này. Hãy kiểm tra lại hoặc đổi ngày bắt đầu."
-        );
+        setWarn("Phòng này đã có hóa đơn cho kỳ này");
         return;
       }
 
@@ -228,14 +187,12 @@ export default function CreateBillPage() {
         description,
         due_date: toISODate(dueDate),
         penalty_amount: toNum(penaltyAmount, 0),
-        total_amount: toNum(baseAmount, 0) + toNum(penaltyAmount, 0),
-
-        // ✅ ép draft (kể cả khi BE auto default)
+        total_amount: totalAmount,
         status: "draft",
       };
 
       const created = await createDraftBill(payload);
-      alert("Lưu hoá đơn nháp thành công.");
+      alert("Lưu hóa đơn nháp thành công");
 
       const id =
         created?.bill_id ??
@@ -243,100 +200,80 @@ export default function CreateBillPage() {
         created?.data?.bill_id ??
         created?.data?.id;
 
-      if (id) nav(`/bills/${id}/edit`);
-      else nav("/bills");
+      nav(id ? `/bills/${id}/edit` : "/bills");
     } catch (e) {
-      setError(e?.message || "Lưu hoá đơn nháp thất bại");
+      setError(e?.message || "Tạo hóa đơn thất bại");
     } finally {
       setSubmitting(false);
     }
   }
 
-  // ======= UI =======
+  // ===== UI =====
   return (
     <div className="container py-3">
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <h3 className="m-0">Tạo hoá đơn (Nháp)</h3>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary" onClick={() => nav(-1)}>
-            Huỷ
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={onSubmit}
-            disabled={submitting}
-          >
-            {submitting ? "Đang lưu..." : "Lưu nháp"}
-          </button>
-        </div>
-      </div>
+      <h3>Tạo hóa đơn (Nháp)</h3>
 
-      {error && (
-        <div className="alert alert-danger white-space-pre-wrap">
-          {String(error)}
-        </div>
-      )}
-      {warn && (
-        <div className="alert alert-warning white-space-pre-wrap">
-          {String(warn)}
-        </div>
-      )}
+      {error && <div className="alert alert-danger">{error}</div>}
+      {warn && <div className="alert alert-warning">{warn}</div>}
 
       <form className="row g-3" onSubmit={onSubmit}>
-        {/* ROOM */}
+        {role === "OWNER" && (
+          <div className="col-md-4">
+            <label className="form-label">Tòa nhà *</label>
+            <select
+              className="form-select"
+              value={buildingId}
+              onChange={(e) => {
+                setBuildingId(e.target.value);
+                setRoomId("");
+              }}
+            >
+              <option value="">-- Chọn tòa nhà --</option>
+              {buildings.map((b) => (
+                <option key={b.building_id} value={b.building_id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="col-md-4">
-          <label className="form-label">
-            Phòng <span className="text-danger">*</span>
-          </label>
+          <label className="form-label">Phòng *</label>
           <select
             className="form-select"
             value={roomId}
+            disabled={!buildingId || loadingRooms}
             onChange={(e) => setRoomId(e.target.value)}
-            disabled={loadingRooms}
           >
             <option value="">-- Chọn phòng --</option>
-            {rooms.map((r) => {
-              const id = r?.room_id ?? r?.id;
-              const label = r?.room_number ?? r?.name ?? `Phòng #${id}`;
-              return (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              );
-            })}
+            {rooms.map((r) => (
+              <option key={r.room_id} value={r.room_id}>
+                {r.room_number}
+              </option>
+            ))}
           </select>
         </div>
 
-        {/* TENANT */}
         <div className="col-md-4">
-          <label className="form-label">
-            Người thanh toán <span className="text-danger">*</span>
-          </label>
+          <label className="form-label">Người thanh toán *</label>
           <select
             className="form-select"
             value={tenantUserId}
+            disabled={!roomId || loadingTenants}
             onChange={(e) => setTenantUserId(e.target.value)}
-            disabled={!roomId || loadingTenants || tenantsInRoom.length === 0}
           >
-            <option value="">-- Chọn người trong phòng --</option>
+            <option value="">-- Chọn người thuê --</option>
             {tenantsInRoom.map((t) => (
               <option key={t.user_id} value={t.user_id}>
                 {t.full_name}
               </option>
             ))}
           </select>
-          {!loadingTenants && roomId && tenantsInRoom.length === 0 && (
-            <div className="form-text text-danger">
-              Phòng này chưa có người thuê hợp lệ.
-            </div>
-          )}
         </div>
 
-        {/* PERIOD DATES */}
-        <div className="col-md-2">
-          <label className="form-label">
-            Ngày bắt đầu kỳ <span className="text-danger">*</span>
-          </label>
+        <div className="col-md-3">
+          <label className="form-label">Ngày bắt đầu kỳ *</label>
           <input
             type="date"
             className="form-control"
@@ -344,10 +281,9 @@ export default function CreateBillPage() {
             onChange={(e) => setPeriodStart(e.target.value)}
           />
         </div>
-        <div className="col-md-2">
-          <label className="form-label">
-            Ngày kết thúc kỳ <span className="text-danger">*</span>
-          </label>
+
+        <div className="col-md-3">
+          <label className="form-label">Ngày kết thúc kỳ *</label>
           <input
             type="date"
             className="form-control"
@@ -356,62 +292,47 @@ export default function CreateBillPage() {
           />
         </div>
 
-        {/* DESCRIPTION */}
         <div className="col-12">
-          <label className="form-label">Mô tả hoá đơn</label>
+          <label className="form-label">Mô tả hóa đơn</label>
           <textarea
             className="form-control"
             rows={3}
-            placeholder="Tiền phòng + Điện + Nước..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
 
-        {/* AMOUNTS */}
         <div className="col-md-4">
-          <label className="form-label">
-            Tổng tiền tháng (không gồm phạt){" "}
-            <span className="text-danger">*</span>
-          </label>
+          <label className="form-label">Tổng tiền tháng *</label>
           <input
             type="number"
-            min="0"
-            step="1000"
             className="form-control"
-            placeholder="VD: 3200000"
             value={baseAmount}
             onChange={(e) => setBaseAmount(e.target.value)}
           />
         </div>
+
         <div className="col-md-4">
-          <label className="form-label">Tiền phạt (nếu quá hạn)</label>
+          <label className="form-label">Tiền phạt</label>
           <input
             type="number"
-            min="0"
-            step="1000"
             className="form-control"
             value={penaltyAmount}
             onChange={(e) => setPenaltyAmount(e.target.value)}
           />
-          <div className="form-text">
-            Có thể để 0 khi tạo, tính sau khi thu tiền/quá hạn.
-          </div>
         </div>
+
         <div className="col-md-4">
-          <label className="form-label">Tổng phải thu (tự tính)</label>
+          <label className="form-label">Tổng phải thu</label>
           <input
             className="form-control"
-            value={totalAmount.toLocaleString()}
             readOnly
+            value={totalAmount.toLocaleString()}
           />
         </div>
 
-        {/* DUE DATE */}
         <div className="col-md-4">
-          <label className="form-label">
-            Hạn thanh toán <span className="text-danger">*</span>
-          </label>
+          <label className="form-label">Hạn thanh toán *</label>
           <input
             type="date"
             className="form-control"
@@ -420,14 +341,13 @@ export default function CreateBillPage() {
           />
         </div>
 
-        {/* ACTIONS (mobile fallback) */}
-        <div className="col-12 d-flex gap-2 d-md-none">
+        <div className="col-12 d-flex gap-2">
           <button
             type="button"
             className="btn btn-outline-secondary"
             onClick={() => nav(-1)}
           >
-            Huỷ
+            Hủy
           </button>
           <button
             type="submit"

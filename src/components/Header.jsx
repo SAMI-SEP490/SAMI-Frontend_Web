@@ -23,7 +23,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
         const u = data?.data || data;
         if (alive) setUser(u);
         localStorage.setItem("sami:user", JSON.stringify(u));
-      // eslint-disable-next-line no-empty
+        // eslint-disable-next-line no-empty
       } catch {}
     })();
     return () => {
@@ -42,7 +42,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
   const handleLogout = async () => {
     try {
       await apiLogout();
-    // eslint-disable-next-line no-empty
+      // eslint-disable-next-line no-empty
     } catch {
     } finally {
       [
@@ -61,7 +61,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
       style={{
         backgroundColor: colors.brand,
         color: "#fff",
-        height: "80px",
+        height: "60px",
         display: "flex",
         alignItems: "center",
         padding: "0 20px",
@@ -100,7 +100,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
           src="/logo2.png"
           alt="SAMI Logo"
           style={{
-            height: "80px",
+            height: "50px",
             objectFit: "contain",
           }}
         />

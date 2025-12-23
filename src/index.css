@@ -2,34 +2,47 @@
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 html,
 body,
 #root {
-  height: 100%;
+    height: 100%;
+}
+
+html {
+    background: #f4f6f8;
+    font-size: 16px;
 }
 body {
-  margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue",
-    Arial, "Noto Sans", "Liberation Sans", sans-serif;
-  line-height: 1.5;
-  color: #111827; /* text tối chuẩn */
-  background: #f4f6f8; /* Nền xám nhạt phủ full width giống mock */
+    margin: 0;
+    font-family:
+        system-ui,
+        -apple-system,
+        Segoe UI,
+        Roboto,
+        "Helvetica Neue",
+        Arial,
+        "Noto Sans",
+        "Liberation Sans",
+        sans-serif;
+    line-height: 1.5;
+    color: #111827; /* text tối chuẩn */
+    background: #f4f6f8; /* Nền xám nhạt phủ full width giống mock */
 }
 
 /* KHÔNG giới hạn width của #root nữa */
 #root {
-  width: 100%;
+    width: 100%;
 }
 
 /* Tuỳ chọn: tiện ích chung */
 .container-fluid {
-  width: 100%;
-  padding-right: 16px;
-  padding-left: 16px;
+    width: 100%;
+    padding-right: 16px;
+    padding-left: 16px;
 }
 .hidden {
-  display: none !important;
+    display: none !important;
 }

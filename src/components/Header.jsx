@@ -37,9 +37,14 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
         user?.username ||
         user?.email ||
         "Người dùng";
+    const { avatar_url, full_name} =
+        user;
+    const avatarSrc =
+        avatar_url ||
+        `https://ui-avatars.com/api/?background=0D8ABC&color=fff&size=256&name=${encodeURIComponent(
+            full_name || "User"
+        )}`;
 
-    // Get first letter for avatar
-    const avatarLetter = displayName.charAt(0).toUpperCase();
 
     const handleLogout = async () => {
         try {
@@ -160,20 +165,23 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
                 >
                     {/* Avatar Circle */}
                     <div
-                        style={{
-                            width: "32px",
-                            height: "32px",
-                            borderRadius: "50%",
-                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: "600",
-                            fontSize: "14px",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                        }}
                     >
-                        {avatarLetter}
+                        <img
+                            src={avatarSrc}
+                            alt="Avatar"
+                            style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "50%",
+                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: "600",
+                                fontSize: "14px",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                            }}
+                        />
                     </div>
 
                     {/* User Name */}

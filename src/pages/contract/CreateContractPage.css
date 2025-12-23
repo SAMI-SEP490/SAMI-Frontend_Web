@@ -1,38 +1,226 @@
-/* src/pages/contract/EditContractPage.css */
-.edit-contract-page {
-    padding: 18px;
-    background: #fff;
-    border-radius: 8px;
+/* src/pages/contract/CreateContractPage.css */
+
+/* --- 1. Layout & Card Style (Đồng bộ với Edit Page) --- */
+.create-contract-page-container {
+    max-width: 1140px;
 }
 
-.edit-contract-page h3 {
+/* Header */
+.create-contract-header h3 {
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+/* Card Wrapper */
+.create-contract-card {
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05) !important;
+    background-color: #fff;
+}
+
+/* Form Elements */
+.form-label {
+    font-size: 0.9rem;
+    color: #546e7a;
+    margin-bottom: 0.5rem;
+}
+
+.form-label.fw-semibold {
+    color: #37474f;
+}
+
+.form-control, .form-select {
+    border-radius: 8px;
+    border: 1px solid #cfd8dc;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.95rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.15);
+}
+
+.form-control-plaintext.bg-light {
+    border: 1px solid #eceff1;
+    color: #607d8b;
+    font-weight: 500;
+}
+
+/* File Upload Section */
+.file-upload-section {
+    background-color: #f8f9fa !important;
+    border: 2px dashed #dee2e6 !important;
+}
+
+.file-upload-section h6 {
+    color: #495057;
+    font-weight: 600;
+}
+
+/* AI Import Button (Special Style) */
+.ai-import-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border: none !important;
+    padding: 8px 20px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    transition: all 0.3s ease;
+    border-radius: 8px;
+    color: white;
+}
+
+.ai-import-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+    color: white;
+}
+
+/* --- 2. Scanner Modal & Animations (Giữ nguyên logic cũ) --- */
+.scanner-modal .modal-content {
+    background: transparent;
+    border: none;
+}
+
+.scanner-body {
+    padding: 0 !important;
+    background: #1a1a1a;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Close/Cancel Button */
+.scanner-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.scanner-close-btn:hover {
+    background: rgba(255, 59, 59, 0.8);
+    transform: scale(1.1);
+}
+
+.scanner-container {
+    position: relative;
+    min-height: 600px;
+}
+
+.pdf-preview {
+    width: 100%;
+    height: 600px;
+    border: none;
+    opacity: 0.7;
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+/* Dynamic Line */
+.scan-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    animation: pulse 1s ease-in-out infinite;
+    transition: top 0.3s linear, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Scanner Status Box */
+.scanner-status {
+    background: rgba(0,0,0,0.85);
+    padding: 32px 48px;
+    border-radius: 16px;
+    border: 2px solid transparent;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    text-align: center;
+    transition: all 0.3s ease;
+    min-width: 320px;
+}
+
+.spinner-circle {
+    width: 64px;
+    height: 64px;
+    border: 4px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+    transition: border-top-color 0.3s ease;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.scan-title {
+    margin-bottom: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    transition: color 0.3s ease;
+}
+
+.scan-subtitle {
+    color: #ccc;
+    font-size: 14px;
     margin-bottom: 16px;
 }
 
-.contract-form {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+.progress-badge {
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 8px 16px;
+    display: inline-block;
 }
 
-.contract-form .form-row {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+.progress-text {
+    font-size: 20px;
+    font-weight: 700;
+    transition: color 0.3s ease;
 }
 
-.contract-form .form-inline {
-    display: flex;
-    gap: 12px;
+/* Success Animation */
+.success-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    animation: checkmark 0.5s ease-in-out;
 }
 
-.contract-form .form-inline > div {
-    flex: 1;
+@keyframes checkmark {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); opacity: 1; }
 }
 
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 8px;
-}
+.success-title { color: #10b981; margin-bottom: 8px; font-weight: 600; }
+.success-subtitle { color: #aaa; font-size: 14px; }

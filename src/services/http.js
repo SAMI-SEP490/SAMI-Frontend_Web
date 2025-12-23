@@ -8,7 +8,7 @@ const API_BASE = String(RAW_BASE).replace(/\/$/, ""); // bỏ slash cuối
 export const http = axios.create({
   baseURL: API_BASE, // ví dụ '/api' hoặc 'http://localhost:3000/api  '
   withCredentials: false,
-  timeout: 20000,
+  timeout: 50000,
 });
 
 // ---- helpers lấy/lưu token, hỗ trợ nhiều key cũ của bạn

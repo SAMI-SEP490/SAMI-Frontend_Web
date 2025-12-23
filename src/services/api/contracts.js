@@ -113,7 +113,7 @@ export async function updateContract(id, contractData) {
 
 export async function deleteContract(id) {
   try {
-    const response = await http.delete(`/contract/${id}`);
+    const response = await http.delete(`/contract/${id}/permanent`);
     return unwrap(response);
   } catch (error) {
     console.error(`Lỗi khi xóa hợp đồng ${id}:`, error);
@@ -159,7 +159,22 @@ export async function fetchContractFileBlob(id) {
     throw error;
   }
 }
+export async function processContractWithAI(file) {
+  try {
+    const fd = new FormData();
+    fd.append("contract_file", file); // Key này phải khớp với upload.single('contract_file') ở router
 
+    const response = await http.post("/contract/import", fd, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return unwrap(response);
+  } catch (error) {
+    console.error("Lỗi khi xử lý AI:", error);
+    throw error;
+  }
+}
 /* ==========================================================================
 // ADDENDUMS (PHỤ LỤC)
    ========================================================================== */

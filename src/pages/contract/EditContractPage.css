@@ -1,38 +1,109 @@
 /* src/pages/contract/EditContractPage.css */
-.edit-contract-page {
-    padding: 18px;
-    background: #fff;
+
+/* Container chính - tạo khoảng cách với lề */
+.edit-contract-page-container {
+    max-width: 1140px; /* Giới hạn chiều rộng trên màn hình lớn */
+}
+
+/* Header của trang */
+.edit-contract-header h3 {
+    font-weight: 700;
+    color: #2c3e50; /* Màu xanh đen chuyên nghiệp */
+}
+
+/* Card bao bọc form */
+.edit-contract-card {
+    border-radius: 12px; /* Bo góc mềm mại hơn */
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05) !important; /* Bóng đổ nhẹ, hiện đại */
+    background-color: #fff;
+}
+
+/* Tùy chỉnh các label */
+.form-label {
+    font-size: 0.9rem;
+    color: #546e7a; /* Màu xám xanh dễ đọc */
+    margin-bottom: 0.5rem;
+}
+
+.form-label.fw-semibold {
+    color: #37474f; /* Màu đậm hơn cho các trường quan trọng */
+}
+
+/* Tùy chỉnh Input và Select của Bootstrap */
+.form-control, .form-select {
     border-radius: 8px;
+    border: 1px solid #cfd8dc;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.95rem;
+    transition: all 0.2s ease-in-out;
 }
 
-.edit-contract-page h3 {
-    margin-bottom: 16px;
+/* Hiệu ứng khi focus vào input */
+.form-control:focus, .form-select:focus {
+    border-color: #3498db; /* Màu xanh dương khi focus */
+    box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.15); /* Highlight nhẹ xung quanh */
 }
 
-.contract-form {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+/* Input readonly (ví dụ tên tòa nhà cho Manager) */
+.form-control-plaintext.bg-light {
+    border: 1px solid #eceff1;
+    color: #607d8b;
+    font-weight: 500;
 }
 
-.contract-form .form-row {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+/* Khu vực upload file */
+.file-upload-section {
+    background-color: #f8f9fa !important; /* Màu nền xám rất nhạt */
 }
 
-.contract-form .form-inline {
-    display: flex;
-    gap: 12px;
+.file-upload-section.dashed-border {
+    border: 2px dashed #dee2e6 !important; /* Viền nét đứt tạo cảm giác vùng thả file */
 }
 
-.contract-form .form-inline > div {
-    flex: 1;
+.file-upload-section h6 {
+    color: #495057;
+    font-weight: 600;
 }
 
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 8px;
+/* Tùy chỉnh Alert hiển thị file hiện tại */
+.alert-info {
+    background-color: #e3f2fd;
+    border-color: #bbdefb;
+    color: #0d47a1;
+}
+
+/* Tùy chỉnh nút bấm */
+.btn-primary {
+    background-color: #3498db;
+    border-color: #3498db;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #2980b9;
+    border-color: #2980b9;
+    transform: translateY(-1px); /* Hiệu ứng nổi nhẹ khi hover */
+}
+
+.btn-light {
+    background-color: #fcfcfc;
+    border-color: #e0e0e0;
+}
+
+.btn-light:hover {
+    background-color: #f0f0f0;
+    border-color: #d0d0d0;
+}
+
+/* Responsive adjustments (nếu cần thêm) */
+@media (max-width: 768px) {
+    .edit-contract-card .card-body {
+        padding: 1.5rem !important;
+    }
+    .form-actions {
+        flex-direction: column-reverse;
+    }
+    .form-actions .btn {
+        width: 100%;
+    }
 }

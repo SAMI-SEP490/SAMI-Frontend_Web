@@ -32,15 +32,20 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
     };
   }, []);
 
-  const displayName =
-    user?.full_name ||
-    user?.name ||
-    user?.username ||
-    user?.email ||
-    "Người dùng";
+    const displayName =
+        user?.full_name ||
+        user?.name ||
+        user?.username ||
+        user?.email ||
+        "Người dùng";
+    const { avatar_url, full_name} =
+        user;
+    const avatarSrc =
+        avatar_url ||
+        `https://ui-avatars.com/api/?background=0D8ABC&color=fff&size=256&name=${encodeURIComponent(
+            full_name || "User"
+        )}`;
 
-  // Get first letter for avatar
-  const avatarLetter = displayName.charAt(0).toUpperCase();
 
   const handleLogout = async () => {
     try {
@@ -129,54 +134,57 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
         </div>
       </div>
 
-      {/* RIGHT – User section with dropdown */}
-      <div
-        style={{
-          marginLeft: "auto",
-          display: "flex",
-          alignItems: "center",
-          position: "relative",
-        }}
-      >
-        {/* User Dropdown Trigger */}
-        <div
-          onClick={() => setShowDropdown(!showDropdown)}
-          className="header-user-btn"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "8px 16px",
-            background: "rgba(255,255,255,0.1)",
-            borderRadius: "24px",
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            border: "1px solid rgba(255,255,255,0.2)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-          }}
-        >
-          {/* Avatar Circle */}
-          <div
-            style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: "600",
-              fontSize: "14px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            }}
-          >
-            {avatarLetter}
-          </div>
+            {/* RIGHT – User section with dropdown */}
+            <div
+                style={{
+                    marginLeft: "auto",
+                    display: "flex",
+                    alignItems: "center",
+                    position: "relative",
+                }}
+            >
+                {/* User Dropdown Trigger */}
+                <div
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className="header-user-btn"
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 16px",
+                        background: "rgba(255,255,255,0.1)",
+                        borderRadius: "24px",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        border: "1px solid rgba(255,255,255,0.2)",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                    }}
+                >
+                    {/* Avatar Circle */}
+                    <div
+                    >
+                        <img
+                            src={avatarSrc}
+                            alt="Avatar"
+                            style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "50%",
+                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: "600",
+                                fontSize: "14px",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                            }}
+                        />
+                    </div>
 
           {/* User Name */}
           <span

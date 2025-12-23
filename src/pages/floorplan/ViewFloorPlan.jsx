@@ -171,6 +171,7 @@ function ViewerInner() {
     };
   }, []);
 
+  // eslint-disable-next-line no-unused-vars
   const activeBuildingObj = useMemo(
     () =>
       buildings.find((b) => String(b.building_id) === String(activeBuilding)) ||

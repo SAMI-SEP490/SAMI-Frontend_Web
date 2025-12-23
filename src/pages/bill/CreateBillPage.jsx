@@ -1,11 +1,23 @@
+// src/pages/bill/CreateBillPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { createDraftBill, precheckDuplicateBill } from "@/services/api/bills";
-import { listAssignedBuildings, listBuildings } from "@/services/api/building";
-import { listRoomsByBuilding } from "@/services/api/rooms";
-import { http, unwrap as un } from "@/services/http";
+import { listBuildings, listAssignedBuildings } from "@/services/api/building";
+import { getRoomsByBuildingId, listRooms } from "@/services/api/rooms";
+
+// ✅ đổi import sang API lấy TẤT CẢ tenant trong phòng
+import { getAllTenantsByRoomId } from "@/services/api/tenants";
+
+import { getAccessToken } from "@/services/http";
 
 // ===== Helpers =====
+const toNum = (v, d = 0) => {
+  if (v === "" || v === null || v === undefined) return d;
+  const n = Number(v);
+  return Number.isNaN(n) ? d : n;
+};
+
 function toISODate(v) {
   if (!v) return "";
   const s = String(v);
@@ -14,21 +26,48 @@ function toISODate(v) {
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 }
-const toNum = (v, d = 0) => {
-  if (v === "" || v === null || v === undefined) return d;
-  const n = Number(v);
-  return Number.isNaN(n) ? d : n;
-};
+
+function decodeRoleFromToken() {
+  try {
+    const token = getAccessToken?.();
+    if (!token) return "";
+    const decoded = JSON.parse(atob(token.split(".")[1]));
+    const r = decoded?.role || decoded?.userRole || "";
+    return String(r).toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
+// unwrap “đủ kiểu” (res / res.data / res.data.data)
+function unwrapAny(x) {
+  if (!x) return x;
+  if (Array.isArray(x)) return x;
+  if (Array.isArray(x?.data)) return x.data;
+  if (Array.isArray(x?.data?.data)) return x.data.data;
+  if (Array.isArray(x?.data?.items)) return x.data.items;
+  if (Array.isArray(x?.items)) return x.items;
+  if (Array.isArray(x?.data?.rooms)) return x.data.rooms;
+  if (Array.isArray(x?.rooms)) return x.rooms;
+  return x?.data?.data ?? x?.data ?? x;
+}
 
 export default function CreateBillPage() {
   const nav = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const role = user?.role;
 
-  // ===== Form state =====
-  const [buildingId, setBuildingId] = useState("");
+  // ===== ROLE =====
+  const [role, setRole] = useState("");
+
+  // ===== Filter / Select =====
+  const [buildings, setBuildings] = useState([]);
+  const [buildingId, setBuildingId] = useState(""); // owner chọn / manager auto
+  const [rooms, setRooms] = useState([]);
   const [roomId, setRoomId] = useState("");
+
+  const [tenantsInRoom, setTenantsInRoom] = useState([]);
   const [tenantUserId, setTenantUserId] = useState("");
+
+  // ===== Bill form =====
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [description, setDescription] = useState("");
@@ -36,50 +75,73 @@ export default function CreateBillPage() {
   const [penaltyAmount, setPenaltyAmount] = useState("0");
   const [dueDate, setDueDate] = useState("");
 
-  // ===== Data =====
-  const [buildings, setBuildings] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [tenantsInRoom, setTenantsInRoom] = useState([]);
-
   // ===== UX =====
   const [loadingBuilding, setLoadingBuilding] = useState(true);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTenants, setLoadingTenants] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
   const [error, setError] = useState("");
   const [warn, setWarn] = useState("");
 
-  const totalAmount = useMemo(
-    () => toNum(baseAmount, 0) + toNum(penaltyAmount, 0),
-    [baseAmount, penaltyAmount]
-  );
+  const totalAmount = useMemo(() => {
+    const base = toNum(baseAmount, 0);
+    const pen = toNum(penaltyAmount, 0);
+    return base + pen;
+  }, [baseAmount, penaltyAmount]);
 
-  // ===== LOAD BUILDING (Y HỆT CREATE CONTRACT) =====
+  // ===== 1) Role from token =====
+  useEffect(() => {
+    const r = decodeRoleFromToken();
+    setRole(r);
+  }, []);
+
+  // ===== 2) Load buildings (GIỐNG CreateContract) =====
   useEffect(() => {
     let cancelled = false;
 
-    async function loadBuildings() {
+    async function fetchBuildings() {
+      if (!role) return;
       setLoadingBuilding(true);
+      setError("");
+      setWarn("");
+
       try {
         if (role === "MANAGER") {
           const res = await listAssignedBuildings();
-          const list = Array.isArray(res) ? res : res?.data;
-          if (!list || list.length === 0)
-            throw new Error("Tài khoản quản lý chưa được gán tòa nhà");
+          const assignedList = unwrapAny(res);
 
-          const b = list[0];
-          const buildingIdValue = b.building_id || b.id;
+          if (!Array.isArray(assignedList) || assignedList.length === 0) {
+            throw new Error("Tài khoản quản lý chưa được gán tòa nhà");
+          }
+
+          const b = assignedList[0];
+          const bId = b?.building_id;
+          if (!bId)
+            throw new Error("Không lấy được building_id từ assigned building");
 
           if (!cancelled) {
             setBuildings([b]);
-            setBuildingId(buildingIdValue);
+            setBuildingId(String(bId));
           }
+          return;
         }
 
         if (role === "OWNER") {
           const res = await listBuildings();
-          const list = Array.isArray(res) ? res : res?.data;
-          if (!cancelled) setBuildings(list || []);
+          const list = unwrapAny(res);
+          if (!cancelled) setBuildings(Array.isArray(list) ? list : []);
+          return;
+        }
+
+        if (!cancelled) {
+          setBuildings([]);
+          setBuildingId("");
+          setRooms([]);
+          setRoomId("");
+          setTenantsInRoom([]);
+          setTenantUserId("");
+          setError("Bạn không có quyền tạo hóa đơn.");
         }
       } catch (e) {
         if (!cancelled)
@@ -89,62 +151,76 @@ export default function CreateBillPage() {
       }
     }
 
-    loadBuildings();
+    fetchBuildings();
     return () => (cancelled = true);
   }, [role]);
 
-  // ===== LOAD ROOMS THEO BUILDING (KHÔNG FILTER CHAY) =====
+  // ===== 3) Load rooms theo building =====
   useEffect(() => {
     let cancelled = false;
 
-    async function loadRooms() {
+    async function fetchRooms() {
       if (!buildingId) {
         setRooms([]);
         return;
       }
+
       setLoadingRooms(true);
+      setError("");
+      setWarn("");
+
       try {
-        // ✅ FIX: truyền đúng params
-        const res = await listRoomsByBuilding({ building_id: buildingId });
-        const list = Array.isArray(res) ? res : res?.data;
-        if (!cancelled) setRooms(list || []);
+        const res = await getRoomsByBuildingId(buildingId);
+        let list = unwrapAny(res);
+        list = Array.isArray(list) ? list : [];
+
+        if (list.length === 0) {
+          const all = unwrapAny(await listRooms());
+          const arr = Array.isArray(all) ? all : [];
+          list = arr.filter(
+            (r) => String(r?.building_id) === String(buildingId)
+          );
+        }
+
+        if (!cancelled) setRooms(list);
       } catch (e) {
-        if (!cancelled)
+        if (!cancelled) {
+          setRooms([]);
           setError(e?.message || "Không tải được danh sách phòng");
+        }
       } finally {
         if (!cancelled) setLoadingRooms(false);
       }
     }
 
-    loadRooms();
+    fetchRooms();
     return () => (cancelled = true);
   }, [buildingId]);
 
-  // ===== LOAD TENANT TRONG PHÒNG (GIỮ NGUYÊN LOGIC CŨ) =====
+  // ===== 4) Load tenants theo room (✅ dùng /tenant/moor/:roomId) =====
   useEffect(() => {
     let cancelled = false;
 
-    async function loadTenants() {
-      setLoadingTenants(true);
+    async function fetchTenants() {
       setTenantUserId("");
-      try {
-        if (!roomId) {
-          setTenantsInRoom([]);
-          return;
-        }
-        const res = await http.get(`/room/${roomId}`);
-        const room = un(res);
-        const tenants =
-          room?.tenants ||
-          room?.occupants ||
-          room?.currentTenants ||
-          room?.room_tenants ||
-          [];
+      if (!roomId) {
+        setTenantsInRoom([]);
+        return;
+      }
 
-        const normalized = tenants
+      setLoadingTenants(true);
+      setWarn("");
+
+      try {
+        // ✅ LẤY TẤT CẢ tenant trong phòng
+        const res = await getAllTenantsByRoomId(roomId);
+        const list = unwrapAny(res);
+        const arr = Array.isArray(list) ? list : [];
+
+        const normalized = arr
           .map((t) => ({
-            user_id: t?.user_id ?? t?.id ?? t?.user?.user_id,
-            full_name: t?.full_name ?? t?.user?.full_name ?? "(Không tên)",
+            user_id: t?.user_id ?? t?.users?.user_id ?? t?.id,
+            full_name: t?.full_name ?? t?.users?.full_name ?? "(Không tên)",
           }))
           .filter((x) => x.user_id);
 
@@ -156,15 +232,20 @@ export default function CreateBillPage() {
       }
     }
 
-    loadTenants();
+    fetchTenants();
     return () => (cancelled = true);
   }, [roomId]);
 
-  // ===== SUBMIT =====
+  // ===== Submit =====
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
     setWarn("");
+
+    if (role !== "OWNER" && role !== "MANAGER") {
+      setError("Bạn không có quyền tạo hóa đơn.");
+      return;
+    }
 
     if (!roomId || !tenantUserId || !periodStart || !periodEnd || !dueDate) {
       setError("Vui lòng nhập đầy đủ thông tin bắt buộc");
@@ -173,6 +254,7 @@ export default function CreateBillPage() {
 
     try {
       setSubmitting(true);
+
       const ok = await precheckDuplicateBill(roomId, periodStart);
       if (!ok) {
         setWarn("Phòng này đã có hóa đơn cho kỳ này");
@@ -192,7 +274,6 @@ export default function CreateBillPage() {
       };
 
       const created = await createDraftBill(payload);
-      alert("Lưu hóa đơn nháp thành công");
 
       const id =
         created?.bill_id ??
@@ -200,6 +281,7 @@ export default function CreateBillPage() {
         created?.data?.bill_id ??
         created?.data?.id;
 
+      alert("Lưu hóa đơn nháp thành công");
       nav(id ? `/bills/${id}/edit` : "/bills");
     } catch (e) {
       setError(e?.message || "Tạo hóa đơn thất bại");
@@ -208,7 +290,6 @@ export default function CreateBillPage() {
     }
   }
 
-  // ===== UI =====
   return (
     <div className="container py-3">
       <h3>Tạo hóa đơn (Nháp)</h3>
@@ -223,6 +304,7 @@ export default function CreateBillPage() {
             <select
               className="form-select"
               value={buildingId}
+              disabled={loadingBuilding}
               onChange={(e) => {
                 setBuildingId(e.target.value);
                 setRoomId("");
@@ -230,8 +312,11 @@ export default function CreateBillPage() {
             >
               <option value="">-- Chọn tòa nhà --</option>
               {buildings.map((b) => (
-                <option key={b.building_id} value={b.building_id}>
-                  {b.name}
+                <option
+                  key={b?.building_id ?? b?.id}
+                  value={b?.building_id ?? b?.id}
+                >
+                  {b?.name}
                 </option>
               ))}
             </select>
@@ -243,13 +328,20 @@ export default function CreateBillPage() {
           <select
             className="form-select"
             value={roomId}
-            disabled={!buildingId || loadingRooms}
+            disabled={
+              !buildingId ||
+              loadingRooms ||
+              (role !== "OWNER" && role !== "MANAGER")
+            }
             onChange={(e) => setRoomId(e.target.value)}
           >
             <option value="">-- Chọn phòng --</option>
             {rooms.map((r) => (
-              <option key={r.room_id} value={r.room_id}>
-                {r.room_number}
+              <option key={r?.room_id ?? r?.id} value={r?.room_id ?? r?.id}>
+                {r?.room_number ??
+                  r?.name ??
+                  r?.number ??
+                  `Phòng ${r?.room_id ?? r?.id}`}
               </option>
             ))}
           </select>
@@ -309,6 +401,7 @@ export default function CreateBillPage() {
             className="form-control"
             value={baseAmount}
             onChange={(e) => setBaseAmount(e.target.value)}
+            placeholder="VD: 3200000"
           />
         </div>
 
@@ -324,11 +417,7 @@ export default function CreateBillPage() {
 
         <div className="col-md-4">
           <label className="form-label">Tổng phải thu</label>
-          <input
-            className="form-control"
-            readOnly
-            value={totalAmount.toLocaleString()}
-          />
+          <input className="form-control" readOnly value={totalAmount} />
         </div>
 
         <div className="col-md-4">

@@ -54,13 +54,6 @@ export default function CreateNotificationPage() {
     navigate(ROUTES.notifications);
   };
 
-  const handleSaveDraft = (e) => {
-    e.preventDefault();
-    alert(
-      "Hiện tại hệ thống chưa lưu bản nháp lên backend.\nBạn có thể giữ tab này mở để chỉnh sửa tiếp trước khi gửi."
-    );
-  };
-
   const handleSend = async (e) => {
     e.preventDefault();
 
@@ -208,8 +201,7 @@ export default function CreateNotificationPage() {
             alignItems: "flex-end",
             marginBottom: 12,
           }}
-        >
-        </div>
+        ></div>
 
         {/* Actions */}
         <div
@@ -220,22 +212,6 @@ export default function CreateNotificationPage() {
             gap: 12,
           }}
         >
-          <button
-            onClick={handleSaveDraft}
-            type="button"
-            style={{
-              background: "#E5E7EB",
-              color: "#111827",
-              padding: "8px 18px",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            Lưu nháp
-          </button>
-
           <button
             onClick={handleSend}
             type="button"

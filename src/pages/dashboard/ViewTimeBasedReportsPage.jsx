@@ -219,7 +219,7 @@ export default function ViewTimeBasedReportsPage() {
               <YAxis />
               <Tooltip formatter={(v) => `${formatNumber(v)} VND`} />
               <Legend />
-              <Bar dataKey="Doanh thu" fill="#3B82F6" />
+              <Bar dataKey="revenue" name="Doanh thu" fill="#3B82F6" />
             </BarChart>
           )}
 
@@ -230,7 +230,7 @@ export default function ViewTimeBasedReportsPage() {
               <YAxis />
               <Tooltip formatter={(v) => `${formatNumber(v)} VND`} />
               <Legend />
-              <Bar dataKey="Doanh thu" fill="#3B82F6" />
+              <Bar dataKey="revenue" name="Doanh thu" fill="#3B82F6" />
             </BarChart>
           )}
         </div>

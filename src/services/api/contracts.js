@@ -18,19 +18,49 @@ function _toISODate(d) {
   return `${year}-${month}-${day}`;
 }
 
+
+
 function _buildContractFormData(form) {
   const fd = new FormData();
-  if (form.roomId) fd.append("room_id", form.roomId);
-  if (form.tenantUserId) fd.append("tenant_user_id", form.tenantUserId);
-  if (form.startDate) fd.append("start_date", _toISODate(form.startDate));
-  if (form.endDate) fd.append("end_date", _toISODate(form.endDate));
-  if (form.rentAmount !== undefined && form.rentAmount !== "") fd.append("rent_amount", form.rentAmount);
-  if (form.depositAmount !== undefined && form.depositAmount !== "") fd.append("deposit_amount", form.depositAmount);
+
+  // 1. Mapping các ID (Lưu ý: EditPage hiện tại của bạn chưa có logic chọn lại Room ID hay Tenant ID, nhưng cứ giữ lại để map)
+  // Kiểm tra cả snake_case và camelCase
+  if (form.room_id || form.roomId) fd.append("room_id", form.room_id || form.roomId);
+  if (form.tenant_user_id || form.tenantUserId) fd.append("tenant_user_id", form.tenant_user_id || form.tenantUserId);
+  if (form.building_id || form.buildingId) fd.append("building_id", form.building_id || form.buildingId);
+
+  // 2. Xử lý ngày tháng
+  // Lấy giá trị từ form.start_date (React gửi) hoặc form.startDate
+  const startDate = form.start_date || form.startDate;
+  if (startDate) fd.append("start_date", _toISODate(startDate));
+
+  const endDate = form.end_date || form.endDate;
+  if (endDate) fd.append("end_date", _toISODate(endDate));
+
+  // 3. Xử lý tiền tệ
+  // React gửi form.rent_amount, Service cũ tìm form.rentAmount
+  const rentAmount = (form.rent_amount !== undefined && form.rent_amount !== "")
+      ? form.rent_amount
+      : form.rentAmount;
+  if (rentAmount !== undefined && rentAmount !== "") fd.append("rent_amount", rentAmount);
+
+  const depositAmount = (form.deposit_amount !== undefined && form.deposit_amount !== "")
+      ? form.deposit_amount
+      : form.depositAmount;
+  if (depositAmount !== undefined && depositAmount !== "") fd.append("deposit_amount", depositAmount);
+
+  // 4. Các trường chung (status, note)
   if (form.status) fd.append("status", form.status);
-  if (form.note !== undefined) fd.append("note", form.note);
+
+  // Note có thể là chuỗi rỗng nhưng không được undefined
+  const note = form.note !== undefined ? form.note : "";
+  if (note !== undefined) fd.append("note", note);
+
+  // 5. File
   if (form.file instanceof File) {
     fd.append(FILE_FIELD, form.file);
   }
+
   return fd;
 }
 

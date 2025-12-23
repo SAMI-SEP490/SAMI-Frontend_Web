@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, Trash, Pencil, Send } from "react-bootstrap-icons";
+import { Eye, Trash, Pencil, Send, CashStack } from "react-bootstrap-icons";
 import {
   listBills,
   listDraftBills,
   deleteOrCancelBill,
   updateDraftBill,
+  createCashPayment,
 } from "../../services/api/bills";
 import { http, unwrap as un } from "../../services/http";
 import "./BillListPage.css";
@@ -187,6 +188,18 @@ export default function BillListPage() {
     );
   }
 
+  async function onCashPay(id) {
+    const ok = window.confirm(
+      "Bạn có chắc chắn muốn xác nhận hóa đơn này đã được thanh toán bằng TIỀN MẶT không?"
+    );
+    if (!ok) return;
+
+    await createCashPayment(id);
+
+    // reload lại bill từ server cho CHUẨN
+    const updated = await listBills();
+    setBills(updated);
+  }
   async function onDelete(id) {
     if (!window.confirm("Xóa hóa đơn nháp này?")) return;
     await deleteOrCancelBill(id);
@@ -281,6 +294,7 @@ export default function BillListPage() {
                   <td>{renderStatusBadge(b)}</td>
 
                   <td className="action-buttons">
+                    {/* Xem luôn có */}
                     <button
                       type="button"
                       className="btn view"
@@ -289,6 +303,7 @@ export default function BillListPage() {
                       <Eye size={14} /> Xem
                     </button>
 
+                    {/* BILL NHÁP */}
                     {status === "draft" && (
                       <>
                         <button
@@ -315,6 +330,17 @@ export default function BillListPage() {
                           <Trash size={14} /> Xóa
                         </button>
                       </>
+                    )}
+
+                    {/* BILL CHƯA THANH TOÁN → TIỀN MẶT */}
+                    {(status === "issued" || status === "overdue") && (
+                      <button
+                        type="button"
+                        className="btn cash"
+                        onClick={() => onCashPay(id)}
+                      >
+                        <CashStack size={14} /> Thanh toán tiền mặt
+                      </button>
                     )}
                   </td>
                 </tr>

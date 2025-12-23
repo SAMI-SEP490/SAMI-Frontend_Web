@@ -15,6 +15,15 @@ export async function listBuildings(params = {}) {
   const { data } = await http.get("/building", { params });
   return unwrap(data);
 }
+export async function listAssignedBuildings() {
+  try {
+    const { data } = await http.get("/building/assigned");
+    return unwrap(data);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách tòa nhà được phân công:", error);
+    throw error;
+  }
+}
 
 /** 🔍 READ - Lấy thông tin tòa nhà theo ID */
 export async function getBuildingById(buildingId) {

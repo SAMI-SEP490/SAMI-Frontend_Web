@@ -34,9 +34,9 @@ import CreateUserPage from "../pages/user/CreateUserPage";
 
 // ===== Contracts =====
 import ContractListPage from "../pages/contract/ContractListPage";
-import ContractDetailPage from "../pages/contract/ContractDetailPage";
-import ContractAddendumPage from "../pages/contract/ContractAddendumPage";
+// import ContractAddendumPage from "../pages/contract/ContractAddendumPage";
 import CreateContractPage from "../pages/contract/CreateContractPage";
+import EditContractPage from "../pages/contract/EditContractPage";
 
 // ===== Bills =====
 import BillListPage from "../pages/bill/BillListPage";
@@ -142,22 +142,14 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path={ROUTES.contractDetail}
-          element={
-            <ProtectedRoute>
-              <ContractDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.contractAddendum}
-          element={
-            <ProtectedRoute>
-              <ContractAddendumPage />
-            </ProtectedRoute>
-          }
-        />
+
+        {/*  path={ROUTES.contractAddendum}*/}
+        {/*  element={*/}
+        {/*    <ProtectedRoute>*/}
+        {/*      <ContractAddendumPage />*/}
+        {/*    </ProtectedRoute>*/}
+        {/*  }*/}
+        {/*/>*/}
         <Route
           path={ROUTES.createContract}
           element={
@@ -166,7 +158,14 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
+          <Route
+              path={ROUTES.editContract}
+              element={
+                  <ProtectedRoute>
+                      <EditContractPage />
+                  </ProtectedRoute>
+              }
+          />
         {/* Tenants */}
         <Route
           path={ROUTES.tenants}

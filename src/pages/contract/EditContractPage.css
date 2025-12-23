@@ -1,0 +1,38 @@
+/* src/pages/contract/EditContractPage.css */
+.edit-contract-page {
+    padding: 18px;
+    background: #fff;
+    border-radius: 8px;
+}
+
+.edit-contract-page h3 {
+    margin-bottom: 16px;
+}
+
+.contract-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.contract-form .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.contract-form .form-inline {
+    display: flex;
+    gap: 12px;
+}
+
+.contract-form .form-inline > div {
+    flex: 1;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+}

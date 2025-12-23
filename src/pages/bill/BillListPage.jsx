@@ -167,12 +167,21 @@ export default function BillListPage() {
   }, [bills, roomFilter, fromDate, toDate]);
 
   async function onPublish(id) {
-    const ok = window.confirm(
-      "Bạn có chắc muốn xuất bản hóa đơn này?\nSau khi xuất bản sẽ không thể chỉnh sửa."
-    );
-    if (!ok) return;
+    const bill = bills.find((b) => getBillId(b) === id);
+    if (!bill) return;
 
-    await updateDraftBill(id, { status: "issued" });
+    await updateDraftBill(id, {
+      status: "issued",
+      room_id: bill.room_id,
+      tenant_user_id: bill.tenant_user_id,
+      billing_period_start: bill.billing_period_start,
+      billing_period_end: bill.billing_period_end,
+      due_date: bill.due_date,
+      total_amount: bill.total_amount,
+      description: bill.description,
+      penalty_amount: bill.penalty_amount,
+    });
+
     setBills((prev) =>
       prev.map((b) => (getBillId(b) === id ? { ...b, status: "issued" } : b))
     );

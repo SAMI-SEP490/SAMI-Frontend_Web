@@ -165,7 +165,7 @@ export default function AppRoutes() {
                       <EditContractPage />
                   </ProtectedRoute>
               }
-          />
+        />
         {/* Tenants */}
         <Route
           path={ROUTES.tenants}

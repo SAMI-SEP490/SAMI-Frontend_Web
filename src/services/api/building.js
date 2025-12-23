@@ -17,7 +17,7 @@ export async function listBuildings(params = {}) {
 }
 export async function listAssignedBuildings() {
   try {
-    const { data } = await http.get("/building/assigned");
+    const { data } = await http.get("/building/manager/assigned");
     return unwrap(data);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách tòa nhà được phân công:", error);

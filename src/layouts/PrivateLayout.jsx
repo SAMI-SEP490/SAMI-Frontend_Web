@@ -13,7 +13,7 @@ export default function PrivateLayout() {
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
 
-  const hideLayoutRoutes = ["/contracts/create", "/other-route-to-hide"];
+  const hideLayoutRoutes = ["/other-route-to-hide"];
   const hideLayout = hideLayoutRoutes.includes(location.pathname);
 
   return (

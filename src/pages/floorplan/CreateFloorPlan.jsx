@@ -470,6 +470,7 @@ function FloorplanEditor() {
   const injectCallbacks = useCallback(() => {
     setNodes((nds) =>
       nds.map((n) => {
+        // ===== BUILDING =====
         if (n.type === "building") {
           return {
             ...n,
@@ -488,6 +489,8 @@ function FloorplanEditor() {
             },
           };
         }
+
+        // ===== BLOCK / SMALL =====
         if (n.type === "block" || n.type === "small") {
           return {
             ...n,
@@ -499,17 +502,21 @@ function FloorplanEditor() {
                   curr.map((m) => {
                     if (m.id !== n.id) return m;
 
-                    // 🔥 NẾU LÀ PHÒNG → label chính là room_number
+                    // ===== ROOM =====
                     if (m.type === "block" && m.data?.icon === "room") {
+                      const roomNumber = String(txt ?? "").replace(/\D/g, "");
+
                       return {
                         ...m,
                         data: {
                           ...m.data,
-                          label: txt,
-                          room_number: txt,
+                          label: roomNumber || "Nhập số phòng",
+                          room_number: roomNumber,
                         },
                       };
                     }
+
+                    // ===== OTHER =====
                     return {
                       ...m,
                       data: { ...m.data, label: txt },
@@ -519,6 +526,7 @@ function FloorplanEditor() {
             },
           };
         }
+
         return n;
       })
     );
@@ -622,9 +630,10 @@ function FloorplanEditor() {
           style: { zIndex: 1 },
           data: {
             room_number: "",
-            label: "Phòng",
+            label: "Nhập số phòng", // 👈 QUAN TRỌNG
             w: 4 * pxPerMeter,
             h: 3 * pxPerMeter,
+            size: `${4 * 3}m2`,
             color: "#1e40af",
             icon: "room",
           },

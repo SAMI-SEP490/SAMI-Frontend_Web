@@ -16,8 +16,8 @@ import "reactflow/dist/style.css";
 
 import { listBuildings } from "../../services/api/building";
 import {
-  createFloorPlan,
   getFloorPlanDetail,
+  updateFloorPlan,
 } from "../../services/api/floorplan";
 
 /* ---------- helpers vẽ shape ---------- */
@@ -461,6 +461,7 @@ function FloorplanEdit() {
   const injectCallbacks = useCallback(() => {
     setNodes((nds) =>
       nds.map((n) => {
+        // ===== BUILDING =====
         if (n.type === "building") {
           return {
             ...n,
@@ -479,6 +480,8 @@ function FloorplanEdit() {
             },
           };
         }
+
+        // ===== BLOCK / SMALL =====
         if (n.type === "block" || n.type === "small") {
           return {
             ...n,
@@ -487,15 +490,38 @@ function FloorplanEdit() {
               ...n.data,
               onChangeLabel: (txt) =>
                 setNodes((curr) =>
-                  curr.map((m) =>
-                    m.id === n.id
-                      ? { ...m, data: { ...m.data, label: txt } }
-                      : m
-                  )
+                  curr.map((m) => {
+                    if (m.id !== n.id) return m;
+
+                    // ===== ROOM (EDIT) =====
+                    if (m.type === "block" && m.data?.icon === "room") {
+                      const roomNumber = String(txt ?? "").replace(/\D/g, "");
+
+                      return {
+                        ...m,
+                        data: {
+                          ...m.data,
+                          label: roomNumber || m.data.label,
+                          room_number: roomNumber,
+                          room_id: m.data.room_id, // 🔥 GIỮ NGUYÊN
+                        },
+                      };
+                    }
+
+                    // ===== OTHER BLOCK / SMALL =====
+                    return {
+                      ...m,
+                      data: {
+                        ...m.data,
+                        label: txt,
+                      },
+                    };
+                  })
                 ),
             },
           };
         }
+
         return n;
       })
     );
@@ -751,10 +777,29 @@ function FloorplanEdit() {
       );
     } else {
       const px = Math.max(0, Number(m || 0) * pxPerMeter);
+
       setNodes((nds) =>
-        nds.map((n) =>
-          n.id === selectedId ? { ...n, data: { ...n.data, [field]: px } } : n
-        )
+        nds.map((n) => {
+          if (n.id !== selectedId) return n;
+
+          const w = field === "w" ? px : n.data.w;
+          const h = field === "h" ? px : n.data.h;
+
+          const wM = Math.round(w / pxPerMeter);
+          const hM = Math.round(h / pxPerMeter);
+          const area = wM * hM;
+
+          const size = `${area}m2`; // 🔥 CHỈ LƯU m2
+
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              [field]: px,
+              size, // VD: "12m2"
+            },
+          };
+        })
       );
     }
   };
@@ -782,55 +827,37 @@ function FloorplanEdit() {
 
   const handleSaveToAPI = async () => {
     try {
-      if (!activeBuilding) {
-        alert("Vui lòng chọn tòa nhà trước khi lưu layout");
-        return;
-      }
-      if (!activeFloor) {
-        alert("Vui lòng chọn tầng trước khi lưu layout");
+      if (!planId) {
+        alert("Không xác định được floor plan để cập nhật");
         return;
       }
 
-      const buildingId = parseInt(activeBuilding, 10);
-      const floorNumber = parseInt(activeFloor, 10);
-
-      if (!buildingId || Number.isNaN(buildingId)) {
-        alert("Không xác định được tòa nhà, hãy chọn lại tòa nhà.");
-        return;
-      }
-      if (Number.isNaN(floorNumber)) {
-        alert("Số tầng không hợp lệ, hãy nhập lại.");
-        return;
-      }
       const roomErr = validateRoomNodesBeforeSave(nodes);
       if (roomErr) {
         alert(roomErr);
         return;
       }
 
-      const buildingName = activeBuildingObj?.name || `#${String(buildingId)}`;
-
       const payload = {
-        building_id: buildingId,
-        floor_number: floorNumber,
-        name: `Tòa ${buildingName} - Tầng ${activeFloor}`,
+        name: `Cập nhật sơ đồ tầng ${activeFloor}`,
         layout: {
           nodes,
           edges,
           meta: {
             pxPerMeter,
             gridGap,
-            editedFrom: planId,
-            savedAt: Date.now(),
+            updatedAt: Date.now(),
           },
         },
       };
 
-      await createFloorPlan(payload);
-      alert("Đã lưu layout (phiên bản mới) lên backend!");
+      await updateFloorPlan(planId, payload);
+
+      alert("Đã cập nhật sơ đồ tầng thành công!");
+      navigate(-1); // quay lại màn view
     } catch (err) {
       console.error(err);
-      alert(err?.message || "Lỗi khi lưu layout");
+      alert(err?.message || "Lỗi khi cập nhật sơ đồ tầng");
     }
   };
 

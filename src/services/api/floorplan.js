@@ -110,3 +110,18 @@ export async function getFloorPlanDetail(planId) {
 
   return un(res);
 }
+
+export async function updateFloorPlan(planId, payload = {}) {
+  if (!planId) throw new Error("planId is required");
+
+  const res = await http.put(`/floor-plan/${planId}`, payload, {
+    validateStatus: () => true,
+  });
+
+  if (res.status >= 400) {
+    const msg = res?.data?.message || "Không thể cập nhật floor plan";
+    throw new Error(msg);
+  }
+
+  return un(res);
+}

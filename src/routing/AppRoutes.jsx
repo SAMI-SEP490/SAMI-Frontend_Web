@@ -158,14 +158,14 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-          <Route
+        <Route
               path={ROUTES.editContract}
               element={
                   <ProtectedRoute>
                       <EditContractPage />
                   </ProtectedRoute>
               }
-          />
+        />
         {/* Tenants */}
         <Route
           path={ROUTES.tenants}

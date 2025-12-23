@@ -85,14 +85,25 @@ export default function CreateTenantPage() {
           if (digits) phoneSet.add(digits);
         });
         setExistingPhones(phoneSet);
-
+        // ====== XÁC ĐỊNH BUILDING CỦA MANAGER (từ tenants) ======
+        let managedBuildingId = null;
+        if (tenants.length > 0) {
+          managedBuildingId =
+            tenants[0]?.room?.building_id ??
+            tenants[0]?.room?.buildingId ??
+            null;
+        }
         // build rooms
         let roomList = [];
 
         if (Array.isArray(apiRooms) && apiRooms.length) {
-          // listRoomsLite đã trả về {id, label}
           roomList = apiRooms
-            .filter((r) => r.id != null && r.label != null)
+            .filter((r) => {
+              if (r.id == null || r.label == null) return false;
+              // 👉 CHỈ LỌC THEO BUILDING CỦA MANAGER
+              if (!managedBuildingId) return true; // fallback an toàn
+              return String(r.building_id) === String(managedBuildingId);
+            })
             .map((r) => ({
               id: String(r.id),
               label: String(r.label),
@@ -501,6 +512,7 @@ export default function CreateTenantPage() {
               border: "none",
               cursor: "pointer",
             }}
+            useEffect
             disabled={saving}
           >
             Hủy bỏ

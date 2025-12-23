@@ -142,14 +142,6 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
-        {/*  path={ROUTES.contractAddendum}*/}
-        {/*  element={*/}
-        {/*    <ProtectedRoute>*/}
-        {/*      <ContractAddendumPage />*/}
-        {/*    </ProtectedRoute>*/}
-        {/*  }*/}
-        {/*/>*/}
         <Route
           path={ROUTES.createContract}
           element={
@@ -158,6 +150,14 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        {/*  path={ROUTES.contractAddendum}*/}
+        {/*  element={*/}
+        {/*    <ProtectedRoute>*/}
+        {/*      <ContractAddendumPage />*/}
+        {/*    </ProtectedRoute>*/}
+        {/*  }*/}
+        {/*/>*/}
+
           <Route
               path={ROUTES.editContract}
               element={

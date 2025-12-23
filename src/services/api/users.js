@@ -290,7 +290,8 @@ export const updateProfile = async ({
   full_name,
   birthday,
   gender,
-  avatar, // ✅ ĐÚNG KEY
+  avatar,
+  phone, // ✅ thêm phone
 }) => {
   const formData = new FormData();
 
@@ -303,6 +304,8 @@ export const updateProfile = async ({
       "gender",
       gender === "Nam" ? "Male" : gender === "Nữ" ? "Female" : "Other"
     );
+
+  if (phone) formData.append("phone", phone.trim()); // ✅ thêm dòng này
 
   if (avatar) {
     formData.append("avatar", avatar); // 👈 multer.single("avatar")

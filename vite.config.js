@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://vcr-naturals-surplus-caribbean.trycloudflare.com/",
+        target: "https://sami-backend-production.eastasia.cloudapp.azure.com",
         changeOrigin: true,
         secure: false,
       },

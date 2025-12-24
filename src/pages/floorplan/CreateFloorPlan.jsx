@@ -861,6 +861,7 @@ function FloorplanEditor() {
 
       await createFloorPlan(payload);
       alert("Đã lưu layout lên hệ thống!");
+      navigate("/floorplan/view");
     } catch (err) {
       console.error(err);
 

@@ -862,7 +862,7 @@ function FloorplanEdit() {
   };
 
   const paletteItems = [
-    { type: "building-rect", label: "Tòa nhà (Rect)", icon: "room" },
+    { type: "building-rect", label: "Tòa nhà (Hình vuông)", icon: "room" },
     { type: "building-L", label: "Tòa nhà (L-shape)", icon: "room" },
     { type: "building-U", label: "Tòa nhà (U-shape)", icon: "room" },
     { type: "building-T", label: "Tòa nhà (T-shape)", icon: "room" },
@@ -909,7 +909,7 @@ function FloorplanEdit() {
   if (loadingLayout) {
     return <div style={{ padding: 30, fontSize: 16 }}>Đang tải layout…</div>;
   }
-
+  console.log(loadingLayout);
   return (
     <div
       style={{

@@ -125,20 +125,33 @@ function CreateContractPage() {
         else setForm(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- AI Logic (Giữ nguyên) ---
-    const handleCancelScan = () => {
+    const handleCancelScan = (urlToRevoke = null) => {
+        // Clear interval nếu còn
         if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+
+        // Reset state UI
         setAiProcessing(false);
-        setShowScanner(false);
+        setShowScanner(false); // Quan trọng nhất: Đóng modal
         setScanProgress(0);
-        if (pdfPreview) { URL.revokeObjectURL(pdfPreview); setPdfPreview(null); }
-        if (fileInputRef.current) fileInputRef.current.value = "";
+
+        // Xử lý dọn dẹp URL: Ưu tiên URL được truyền vào, nếu không thì dùng state (có thể bị stale)
+        const targetUrl = urlToRevoke || pdfPreview;
+        if (targetUrl) {
+            URL.revokeObjectURL(targetUrl);
+            setPdfPreview(null);
+        }
+
+        // Reset input file (dùng ?. để tránh lỗi nếu ref bị null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     };
 
     const handleAiImportFile = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // 1. Setup giao diện Scan
         const fileURL = URL.createObjectURL(file);
         setPdfPreview(fileURL);
         setShowScanner(true);
@@ -146,6 +159,7 @@ function CreateContractPage() {
         setAiProcessing(true);
         setAiMessage(null);
 
+        // 2. Chạy giả lập thanh progress
         scanIntervalRef.current = setInterval(() => {
             setScanProgress(prev => {
                 const increment = Math.floor(Math.random() * 3) + 1;
@@ -154,23 +168,30 @@ function CreateContractPage() {
         }, 250);
 
         try {
+            // 3. Gọi API xử lý
             const res = await processContractWithAI(file);
+
+            // Xử lý xong -> set 100%
             if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
             setScanProgress(100);
 
+            // Kiểm tra dữ liệu trả về
             if (!res || !res.contract_data) {
                 setAiMessage({ type: 'warning', text: res?.message || "Không trích xuất được dữ liệu." });
                 setAiProcessing(false);
-                return; // Dừng luôn, không cần chờ 40s để cancel
+                setTimeout(() => handleCancelScan(), 2000); // Tự đóng nếu lỗi nhẹ
+                return;
             }
+
             const { contract_data, tenant_info } = res;
             const buildingId = tenant_info?.room?.building_id;
             const roomId = contract_data?.room_id;
 
+            // Load dữ liệu phụ thuộc (Rooms/Tenants) để dropdown hiển thị đúng
             if (buildingId) await getRoomsByBuildingId(buildingId).then(r => setRooms(Array.isArray(r) ? r : r.data || [])).catch(() => {});
             if (roomId) await getTenantsByRoomId(roomId).then(t => setTenants(Array.isArray(t) ? t : [])).catch(() => {});
 
-            // 3. FILL FORM NGAY LẬP TỨC (Bỏ setTimeout 40000)
+            // 4. Điền dữ liệu vào Form
             setForm(prev => ({
                 ...prev,
                 building_id: String(buildingId || ""),
@@ -185,12 +206,21 @@ function CreateContractPage() {
                 note: contract_data?.note || "",
                 file: file
             }));
+
+            // 5. Thông báo thành công
             setAiMessage({ type: 'success', text: "✅ Đã điền thông tin xong!" });
 
+            // --- QUAN TRỌNG: TỰ ĐỘNG ĐÓNG MODAL SAU 1.5 GIÂY ---
+            setTimeout(() => {
+                handleCancelScan();
+            }, 500);
+            // ----------------------------------------------------
 
         } catch (error) {
             if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
             setAiMessage({ type: 'danger', text: "Lỗi xử lý: " + error.message });
+
+            // Tự đóng nếu có lỗi exception
             setTimeout(() => handleCancelScan(), 3000);
         }
     };

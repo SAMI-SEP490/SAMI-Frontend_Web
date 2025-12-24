@@ -75,11 +75,13 @@ const SideBar = () => {
         active={isActive("/notifications")}
         onClick={() => navigate("/notifications")}
       />
+      {(String(user.role).toLowerCase() === "owner" &&
       <MenuButton
         label="Quy định"
         active={isActive("/regulations")}
         onClick={() => navigate("/regulations")}
       />
+      )}
       <MenuButton
         label="Bảo trì"
         active={isActive("/maintaince-requests")}

@@ -68,7 +68,7 @@ export default function NotificationListPage() {
       >
         <div>
           <h2 style={{ fontWeight: 700, marginBottom: 4 }}>
-            Quản lý thông báo / quy định
+            Quản lý thông báo
           </h2>
           <p style={{ fontSize: 14, color: "#6B7280", margin: 0 }}>
             Lịch sử các thông báo đã gửi tới cư dân.

@@ -161,47 +161,32 @@ function CreateContractPage() {
             if (!res || !res.contract_data) {
                 setAiMessage({ type: 'warning', text: res?.message || "Không trích xuất được dữ liệu." });
                 setAiProcessing(false);
-                setTimeout(() => handleCancelScan(), 40000);
-                return;
+                return; // Dừng luôn, không cần chờ 40s để cancel
             }
-
             const { contract_data, tenant_info } = res;
             const buildingId = tenant_info?.room?.building_id;
             const roomId = contract_data?.room_id;
-            const tenantUserId = contract_data?.tenant_user_id;
 
-            // Load data phụ thuộc
-            if (buildingId) {
-                try {
-                    const roomRes = await getRoomsByBuildingId(buildingId);
-                    setRooms(Array.isArray(roomRes) ? roomRes : roomRes.data || []);
-                } catch (err) {}
-            }
-            if (roomId) {
-                try {
-                    const tenantRes = await getTenantsByRoomId(roomId);
-                    setTenants(Array.isArray(tenantRes) ? tenantRes : []);
-                } catch (err) {}
-            }
+            if (buildingId) await getRoomsByBuildingId(buildingId).then(r => setRooms(Array.isArray(r) ? r : r.data || [])).catch(() => {});
+            if (roomId) await getTenantsByRoomId(roomId).then(t => setTenants(Array.isArray(t) ? t : [])).catch(() => {});
 
-            setTimeout(() => {
-                setForm(prev => ({
-                    ...prev,
-                    building_id: String(buildingId || ""),
-                    room_id: String(roomId || ""),
-                    tenant_user_id: String(tenantUserId || ""),
-                    room_number: tenant_info?.room?.room_number || "",
-                    start_date: contract_data?.start_date || "",
-                    end_date: contract_data?.end_date || "",
-                    rent_amount: contract_data?.rent_amount || "",
-                    deposit_amount: contract_data?.deposit_amount || "",
-                    status: contract_data?.status || "pending",
-                    note: contract_data?.note || "",
-                    file: file
-                }));
-                setAiMessage({ type: 'success', text: "✅ Đã điền thông tin từ hợp đồng thành công!" });
-                setTimeout(() => handleCancelScan(), 1500);
-            }, 40000);
+            // 3. FILL FORM NGAY LẬP TỨC (Bỏ setTimeout 40000)
+            setForm(prev => ({
+                ...prev,
+                building_id: String(buildingId || ""),
+                room_id: String(roomId || ""),
+                tenant_user_id: String(contract_data?.tenant_user_id || ""),
+                room_number: tenant_info?.room?.room_number || "",
+                start_date: contract_data?.start_date || "",
+                end_date: contract_data?.end_date || "",
+                rent_amount: contract_data?.rent_amount || "",
+                deposit_amount: contract_data?.deposit_amount || "",
+                status: contract_data?.status || "pending",
+                note: contract_data?.note || "",
+                file: file
+            }));
+            setAiMessage({ type: 'success', text: "✅ Đã điền thông tin xong!" });
+
 
         } catch (error) {
             if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);

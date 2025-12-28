@@ -27,6 +27,8 @@ function EditBuildingPage() {
   const [editService, setEditService] = useState(false);
   const [electricPrice, setElectricPrice] = useState(0);
   const [waterPrice, setWaterPrice] = useState(0);
+  const [serviceFee, setServiceFee] = useState(0);
+  const [billDueDay, setBillDueDay] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -45,6 +47,8 @@ function EditBuildingPage() {
         setAddress(b.address || "");
         setElectricPrice(b.electric_unit_price ?? 0);
         setWaterPrice(b.water_unit_price ?? 0);
+        setServiceFee(b.service_fee ?? 0);
+        setBillDueDay(b.bill_due_day ?? "");
 
         const mgrs = await getBuildingManagers(b.building_id);
         setManagers(mgrs);
@@ -83,6 +87,8 @@ function EditBuildingPage() {
         address,
         electric_unit_price: Number(electricPrice),
         water_unit_price: Number(waterPrice),
+        service_fee: Number(serviceFee),
+        bill_due_day: billDueDay ? Number(billDueDay) : null,
       });
 
       alert("✅ Cập nhật tòa nhà thành công");
@@ -158,8 +164,8 @@ function EditBuildingPage() {
         <h5 className="section-title">Dịch vụ</h5>
 
         <Row>
-          <Col md={4}>
-            <label>Giá điện (VNĐ)</label>
+          <Col md={3}>
+            <label>Giá điện (VNĐ/số điện)</label>
             <input
               type="number"
               value={electricPrice}
@@ -168,13 +174,36 @@ function EditBuildingPage() {
             />
           </Col>
 
-          <Col md={4}>
-            <label>Giá nước (VNĐ)</label>
+          <Col md={3}>
+            <label>Giá nước (VNĐ/khối nước)</label>
             <input
               type="number"
               value={waterPrice}
               disabled={!editService}
               onChange={(e) => setWaterPrice(e.target.value)}
+            />
+          </Col>
+
+          <Col md={3}>
+            <label>Giá dịch vụ khác (VNĐ)</label>
+            <input
+              type="number"
+              value={serviceFee}
+              disabled={!editService}
+              onChange={(e) => setServiceFee(e.target.value)}
+            />
+          </Col>
+
+          <Col md={3}>
+            <label>Ngày đóng tiền hàng tháng (1-31)</label>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              placeholder="Chưa tạo"
+              value={billDueDay}
+              disabled={!editService}
+              onChange={(e) => setBillDueDay(e.target.value)}
             />
           </Col>
         </Row>

@@ -1,0 +1,85 @@
+.edit-building-container {
+  padding: 30px;
+  min-height: 100vh;
+  background: #f5f7fb;
+}
+
+.page-title {
+  font-weight: 600;
+  margin-bottom: 25px;
+}
+
+.section-card {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.section-title {
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.manager-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.manager-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.remove-btn {
+  border: none;
+  background: transparent;
+  color: #ff4d4f;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.section-card input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.section-card input:disabled {
+  background: #f1f3f5;
+  color: #666;
+}
+
+.service-actions {
+  margin-top: 15px;
+}
+
+.page-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.loading-center {
+  text-align: center;
+  margin-top: 60px;
+}
+
+.empty-text {
+  color: #999;
+}
+
+.page-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}

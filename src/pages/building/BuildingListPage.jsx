@@ -21,15 +21,31 @@ export default function BuildingListPage() {
   async function fetchData() {
     try {
       setLoading(true);
+
       const data = await listBuildings();
       setBuildings(data || []);
 
       const managerPromises = data.map(async (b) => {
-        const mgrs = await getBuildingManagers(b.building_id);
-        return [b.building_id, mgrs];
+        const res = await getBuildingManagers(b.building_id);
+
+        // ✅ LOG FULL RESPONSE TỪ API
+        console.log(
+          `BUILDING ${b.building_id} MANAGERS RESPONSE:`,
+          JSON.stringify(res, null, 2)
+        );
+
+        // ⚠️ LẤY ĐÚNG MẢNG managers
+        return [b.building_id, res || []];
       });
 
       const results = await Promise.all(managerPromises);
+
+      // ✅ LOG TẤT CẢ MANAGERS SAU KHI RESOLVE
+      console.log(
+        "ALL BUILDING MANAGERS MAP:",
+        JSON.stringify(results, null, 2)
+      );
+
       setManagersMap(Object.fromEntries(results));
     } catch (err) {
       console.error(err);
@@ -38,6 +54,10 @@ export default function BuildingListPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    console.log("managersMap updated:", managersMap);
+  }, [managersMap]);
 
   useEffect(() => {
     fetchData();

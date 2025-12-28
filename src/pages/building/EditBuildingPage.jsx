@@ -2,166 +2,213 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Form, Button, Spinner, Row, Col, Badge } from "react-bootstrap";
-import { colors } from "../../constants/colors";
 import {
   updateBuilding,
   listBuildings,
   getBuildingManagers,
   removeManager,
 } from "../../services/api/building";
+import "./EditBuildingPage.css";
 
 function EditBuildingPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [building, setBuilding] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // ===== PART 1 =====
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [managers, setManagers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+
+  // ===== PART 2 =====
+  const [editService, setEditService] = useState(false);
+  const [electricPrice, setElectricPrice] = useState(0);
+  const [waterPrice, setWaterPrice] = useState(0);
 
   useEffect(() => {
-    async function fetchBuilding() {
+    async function fetchData() {
       try {
         setLoading(true);
-        const data = await listBuildings();
-        const b = data.find((item) => item.building_id === parseInt(id));
+        const buildings = await listBuildings();
+        const b = buildings.find((i) => i.building_id === parseInt(id));
+
         if (!b) {
           alert("Tòa nhà không tồn tại");
-          navigate("/buildings");
-          return;
+          return navigate("/buildings");
         }
+
         setBuilding(b);
-        setName(b.name);
-        setAddress(b.address);
+        setName(b.name || "");
+        setAddress(b.address || "");
+        setElectricPrice(b.electric_unit_price ?? 0);
+        setWaterPrice(b.water_unit_price ?? 0);
 
         const mgrs = await getBuildingManagers(b.building_id);
         setManagers(mgrs);
-      } catch (error) {
-        console.error("Error fetching building:", error);
+      } catch (err) {
+        console.error(err);
+        alert("❌ Lỗi tải dữ liệu");
       } finally {
         setLoading(false);
       }
     }
-    fetchBuilding();
+
+    fetchData();
   }, [id, navigate]);
 
-  const handleSave = async () => {
-    if (!name.trim() || !address.trim()) {
-      alert("Vui lòng điền đầy đủ thông tin");
-      return;
+  // ===== REMOVE MANAGER =====
+  const handleRemoveManager = async (userId, fullName) => {
+    if (!window.confirm(`Xóa ${fullName} khỏi tòa nhà?`)) return;
+    try {
+      await removeManager(building.building_id, userId);
+      setManagers((prev) => prev.filter((m) => m.user_id !== userId));
+    } catch (err) {
+      alert("❌ Không thể xóa quản lý");
     }
+  };
+
+  // ===== SAVE ALL =====
+  const handleSaveAll = async () => {
+    if (!name.trim() || !address.trim()) {
+      return alert("Vui lòng nhập tên và địa chỉ");
+    }
+
     try {
       setSaving(true);
-      await updateBuilding(building.building_id, { name, address });
-      alert("Cập nhật tòa nhà thành công");
+      await updateBuilding(building.building_id, {
+        name,
+        address,
+        electric_unit_price: Number(electricPrice),
+        water_unit_price: Number(waterPrice),
+      });
+
+      alert("✅ Cập nhật tòa nhà thành công");
       navigate("/buildings");
-    } catch (error) {
-      console.error("Error updating building:", error);
-      alert("Cập nhật tòa nhà thất bại");
+    } catch (err) {
+      console.error(err);
+      alert("❌ Cập nhật thất bại");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleRemoveManager = async (userId, fullName) => {
-    if (!window.confirm(`Xóa ${fullName} khỏi tòa nhà này?`)) return;
-    try {
-      setLoading(true);
-      await removeManager(building.building_id, userId);
-      setManagers((prev) => prev.filter((m) => m.user_id !== userId));
-    } catch (error) {
-      console.error("Error removing manager:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   if (loading || !building) {
     return (
-      <div className="text-center mt-5">
+      <div className="loading-center">
         <Spinner animation="border" /> Đang tải...
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        padding: 30,
-        backgroundColor: colors.background,
-      }}
-    >
-      <h4 style={{ fontWeight: "600", marginBottom: 20 }}>Chỉnh sửa tòa nhà</h4>
+    <div className="edit-building-container">
+      <h3 className="page-title">Chỉnh sửa tòa nhà</h3>
 
-      <Form>
-        <Row className="mb-3">
+      {/* ================= PART 1 ================= */}
+      <div className="section-card">
+        <h5 className="section-title">Thông tin cơ bản</h5>
+
+        <Row>
           <Col md={6}>
             <Form.Label>Tên tòa nhà</Form.Label>
             <Form.Control
-              type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </Col>
         </Row>
 
-        <Row className="mb-3">
+        <Row className="mt-3">
           <Col md={6}>
             <Form.Label>Địa chỉ</Form.Label>
             <Form.Control
-              type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
             />
           </Col>
         </Row>
 
-        <Row className="mb-3">
-          <Col md={6}>
-            <Form.Label>Quản lý tòa nhà</Form.Label>
-            <div>
-              {managers.length > 0 ? (
-                managers.map((m) => (
-                  <Badge
-                    bg="secondary"
-                    key={m.user_id}
-                    className="me-2 mb-2"
-                    style={{ padding: "0.5em 0.7em" }}
+        <div className="mt-3">
+          <Form.Label>Quản lý tòa nhà</Form.Label>
+          <div className="manager-list">
+            {managers.length > 0 ? (
+              managers.map((m) => (
+                <Badge key={m.user_id} bg="secondary" className="manager-badge">
+                  {m.full_name}
+                  <button
+                    className="remove-btn"
+                    onClick={() => handleRemoveManager(m.user_id, m.full_name)}
                   >
-                    {m.full_name}{" "}
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() =>
-                        handleRemoveManager(m.user_id, m.full_name)
-                      }
-                    >
-                      Xóa
-                    </Button>
-                  </Badge>
-                ))
-              ) : (
-                <div>-</div>
-              )}
-            </div>
+                    ✕
+                  </button>
+                </Badge>
+              ))
+            ) : (
+              <span className="empty-text">—</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ================= PART 2 ================= */}
+      <div className="section-card">
+        <h5 className="section-title">Dịch vụ</h5>
+
+        <Row>
+          <Col md={4}>
+            <label>Giá điện (VNĐ)</label>
+            <input
+              type="number"
+              value={electricPrice}
+              disabled={!editService}
+              onChange={(e) => setElectricPrice(e.target.value)}
+            />
+          </Col>
+
+          <Col md={4}>
+            <label>Giá nước (VNĐ)</label>
+            <input
+              type="number"
+              value={waterPrice}
+              disabled={!editService}
+              onChange={(e) => setWaterPrice(e.target.value)}
+            />
           </Col>
         </Row>
 
-        <Button variant="primary" onClick={handleSave} disabled={saving}>
-          {saving ? "Đang lưu..." : "Lưu"}
+        <div className="service-actions">
+          {!editService ? (
+            <Button
+              variant="outline-primary"
+              onClick={() => setEditService(true)}
+            >
+              Sửa dịch vụ
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={() => setEditService(false)}>
+              Hủy chỉnh sửa
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ================= SAVE ALL ================= */}
+      <div className="page-actions">
+        <Button variant="primary" onClick={handleSaveAll} disabled={saving}>
+          {saving ? "Đang lưu..." : "Lưu toàn bộ"}
         </Button>
+
         <Button
           variant="secondary"
-          className="ms-2"
           onClick={() => navigate("/buildings")}
           disabled={saving}
         >
           Hủy
         </Button>
-      </Form>
+      </div>
     </div>
   );
 }

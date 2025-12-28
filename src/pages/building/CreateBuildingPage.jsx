@@ -1,8 +1,9 @@
+// src/pages/building/CreateBuildingPage.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form, Button, Row, Col, Spinner } from "react-bootstrap";
-import { colors } from "../../constants/colors";
 import { createBuilding } from "../../services/api/building";
+import "./EditBuildingPage.css";
 
 function CreateBuildingPage() {
   const navigate = useNavigate();
@@ -11,9 +12,9 @@ function CreateBuildingPage() {
   const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     if (!name.trim() || !address.trim()) {
-      alert("Vui lòng điền đầy đủ thông tin");
+      alert("❌ Vui lòng nhập đầy đủ Tên và Địa chỉ");
       return;
     }
 
@@ -22,72 +23,72 @@ function CreateBuildingPage() {
       await createBuilding({
         name,
         address,
+        electric_unit_price: null,
+        water_unit_price: null,
       });
-      alert("Tạo tòa nhà thành công");
+
+      alert("✅ Tạo tòa nhà thành công");
       navigate("/buildings");
-    } catch (error) {
-      console.error("Error creating building:", error);
-      alert("Tạo tòa nhà thất bại");
+    } catch (err) {
+      console.error(err);
+      alert("❌ Tạo tòa nhà thất bại");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        padding: 30,
-        backgroundColor: colors.background,
-      }}
-    >
-      <h4 style={{ fontWeight: "600", marginBottom: 20 }}>Thêm tòa nhà mới</h4>
+    <div className="edit-building-container">
+      <h3 className="page-title">Thêm tòa nhà mới</h3>
 
-      <Form>
-        <Row className="mb-3">
+      {/* ===== THÔNG TIN CƠ BẢN ===== */}
+      <div className="section-card">
+        <h5 className="section-title">Thông tin cơ bản</h5>
+
+        <Row>
           <Col md={6}>
             <Form.Label>Tên tòa nhà</Form.Label>
             <Form.Control
-              type="text"
-              placeholder="Nhập tên tòa nhà"
               value={name}
+              placeholder="Nhập tên tòa nhà"
               onChange={(e) => setName(e.target.value)}
             />
           </Col>
         </Row>
 
-        <Row className="mb-3">
+        <Row className="mt-3">
           <Col md={6}>
             <Form.Label>Địa chỉ</Form.Label>
             <Form.Control
-              type="text"
-              placeholder="Nhập địa chỉ tòa nhà"
               value={address}
+              placeholder="Nhập địa chỉ tòa nhà"
               onChange={(e) => setAddress(e.target.value)}
             />
           </Col>
         </Row>
+      </div>
 
-        <Button variant="success" onClick={handleCreate} disabled={saving}>
-          {saving ? (
-            <>
-              <Spinner size="sm" className="me-2" />
-              Đang tạo...
-            </>
-          ) : (
-            "Tạo tòa nhà"
-          )}
-        </Button>
-
+      {/* ===== ACTIONS ===== */}
+      <div className="page-actions">
         <Button
           variant="secondary"
-          className="ms-2"
           onClick={() => navigate("/buildings")}
           disabled={saving}
         >
           Hủy
         </Button>
-      </Form>
+
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? (
+            <>
+              <Spinner size="sm" className="me-2" />
+              Đang lưu...
+            </>
+          ) : (
+            "Lưu tòa nhà"
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

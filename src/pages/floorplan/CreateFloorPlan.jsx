@@ -399,6 +399,10 @@ function FloorplanEditor() {
     }),
     []
   );
+  // ===== FLOOR RULE =====
+  const totalFloors = activeBuildingObj?.number_of_floors || 0;
+  const nextFloor = totalFloors + 1;
+  const isMaxFloorReached = nextFloor > 20;
 
   const activeBuildingObj = useMemo(
     () =>
@@ -827,9 +831,13 @@ function FloorplanEditor() {
         alert("Vui lòng chọn tầng trước khi lưu layout");
         return;
       }
+      if (isMaxFloorReached) {
+        alert("Không thể tạo thêm tầng. Tòa nhà đã đạt tối đa 20 tầng.");
+        return;
+      }
 
       const buildingId = parseInt(activeBuilding, 10);
-      const floorNumber = parseInt(activeFloor, 10);
+      const floorNumber = nextFloor;
 
       if (!buildingId || Number.isNaN(buildingId)) {
         alert("Không xác định được tòa nhà, hãy chọn lại tòa nhà.");
@@ -1037,28 +1045,25 @@ function FloorplanEditor() {
                 </div>
               )}
             </div>
-            <div>
-              <label style={labelStyle}>Tầng</label>
-              {floorOptions.length > 0 ? (
-                <select
-                  style={inputStyle}
-                  value={activeFloor}
-                  onChange={(e) => setActiveFloor(e.target.value)}
-                >
-                  {floorOptions.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  style={inputStyle}
-                  value={activeFloor}
-                  onChange={(e) => setActiveFloor(e.target.value)}
-                  placeholder="VD: 1"
-                />
-              )}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontWeight: 600 }}>Tầng</label>
+              <input
+                value={
+                  isMaxFloorReached
+                    ? "Đã đạt tối đa 20 tầng"
+                    : `Tầng ${nextFloor}`
+                }
+                disabled
+                style={{
+                  width: "100%",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  marginTop: 4,
+                  background: "#f1f5f9",
+                  fontWeight: 600,
+                }}
+              />
             </div>
           </div>
           <div

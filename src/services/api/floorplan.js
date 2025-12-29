@@ -125,3 +125,18 @@ export async function updateFloorPlan(planId, payload = {}) {
 
   return un(res);
 }
+
+export async function deleteFloorPlan(planId) {
+  if (!planId) throw new Error("planId is required");
+
+  const res = await http.delete(`/floor-plan/${planId}`, {
+    validateStatus: () => true,
+  });
+
+  if (res.status >= 400) {
+    const msg = res?.data?.message || "Không thể xóa floor plan";
+    throw new Error(msg);
+  }
+
+  return un(res);
+}

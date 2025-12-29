@@ -13,6 +13,7 @@ import { listBuildings } from "../../services/api/building";
 import {
   listFloorPlans,
   getFloorPlanDetail,
+  deleteFloorPlan,
 } from "../../services/api/floorplan";
 
 /* ===== Simple SVG building (no handles) ===== */
@@ -314,22 +315,51 @@ function ViewerInner() {
   }, [activeBuilding, activeFloor, plansByFloor]);
 
   // ===================== 4. Điều hướng sang màn Create/Edit =====================
+  const maxFloor = floorIds.length ? Math.max(...floorIds.map(Number)) : 0;
+  const activePlan = plansByFloor[activeFloor];
+
   const gotoCreate = () => {
+    const nextFloor = maxFloor + 1;
+
+    if (nextFloor > 20) {
+      alert("Tòa nhà đã đạt tối đa 20 tầng, không thể tạo thêm.");
+      return;
+    }
+
     const qs = new URLSearchParams({
       building: activeBuilding || "",
-      floor: activeFloor || "",
+      floor: String(nextFloor),
       mode: "create",
     }).toString();
+
     navigate(`/floorplan/create?${qs}`);
   };
 
-   const gotoEdit = () => {
+  const gotoEdit = () => {
     if (!hasPlan) return;
     const summary = plansByFloor[activeFloor];
     if (!summary || !summary.plan_id) return;
-
-    // chuyển sang màn edit riêng, truyền planId
     navigate(`/floorplan/edit/${summary.plan_id}`);
+  };
+
+  // ====== ✅ THÊM: chỉ xóa tầng cao nhất ======
+  const canDeleteFloor =
+    activePlan &&
+    Number(activeFloor) === maxFloor &&
+    activePlan.is_published === false;
+
+  const handleDeleteFloor = async () => {
+    if (!canDeleteFloor) return;
+
+    const ok = window.confirm(
+      `Chỉ được xóa tầng cao nhất.\nBạn có chắc muốn xóa tầng ${activeFloor}?`
+    );
+    if (!ok) return;
+
+    await deleteFloorPlan(activePlan.plan_id);
+
+    // reload đơn giản, tránh lệch state
+    window.location.reload();
   };
 
   // ===================== RENDER UI =====================
@@ -362,6 +392,8 @@ function ViewerInner() {
             }}
           >
             <div style={{ fontWeight: 700 }}>Chọn bản vẽ đã lưu</div>
+
+            {/* ====== ACTION BUTTONS ====== */}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={gotoCreate}
@@ -374,10 +406,11 @@ function ViewerInner() {
                   border: "none",
                   cursor: "pointer",
                 }}
-                title="Tạo mới hoặc tạo nhanh tầng đang chọn"
+                title={`Tạo tầng ${maxFloor + 1}`}
               >
                 Tạo mới
               </button>
+
               <button
                 onClick={gotoEdit}
                 disabled={!hasPlan}
@@ -394,6 +427,25 @@ function ViewerInner() {
               >
                 Chỉnh sửa
               </button>
+
+              {/* ====== ✅ NÚT XÓA TẦNG CAO NHẤT ====== */}
+              {canDeleteFloor && (
+                <button
+                  onClick={handleDeleteFloor}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    background: "#ef4444",
+                    color: "#fff",
+                    fontWeight: 700,
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                  title="Chỉ được xóa tầng cao nhất"
+                >
+                  Xóa tầng
+                </button>
+              )}
             </div>
           </div>
 

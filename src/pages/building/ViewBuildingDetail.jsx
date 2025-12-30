@@ -1,114 +1,138 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Form, Spinner, Row, Col, Badge, Button } from "react-bootstrap";
-import { colors } from "../../constants/colors";
+import { Spinner, Row, Col, Badge } from "react-bootstrap";
 import {
   listBuildings,
   getBuildingManagers,
 } from "../../services/api/building";
+import "./EditBuildingPage.css"; // tái sử dụng CSS
 
 function ViewBuildingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [building, setBuilding] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [managers, setManagers] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    async function fetchBuilding() {
+    async function fetchData() {
       try {
         setLoading(true);
-        const data = await listBuildings();
-        const b = data.find((item) => item.building_id === parseInt(id));
+
+        const buildings = await listBuildings();
+        const b = buildings.find((i) => i.building_id === parseInt(id));
+
         if (!b) {
           alert("Tòa nhà không tồn tại");
-          navigate("/buildings");
-          return;
+          return navigate("/buildings");
         }
+
         setBuilding(b);
 
         const mgrs = await getBuildingManagers(b.building_id);
         setManagers(mgrs);
-      } catch (error) {
-        console.error("Error fetching building:", error);
+      } catch (err) {
+        console.error(err);
+        alert("❌ Lỗi tải dữ liệu");
       } finally {
         setLoading(false);
       }
     }
-    fetchBuilding();
+
+    fetchData();
   }, [id, navigate]);
 
   if (loading || !building) {
     return (
-      <div className="text-center mt-5">
+      <div className="loading-center">
         <Spinner animation="border" /> Đang tải...
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        padding: 30,
-        backgroundColor: colors.background,
-      }}
-    >
-      <h4 style={{ fontWeight: "600", marginBottom: 20 }}>Chi tiết tòa nhà</h4>
+    <div className="edit-building-container">
+      <h3 className="page-title">Chi tiết tòa nhà</h3>
 
-      <Form>
-        <Row className="mb-3">
+      {/* ================= THÔNG TIN CƠ BẢN ================= */}
+      <div className="section-card">
+        <h5 className="section-title">Thông tin cơ bản</h5>
+
+        <Row>
           <Col md={6}>
-            <Form.Label>Tên tòa nhà</Form.Label>
-            <Form.Control type="text" value={building.name} disabled />
+            <label className="view-label">Tên tòa nhà</label>
+            <div className="view-value">{building.name || "—"}</div>
           </Col>
         </Row>
 
-        <Row className="mb-3">
+        <Row className="mt-3">
           <Col md={6}>
-            <Form.Label>Địa chỉ</Form.Label>
-            <Form.Control type="text" value={building.address} disabled />
+            <label className="view-label">Địa chỉ</label>
+            <div className="view-value">{building.address || "—"}</div>
           </Col>
         </Row>
 
-        <Row className="mb-3">
-          <Col md={6}>
-            <Form.Label>Trạng thái</Form.Label>
-            <Form.Control
-              type="text"
-              value={building.is_active ? "Đang hoạt động" : "Ngừng hoạt động"}
-              disabled
-            />
-          </Col>
-        </Row>
+        <div className="mt-3">
+          <label className="view-label">Quản lý tòa nhà</label>
+          <div className="manager-list">
+            {managers.length > 0 ? (
+              managers.map((m) => (
+                <Badge key={m.user_id} bg="secondary" className="manager-badge">
+                  {m.full_name}
+                </Badge>
+              ))
+            ) : (
+              <span className="empty-text">—</span>
+            )}
+          </div>
+        </div>
+      </div>
 
-        <Row className="mb-3">
-          <Col md={6}>
-            <Form.Label>Quản lý tòa nhà</Form.Label>
-            <div>
-              {managers.length > 0 ? (
-                managers.map((m) => (
-                  <Badge
-                    bg="secondary"
-                    key={m.user_id}
-                    className="me-2 mb-2"
-                    style={{ padding: "0.5em 0.7em" }}
-                  >
-                    {m.full_name}
-                  </Badge>
-                ))
-              ) : (
-                <div>-</div>
-              )}
+      {/* ================= DỊCH VỤ ================= */}
+      <div className="section-card">
+        <h5 className="section-title">Dịch vụ</h5>
+
+        <Row>
+          <Col md={3}>
+            <label className="view-label">Giá điện</label>
+            <div className="view-value">
+              {building.electric_unit_price ?? 0} VNĐ
+            </div>
+          </Col>
+
+          <Col md={3}>
+            <label className="view-label">Giá nước</label>
+            <div className="view-value">
+              {building.water_unit_price ?? 0} VNĐ
+            </div>
+          </Col>
+
+          <Col md={3}>
+            <label className="view-label">Phí dịch vụ</label>
+            <div className="view-value">{building.service_fee ?? 0} VNĐ</div>
+          </Col>
+
+          <Col md={3}>
+            <label className="view-label">Ngày đóng tiền</label>
+            <div className="view-value">
+              {building.bill_due_day
+                ? `Ngày ${building.bill_due_day}`
+                : "Chưa thiết lập"}
             </div>
           </Col>
         </Row>
+      </div>
 
-        <Button variant="secondary" onClick={() => navigate("/buildings")}>
+      {/* ================= ACTION ================= */}
+      <div className="page-actions">
+        <button
+          className="btn btn-secondary"
+          onClick={() => navigate("/buildings")}
+        >
           Quay lại
-        </Button>
-      </Form>
+        </button>
+      </div>
     </div>
   );
 }

@@ -83,3 +83,14 @@
   gap: 12px;
   margin-top: 24px;
 }
+.view-label {
+  font-size: 13px;
+  color: #6c757d;
+  margin-bottom: 4px;
+}
+
+.view-value {
+  font-size: 15px;
+  font-weight: 500;
+  padding: 6px 0;
+}

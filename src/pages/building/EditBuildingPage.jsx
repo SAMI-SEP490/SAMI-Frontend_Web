@@ -144,12 +144,12 @@ function EditBuildingPage() {
               managers.map((m) => (
                 <Badge key={m.user_id} bg="secondary" className="manager-badge">
                   {m.full_name}
-                  <button
+                  {/* <button
                     className="remove-btn"
                     onClick={() => handleRemoveManager(m.user_id, m.full_name)}
                   >
                     ✕
-                  </button>
+                  </button> */}
                 </Badge>
               ))
             ) : (

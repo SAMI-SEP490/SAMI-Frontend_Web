@@ -140,3 +140,13 @@ export async function deleteFloorPlan(planId) {
 
   return un(res);
 }
+
+// Lấy tầng tiếp theo cần tạo (dựa trên dữ liệu floor_plans ở backend)
+export async function getNextFloorNumber(building_id) {
+  const res = await http.get("/floor-plan/next-floor", {
+    params: { building_id },
+  });
+
+  // backend trả: { success: true, next_floor_number: X }
+  return un(res);
+}

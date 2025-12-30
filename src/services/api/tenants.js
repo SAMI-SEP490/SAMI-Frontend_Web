@@ -1,5 +1,5 @@
 // src/services/api/tenants.js
-import { http, unwrap } from "../http";
+import { http } from "../http";
 
 // unwrap các kiểu response {data:{data}} | {data} | data
 const un = (res) => res?.data?.data ?? res?.data ?? res;

@@ -1,12 +1,7 @@
 // src/services/api/auth.js
 import { http, unwrap } from "../http";
 
-const PROFILE_PATHS = [
-  "/auth/profile",
-  "/auth/me",
-  "/user/profile",
-  "/user/me",
-];
+const PROFILE_PATHS = ["/auth/profile"];
 /** Lưu session về localStorage theo cả 2 dạng key để tránh lệch với chỗ khác */
 function persistSession(payload) {
   if (!payload) return;

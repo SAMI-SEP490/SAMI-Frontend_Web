@@ -399,11 +399,6 @@ function FloorplanEditor() {
     }),
     []
   );
-  // ===== FLOOR RULE =====
-  const totalFloors = activeBuildingObj?.number_of_floors || 0;
-  const nextFloor = totalFloors + 1;
-  const isMaxFloorReached = nextFloor > 20;
-
   const activeBuildingObj = useMemo(
     () =>
       buildings.find(
@@ -411,6 +406,10 @@ function FloorplanEditor() {
       ),
     [buildings, activeBuilding]
   );
+  // ===== FLOOR RULE =====
+  const totalFloors = activeBuildingObj?.number_of_floors || 0;
+  const nextFloor = totalFloors + 1;
+  const isMaxFloorReached = nextFloor > 20;
 
   const floorOptions = useMemo(() => {
     const totalFloors = activeBuildingObj?.number_of_floors || 0;
@@ -467,6 +466,7 @@ function FloorplanEditor() {
     };
   }, [activeBuilding]);
 
+  // eslint-disable-next-line no-unused-vars
   const comboKey = `${activeBuilding || "NO_BUILDING"}-${
     activeFloor || "NO_FLOOR"
   }`;
@@ -536,50 +536,17 @@ function FloorplanEditor() {
     );
   }, [gridGap, setNodes]);
 
-  const loadFromAPI = useCallback(async () => {
-    if (!activeBuilding || !activeFloor) {
-      setNodes(() => []);
-      setEdges(() => []);
-      return;
-    }
-    try {
-      const res = await fetch(`${API_BASE}/${comboKey}`, {
-        credentials: "include",
-      });
-      if (!res.ok) {
-        setNodes(() => []);
-        setEdges(() => []);
-        return;
-      }
-      const json = await res.json();
-      const layout = json?.data?.layout;
-      if (layout) {
-        const { nodes: n = [], edges: e = [], meta = {} } = layout;
-        setNodes(n);
-        setEdges(e);
-        if (meta?.pxPerMeter) setPxPerMeter(meta.pxPerMeter);
-        if (meta?.gridGap) setGridGap(meta.gridGap);
-        setTimeout(injectCallbacks, 0);
-      } else {
-        setNodes(() => []);
-        setEdges(() => []);
-      }
-    } catch {
-      setNodes(() => []);
-      setEdges(() => []);
-    }
-  }, [
-    comboKey,
-    activeBuilding,
-    activeFloor,
-    injectCallbacks,
-    setNodes,
-    setEdges,
-  ]);
-
   useEffect(() => {
-    loadFromAPI();
-  }, [loadFromAPI]);
+    // CREATE MODE: luôn khởi tạo canvas trống
+    setNodes([]);
+    setEdges([]);
+
+    // đảm bảo callback được gắn
+    setTimeout(() => {
+      injectCallbacks();
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBuilding]);
 
   useEffect(() => {
     injectCallbacks();
@@ -637,7 +604,7 @@ function FloorplanEditor() {
             label: "Nhập số phòng", // 👈 QUAN TRỌNG
             w: 4 * pxPerMeter,
             h: 3 * pxPerMeter,
-            size: `${4 * 3}m2`,
+            size: 4 * 3,
             color: "#1e40af",
             icon: "room",
           },

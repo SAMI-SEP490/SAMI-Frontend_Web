@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ReactFlow,
+import ReactFlow, {
   ReactFlowProvider,
   Background,
-  MiniMap,
   Controls,
+  MiniMap,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -14,6 +13,7 @@ import {
   listFloorPlans,
   getFloorPlanDetail,
   deleteFloorPlan,
+  getNextFloorNumber,
 } from "../../services/api/floorplan";
 
 /* ===== Simple SVG building (no handles) ===== */
@@ -318,21 +318,28 @@ function ViewerInner() {
   const maxFloor = floorIds.length ? Math.max(...floorIds.map(Number)) : 0;
   const activePlan = plansByFloor[activeFloor];
 
-  const gotoCreate = () => {
-    const nextFloor = maxFloor + 1;
+  const gotoCreate = async () => {
+    if (!activeBuilding) return;
 
-    if (nextFloor > 20) {
-      alert("Tòa nhà đã đạt tối đa 20 tầng, không thể tạo thêm.");
-      return;
+    try {
+      const data = await getNextFloorNumber(activeBuilding);
+      const next = data?.next_floor_number;
+
+      if (!next) {
+        alert("Không lấy được tầng kế tiếp từ hệ thống.");
+        return;
+      }
+
+      const qs = new URLSearchParams({
+        building: activeBuilding || "",
+        floor: String(next),
+        mode: "create",
+      }).toString();
+
+      navigate(`/floorplan/create?${qs}`);
+    } catch (e) {
+      alert(e?.message || "Lỗi lấy tầng kế tiếp.");
     }
-
-    const qs = new URLSearchParams({
-      building: activeBuilding || "",
-      floor: String(nextFloor),
-      mode: "create",
-    }).toString();
-
-    navigate(`/floorplan/create?${qs}`);
   };
 
   const gotoEdit = () => {

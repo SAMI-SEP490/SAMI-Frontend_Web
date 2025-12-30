@@ -15,7 +15,10 @@ import {
 import "reactflow/dist/style.css";
 
 import { listBuildings } from "../../services/api/building";
-import { createFloorPlan } from "../../services/api/floorplan";
+import {
+  createFloorPlan,
+  getNextFloorNumber,
+} from "../../services/api/floorplan";
 
 const API_BASE = "/api/floor-plan";
 
@@ -383,6 +386,7 @@ function FloorplanEditor() {
 
   const [activeBuilding, setActiveBuilding] = useState(qpBuilding || "");
   const [activeFloor, setActiveFloor] = useState(qpFloor || "1");
+  const [nextFloorFromDB, setNextFloorFromDB] = useState(null);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -399,6 +403,7 @@ function FloorplanEditor() {
     }),
     []
   );
+  
   const activeBuildingObj = useMemo(
     () =>
       buildings.find(
@@ -407,16 +412,13 @@ function FloorplanEditor() {
     [buildings, activeBuilding]
   );
   // ===== FLOOR RULE =====
-  const totalFloors = activeBuildingObj?.number_of_floors || 0;
-  const nextFloor = totalFloors + 1;
+  const nextFloor = nextFloorFromDB ?? 1;
   const isMaxFloorReached = nextFloor > 20;
 
   const floorOptions = useMemo(() => {
-    const totalFloors = activeBuildingObj?.number_of_floors || 0;
-    if (!totalFloors || totalFloors <= 0) return [];
-    return Array.from({ length: totalFloors }, (_, i) => String(i + 1));
-  }, [activeBuildingObj]);
-
+    if (!nextFloorFromDB || nextFloorFromDB <= 1) return [];
+    return Array.from({ length: nextFloorFromDB - 1 }, (_, i) => String(i + 1));
+  }, [nextFloorFromDB]);
   useEffect(() => {
     if (floorOptions.length > 0) {
       if (!floorOptions.includes(String(activeFloor))) {
@@ -424,6 +426,28 @@ function FloorplanEditor() {
       }
     }
   }, [floorOptions, activeFloor]);
+
+  useEffect(() => {
+    if (!activeBuilding) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const data = await getNextFloorNumber(activeBuilding);
+        if (cancelled) return;
+
+        setNextFloorFromDB(data.next_floor_number);
+        setActiveFloor(String(data.next_floor_number));
+      } catch (err) {
+        console.error("Get next floor error:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBuilding]);
 
   // load list building
   useEffect(() => {

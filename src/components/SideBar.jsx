@@ -49,17 +49,20 @@ const SideBar = () => {
         active={isActive("/contracts")}
         onClick={() => navigate("/contracts")}
       />
-      {(String(user.role).toLowerCase() === "manager" && <MenuButton
-        label="Danh sách người thuê"
-        active={isActive("/tenants")}
-        onClick={() => navigate("/tenants")}
-      />)}
-      {(String(user.role).toLowerCase() === "owner" && 
-      <MenuButton
-        label="Danh sách người dùng"
-        active={isActive("/users")}
-        onClick={() => navigate("/users")}
-      />)}
+      {String(user.role).toLowerCase() === "manager" && (
+        <MenuButton
+          label="Danh sách người thuê"
+          active={isActive("/tenants")}
+          onClick={() => navigate("/tenants")}
+        />
+      )}
+      {String(user.role).toLowerCase() === "owner" && (
+        <MenuButton
+          label="Danh sách người dùng"
+          active={isActive("/users")}
+          onClick={() => navigate("/users")}
+        />
+      )}
       <MenuButton
         label="Danh sách hóa đơn"
         active={isActive("/bills")}
@@ -75,12 +78,12 @@ const SideBar = () => {
         active={isActive("/notifications")}
         onClick={() => navigate("/notifications")}
       />
-      {(String(user.role).toLowerCase() === "owner" &&
-      <MenuButton
-        label="Quy định"
-        active={isActive("/regulations")}
-        onClick={() => navigate("/regulations")}
-      />
+      {String(user.role).toLowerCase() === "owner" && (
+        <MenuButton
+          label="Quy định"
+          active={isActive("/regulations")}
+          onClick={() => navigate("/regulations")}
+        />
       )}
       <MenuButton
         label="Bảo trì"
@@ -91,6 +94,11 @@ const SideBar = () => {
         label="Đăng ký xe"
         active={isActive("/vehicle-registrations")}
         onClick={() => navigate("/vehicle-registrations")}
+      />
+      <MenuButton
+        label="Dịch vụ tiện ích"
+        active={isActive("/utility-services")}
+        onClick={() => navigate("/utility-services")}
       />
 
       <Section title="Tòa nhà & Sơ đồ" />

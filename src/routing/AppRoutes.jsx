@@ -61,8 +61,8 @@ import CreateBuildingPage from "../pages/building/CreateBuildingPage";
 import ViewBuildingDetail from "../pages/building/ViewBuildingDetail";
 
 // ===== Floorplan (lazy) =====
-const CreateFloorPlan = lazy(
-  () => import("@/pages/floorplan/CreateFloorPlan.jsx"),
+const CreateFloorPlan = lazy(() =>
+  import("@/pages/floorplan/CreateFloorPlan.jsx")
 );
 const ViewFloorPlan = lazy(() => import("@/pages/floorplan/ViewFloorPlan.jsx"));
 const EditFloorPlan = lazy(() => import("@/pages/floorplan/EditFloorPlan.jsx"));
@@ -79,7 +79,11 @@ import EditRegulationPage from "../pages/regulation/EditRegulationPage";
 import VehicleRegistrationListPage from "../pages/vehicle/VehicleRegistrationListPage";
 import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
 
+// rooms
 import RoomListPage from "@/pages/room/RoomListPage.jsx";
+
+// ===== Utility Services =====
+import UtilityServicePage from "@/pages/services/UtilityServicePage.jsx";
 
 const isAuthed = () =>
   !!localStorage.getItem("sami:access") ||
@@ -437,6 +441,15 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <RoomListPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* ===== Utility Services ===== */}
+        <Route
+          path={ROUTES.utilityServices}
+          element={
+            <ProtectedRoute>
+              <UtilityServicePage />
             </ProtectedRoute>
           }
         />

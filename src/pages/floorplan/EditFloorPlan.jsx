@@ -789,7 +789,7 @@ function FloorplanEdit() {
           const hM = Math.round(h / pxPerMeter);
           const area = wM * hM;
 
-          const size = `${area}m2`; // 🔥 CHỈ LƯU m2
+          const size = area; // 🔥 CHỈ LƯU m2
 
           return {
             ...n,

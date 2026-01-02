@@ -1,154 +1,236 @@
 /* src/pages/contract/ContractListPage.css */
 
-/* Container chính */
-.container {
-    max-width: 1200px;
-    margin: 40px auto;
-    padding: 20px 30px;
+/* --- GENERAL LAYOUT --- */
+.contract-page-container {
+    padding: 24px 40px;
+    background-color: #f8f9fa; /* Nền xám nhạt cho toàn trang */
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* --- HEADER --- */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.page-title h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+}
+
+.page-title p {
+    color: #6b7280;
+    margin: 4px 0 0 0;
+    font-size: 14px;
+}
+
+/* --- FILTER CARD --- */
+.filter-card {
     background: #fff;
     border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    font-family: Arial, sans-serif;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
 }
 
-/* Header & Title */
-.title {
-    font-size: 28px;
-    color: #1e3a8a;
-    font-weight: bold;
-    margin-bottom: 20px;
-    border-bottom: 2px solid #1e90ff;
-    padding-bottom: 8px;
+.filter-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Filter Bar */
-.filter-bar {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 16px;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: end;
 }
 
-.search-input,
-.status-select,
-.date-input {
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    font-size: 14px;
-}
-
-.search-input {
-    flex: 1;
-    min-width: 200px;
-}
-.search-input:focus, .status-select:focus, .date-input:focus {
-    outline: none;
-    border-color: #1e90ff;
-    box-shadow: 0 0 3px #1e90ff;
-}
-
-.btn-reset {
-    background-color: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fcd34d;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-weight: 500;
+.filter-group {
     display: flex;
-    align-items: center;
-    gap: 5px;
-    transition: 0.2s;
-}
-.btn-reset:hover { background-color: #fde68a; }
-
-/* Table Styling */
-.table-wrapper {
-    overflow-x: auto;
-}
-.table-wrapper table {
-    width: 100%;
-    border-collapse: collapse;
-}
-.table-wrapper table thead {
-    background: #f4f4f4;
-}
-.table-wrapper table th,
-.table-wrapper table td {
-    padding: 12px 10px;
-    border-bottom: 1px solid #ddd;
-    font-size: 14px;
-    text-align: left;
-    vertical-align: middle;
-}
-.table-wrapper table thead th {
-    font-weight: 600;
-    color: #333;
-}
-.table-wrapper table tbody tr:hover {
-    background-color: #f9fafb;
-}
-
-/* Status Badges */
-.status {
-    padding: 6px 12px;
-    border-radius: 12px;
-    font-size: 13px;
-    font-weight: 500;
-    display: inline-block;
-    text-align: center;
-    white-space: nowrap;
-}
-.status.active { background-color: #d1fae5; color: #065f46; } /* Xanh lá */
-.status.pending { background-color: #fef3c7; color: #92400e; } /* Vàng */
-.status.expired { background-color: #f3f4f6; color: #374151; } /* Xám */
-.status.terminated { background-color: #fee2e2; color: #b91c1c; } /* Đỏ */
-
-/* Action Buttons */
-.action-buttons {
-    display: flex;
+    flex-direction: column;
     gap: 6px;
 }
-.btn-custom {
-    padding: 5px 10px;
-    border-radius: 6px;
+
+.filter-group label {
     font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.form-control-sm, .form-select-sm {
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 160px;
+}
+.form-control-sm:focus, .form-select-sm:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-input-wrapper {
+    flex-grow: 1;
+    min-width: 250px;
+}
+
+.btn-reset-filter {
+    color: #ef4444;
     font-weight: 500;
-    cursor: pointer;
-    border: 1px solid transparent;
-    display: inline-flex;
+    border: 1px dashed #fca5a5;
+    background: #fef2f2;
+}
+.btn-reset-filter:hover {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+/* --- TABLE STYLING --- */
+.table-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    overflow: hidden; /* Bo tròn góc table */
+    border: 1px solid #e5e7eb;
+}
+
+.custom-table {
+    margin-bottom: 0;
+    width: 100%;
+}
+
+.custom-table thead th {
+    background-color: #f9fafb;
+    color: #6b7280;
+    font-size: 12px;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+    border-top: none;
+}
+
+.custom-table tbody td {
+    padding: 16px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f3f4f6;
+    color: #1f2937;
+    font-size: 14px;
+}
+
+.custom-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.custom-table tbody tr:hover {
+    background-color: #f9fafb;
+    transition: background-color 0.2s;
+}
+
+/* Text Highlights */
+.tenant-name {
+    font-weight: 600;
+    color: #111827;
+    display: block;
+}
+.room-info {
+    font-size: 13px;
+    color: #6b7280;
+    display: flex;
     align-items: center;
     gap: 4px;
-    transition: 0.2s;
 }
-.btn-view { background-color: #dbeafe; color: #1e3a8a; border-color: #93c5fd; }
-.btn-view:hover { background-color: #bfdbfe; }
-
-.btn-download { background-color: #d1fae5; color: #065f46; border-color: #10b981; }
-.btn-download:hover { background-color: #a7f3d0; }
-
-.btn-delete { background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-.btn-delete:hover { background-color: #fecaca; }
-
-.no-data {
-    text-align: center;
-    padding: 30px;
-    font-style: italic;
-    color: #666;
+.price-tag {
+    font-family: 'Consolas', monospace; /* Số tiền dễ nhìn hơn */
+    font-weight: 700;
+    color: #059669;
+}
+.date-range {
+    font-size: 13px;
+    color: #4b5563;
 }
 
-/* Detail Modal Content */
-.detail-content p {
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #eee;
+/* --- STATUS BADGES --- */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+/* Colors for statuses */
+.status-active { background: #ecfdf5; color: #047857; }
+.status-active .status-dot { background: #10b981; }
+
+.status-pending { background: #fffbeb; color: #b45309; }
+.status-pending .status-dot { background: #f59e0b; }
+
+.status-expired { background: #f3f4f6; color: #4b5563; }
+.status-expired .status-dot { background: #9ca3af; }
+
+.status-terminated { background: #fef2f2; color: #b91c1c; }
+.status-terminated .status-dot { background: #ef4444; }
+
+/* --- ACTION BUTTONS (Icon Only) --- */
+.action-cell {
     display: flex;
-    justify-content: space-between;
+    gap: 8px;
+    justify-content: flex-end;
 }
-.detail-content strong {
-    color: #1e3a8a;
+
+.btn-icon {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    transition: all 0.2s;
+}
+
+.btn-icon:hover {
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+.btn-icon.view:hover { background-color: #eff6ff; color: #2563eb; }
+.btn-icon.download:hover { background-color: #ecfdf5; color: #059669; }
+.btn-icon.delete:hover { background-color: #fef2f2; color: #dc2626; }
+.btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* --- MODAL IMPROVEMENTS --- */
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+.detail-item {
+    background: #f9fafb;
+    padding: 12px;
+    border-radius: 8px;
+}
+.detail-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #6b7280;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.detail-value {
+    font-size: 15px;
+    color: #111827;
+    font-weight: 500;
 }

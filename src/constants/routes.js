@@ -72,4 +72,7 @@ export const ROUTES = {
   roomDetail: "/rooms/:id",
   roomEdit: "/rooms/:id/edit",
   roomCreate: "/rooms/create",
+
+  // Utility Services
+  utilityServices: "/utility-services",
 };

@@ -300,8 +300,13 @@ function BlockNode({ data }) {
     h = 80,
     color = "#1e40af",
     icon = "room",
+    room_number,
     onChangeLabel,
   } = data || {};
+
+  const displayText =
+    icon === "room" ? String(room_number || "").trim() || "Phòng" : label;
+
   return (
     <div
       style={{
@@ -333,7 +338,16 @@ function BlockNode({ data }) {
       >
         <Icon name={icon} size={16} />
       </span>
-      <EditableLabel text={label} onCommit={(t) => onChangeLabel?.(t)} />
+
+      {/* Room: không cho edit label bằng double click nữa, chỉ hiển thị số phòng */}
+      {icon === "room" ? (
+        <span style={{ userSelect: "none", fontSize: 13 }}>{displayText}</span>
+      ) : (
+        <EditableLabel
+          text={displayText}
+          onCommit={(t) => onChangeLabel?.(t)}
+        />
+      )}
     </div>
   );
 }
@@ -403,7 +417,7 @@ function FloorplanEditor() {
     }),
     []
   );
-  
+
   const activeBuildingObj = useMemo(
     () =>
       buildings.find(
@@ -538,8 +552,8 @@ function FloorplanEditor() {
                         ...m,
                         data: {
                           ...m.data,
-                          label: roomNumber || "Nhập số phòng",
-                          room_number: roomNumber,
+                          label: "Phòng", // ✅ KHÔNG đổi label
+                          room_number: roomNumber, // ✅ chỉ lưu số phòng
                         },
                       };
                     }
@@ -625,10 +639,10 @@ function FloorplanEditor() {
           style: { zIndex: 1 },
           data: {
             room_number: "",
-            label: "Nhập số phòng", // 👈 QUAN TRỌNG
+            label: "Phòng",
             w: 4 * pxPerMeter,
             h: 3 * pxPerMeter,
-            size: 4 * 3,
+            size: null,
             color: "#1e40af",
             icon: "room",
           },
@@ -745,6 +759,7 @@ function FloorplanEditor() {
         setTimeout(injectCallbacks, 0);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pxPerMeter, rf, gridGap, injectCallbacks, setNodes]
   );
 
@@ -783,10 +798,27 @@ function FloorplanEditor() {
       );
     } else {
       const px = Math.max(0, Number(m || 0) * pxPerMeter);
+
       setNodes((nds) =>
-        nds.map((n) =>
-          n.id === selectedId ? { ...n, data: { ...n.data, [field]: px } } : n
-        )
+        nds.map((n) => {
+          if (n.id !== selectedId) return n;
+
+          const nextData = { ...n.data, [field]: px };
+
+          // ✅ Nếu là node Phòng thì cập nhật luôn diện tích m2 để BE lưu chuẩn
+          if (n?.data?.nodeType === "room") {
+            const wPx = field === "w" ? px : Number(n?.data?.w || 0);
+            const hPx = field === "h" ? px : Number(n?.data?.h || 0);
+
+            const wM = wPx / pxPerMeter;
+            const hM = hPx / pxPerMeter;
+            const area = Number((wM * hM).toFixed(2));
+
+            nextData.size = Number.isFinite(area) ? area : null;
+          }
+
+          return { ...n, data: nextData };
+        })
       );
     }
   };
@@ -1143,10 +1175,12 @@ function FloorplanEditor() {
                   <label style={labelStyle}>Số phòng</label>
                   <input
                     style={inputStyle}
-                    type="text"
                     value={selectedNode?.data?.room_number || ""}
                     onChange={(e) => {
-                      const v = e.target.value;
+                      const onlyNumber = String(e.target.value || "").replace(
+                        /\D/g,
+                        ""
+                      );
                       setNodes((nds) =>
                         nds.map((n) =>
                           n.id === selectedId
@@ -1154,17 +1188,15 @@ function FloorplanEditor() {
                                 ...n,
                                 data: {
                                   ...n.data,
-                                  room_number: v,
-                                  label: v
-                                    ? `Phòng ${v}`
-                                    : n.data?.label || "Phòng",
+                                  room_number: onlyNumber,
+                                  label: "Phòng",
                                 },
                               }
                             : n
                         )
                       );
                     }}
-                    placeholder="VD: 101"
+                    placeholder="Nhập số phòng..."
                   />
                 </div>
               )}

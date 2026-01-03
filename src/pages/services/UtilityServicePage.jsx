@@ -1,0 +1,344 @@
+// src/pages/services/UtilityServicePage.js
+// Created: 2026-01-01
+// Updated: FIX manager cannot see data, fix user_id compare, keep multi-request logic
+
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  listBuildings,
+  getBuildingManagers,
+} from "../../services/api/building";
+import {
+  getUtilityReadingsForm,
+  submitUtilityReadings,
+} from "../../services/api/utility";
+import "./UtilityServicePage.css";
+
+/**
+ * Trang quản lý / nhập chỉ số điện nước
+ * - OWNER: chọn tòa nhà
+ * - MANAGER: chỉ xem tòa nhà mình quản lý
+ */
+export default function UtilityServicePage() {
+  // ---------------- USER ----------------
+  const user = JSON.parse(localStorage.getItem("sami:user"));
+  const role = user?.role;
+  const userId = user?.id;
+
+  const today = new Date();
+
+  // ---------------- STATE ----------------
+  const [buildings, setBuildings] = useState([]);
+  const [selectedBuildingId, setSelectedBuildingId] = useState(null);
+
+  const [month, setMonth] = useState(today.getMonth() + 1);
+  const [year, setYear] = useState(today.getFullYear());
+
+  const [rooms, setRooms] = useState([]);
+  const [originalRooms, setOriginalRooms] = useState([]);
+
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // ---------------- HELPERS ----------------
+  const daysInMonth = (m, y) => new Date(y, m, 0).getDate();
+
+  const canEditThisMonth = (billDueDay) => {
+    if (!billDueDay) return false;
+
+    const maxDay = daysInMonth(month, year);
+    const effectiveDueDay = Math.min(billDueDay, maxDay);
+    const dueDate = new Date(year, month - 1, effectiveDueDay, 23, 59, 59);
+
+    return today <= dueDate;
+  };
+
+  // ---------------- DERIVED ----------------
+  const billDueDay = useMemo(() => {
+    return buildings.find(
+      (b) => Number(b.building_id) === Number(selectedBuildingId)
+    )?.bill_due_day;
+  }, [buildings, selectedBuildingId]);
+
+  const canEdit = useMemo(
+    () => canEditThisMonth(billDueDay),
+    [billDueDay, month, year]
+  );
+
+  const hasChanged = useMemo(() => {
+    if (rooms.length !== originalRooms.length) return false;
+
+    return rooms.some(
+      (r, idx) =>
+        r.new_electric !== originalRooms[idx]?.new_electric ||
+        r.new_water !== originalRooms[idx]?.new_water
+    );
+  }, [rooms, originalRooms]);
+
+  // ---------------- LOAD BUILDINGS ----------------
+  useEffect(() => {
+    async function loadBuildings() {
+      try {
+        const all = await listBuildings();
+
+        // OWNER: thấy tất cả
+        if (role === "OWNER") {
+          setBuildings(all);
+          if (all.length) {
+            setSelectedBuildingId(all[0].building_id);
+          }
+          return;
+        }
+
+        // MANAGER: lọc theo manager
+        const allowed = [];
+
+        for (const b of all) {
+          try {
+            const managers = await getBuildingManagers(b.building_id);
+
+            const isManager = managers.some(
+              (m) => Number(m.user_id) === Number(userId)
+            );
+
+            if (isManager) {
+              allowed.push(b);
+            }
+          } catch (err) {
+            console.error(
+              "Error loading managers of building",
+              b.building_id,
+              err
+            );
+          }
+        }
+
+        setBuildings(allowed);
+        if (allowed.length) {
+          setSelectedBuildingId(allowed[0].building_id);
+        }
+      } catch (err) {
+        console.error("Error loading buildings", err);
+      }
+    }
+    console.log("Loading buildings for role:", role, "userId:", userId);
+    loadBuildings();
+  }, [role, userId]);
+
+  // ---------------- LOAD READINGS ----------------
+  useEffect(() => {
+    if (!selectedBuildingId) return;
+
+    async function loadReadings() {
+      setLoading(true);
+      try {
+        const formData = await getUtilityReadingsForm({
+          building_id: selectedBuildingId,
+          month,
+          year,
+        });
+
+        const mapped = formData.map((r) => ({
+          ...r,
+          new_electric: r.new_electric ?? r.old_electric,
+          new_water: r.new_water ?? r.old_water,
+        }));
+
+        setRooms(mapped);
+        setOriginalRooms(JSON.parse(JSON.stringify(mapped)));
+      } catch (err) {
+        console.error("Error loading readings", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadReadings();
+  }, [selectedBuildingId, month, year]);
+
+  // ---------------- EVENTS ----------------
+  const handleChange = (roomId, field, value) => {
+    setRooms((prev) =>
+      prev.map((r) =>
+        r.room_id === roomId ? { ...r, [field]: Number(value) } : r
+      )
+    );
+  };
+
+  const handleSave = async () => {
+    const invalid = rooms.some(
+      (r) => r.new_electric < r.old_electric || r.new_water < r.old_water
+    );
+
+    if (invalid) {
+      alert("Chỉ số mới không được nhỏ hơn chỉ số cũ");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await submitUtilityReadings({
+        building_id: selectedBuildingId,
+        billing_month: month,
+        billing_year: year,
+        readings: rooms.map((r) => ({
+          room_id: r.room_id,
+          new_electric: r.new_electric,
+          new_water: r.new_water,
+        })),
+      });
+
+      setOriginalRooms(JSON.parse(JSON.stringify(rooms)));
+      alert("Lưu chỉ số thành công");
+    } catch (err) {
+      console.error("Error saving readings", err);
+      alert("Lỗi khi lưu chỉ số");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setRooms(JSON.parse(JSON.stringify(originalRooms)));
+  };
+
+  // ---------------- FILTER ----------------
+  const filteredRooms = useMemo(() => {
+    return rooms.filter((r) =>
+      r.room_number.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [rooms, search]);
+
+  // ---------------- RENDER ----------------
+  return (
+    <div className="container">
+      <h2 className="title">Quản lý dịch vụ điện nước</h2>
+
+      {/* FILTER BAR */}
+      <div className="filter-bar">
+        {role === "OWNER" && (
+          <div className="filter-item">
+            <label className="filter-label">Tòa nhà:</label>
+            <select
+              value={selectedBuildingId || ""}
+              onChange={(e) => setSelectedBuildingId(Number(e.target.value))}
+              className="status-select"
+            >
+              {buildings.map((b) => (
+                <option key={b.building_id} value={b.building_id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="filter-item">
+          <label className="filter-label">Tháng:</label>
+          <input
+            type="number"
+            min={1}
+            max={12}
+            value={month}
+            onChange={(e) => setMonth(Number(e.target.value))}
+            className="search-input"
+          />
+        </div>
+
+        <div className="filter-item">
+          <label className="filter-label">Năm:</label>
+          <input
+            type="number"
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="search-input"
+          />
+        </div>
+
+        <div className="filter-item flex-grow">
+          <label className="filter-label">Tìm phòng:</label>
+          <input
+            type="text"
+            placeholder="Nhập tên phòng..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="search-input"
+          />
+        </div>
+      </div>
+
+      {/* TABLE */}
+      {loading ? (
+        <p className="loading-text">Đang tải dữ liệu...</p>
+      ) : (
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th className="center">Phòng</th>
+                <th className="center">Điện cũ</th>
+                <th className="center">Điện mới</th>
+                <th className="center">Nước cũ</th>
+                <th className="center">Nước mới</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRooms.map((r) => (
+                <tr key={r.room_id}>
+                  <td className="center">{r.room_number}</td>
+                  <td className="center">{r.old_electric}</td>
+                  <td>
+                    <input
+                      type="number"
+                      value={r.new_electric}
+                      disabled={!canEdit}
+                      onChange={(e) =>
+                        handleChange(r.room_id, "new_electric", e.target.value)
+                      }
+                      className="table-input"
+                    />
+                  </td>
+                  <td className="center">{r.old_water}</td>
+                  <td>
+                    <input
+                      type="number"
+                      value={r.new_water}
+                      disabled={!canEdit}
+                      onChange={(e) =>
+                        handleChange(r.room_id, "new_water", e.target.value)
+                      }
+                      className="table-input"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {filteredRooms.length === 0 && (
+            <p className="no-data">Không có phòng nào.</p>
+          )}
+        </div>
+      )}
+
+      {/* ACTION */}
+      <div className="action-buttons bottom">
+        <button
+          className="btn add"
+          disabled={!hasChanged || saving || !canEdit}
+          onClick={handleSave}
+        >
+          💾 Lưu thay đổi
+        </button>
+
+        <button
+          className="btn delete"
+          disabled={!hasChanged}
+          onClick={handleCancel}
+        >
+          ↩ Hủy
+        </button>
+      </div>
+    </div>
+  );
+}

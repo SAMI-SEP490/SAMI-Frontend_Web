@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getContractById, updateContract, fetchContractFileBlob } from "../../services/api/contracts";
 import { listBuildings, listAssignedBuildings } from "@/services/api/building.js";
-import { getRoomsByBuildingId } from "@/services/api/rooms.js";
+import { getEmptyRoomsByBuildingId } from "@/services/api/rooms.js";
 import { getTenantsByRoomId } from "@/services/api/tenants.js";
 
 import { Button, Spinner, Alert } from "react-bootstrap"; // Thêm Alert
@@ -76,7 +76,7 @@ function EditContractPage() {
                 }
 
                 if (currentBuildingId) {
-                    const rRes = await getRoomsByBuildingId(currentBuildingId);
+                    const rRes = await getEmptyRoomsByBuildingId(currentBuildingId);
                     tempRooms = Array.isArray(rRes) ? rRes : rRes.data || [];
                     setRooms(tempRooms);
 
@@ -121,7 +121,7 @@ function EditContractPage() {
         setRooms([]);
         setTenants([]);
         if (bId) {
-            const res = await getRoomsByBuildingId(bId);
+            const res = await getEmptyRoomsByBuildingId(bId);
             setRooms(Array.isArray(res) ? res : res.data || []);
         }
     };

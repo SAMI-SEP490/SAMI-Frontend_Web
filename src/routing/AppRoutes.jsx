@@ -79,6 +79,8 @@ import EditRegulationPage from "../pages/regulation/EditRegulationPage";
 import VehicleRegistrationListPage from "../pages/vehicle/VehicleRegistrationListPage";
 import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
 
+// parking slots
+import SlotListPage from "../pages/parkingslot/SlotListPage";
 import RoomListPage from "@/pages/room/RoomListPage.jsx";
 
 const isAuthed = () =>
@@ -194,7 +196,7 @@ export default function AppRoutes() {
           path={ROUTES.tenantCreate}
           element={
             <ProtectedRoute>
-              <CreateTenantPage />
+              <CreateTenantPage/>
             </ProtectedRoute>
           }
         />
@@ -382,7 +384,14 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path={ROUTES.SlotListPage}
+          element={
+            <ProtectedRoute>
+              <SlotListPage />
+            </ProtectedRoute>
+          }
+        />
         {/* Floorplan (lazy with Suspense) */}
         <Route
           path={ROUTES.floorplanCreate}

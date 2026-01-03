@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createContract, processContractWithAI } from "../../services/api/contracts";
 import { listBuildings, listAssignedBuildings } from "@/services/api/building.js";
-import { getRoomsByBuildingId } from "@/services/api/rooms.js";
+import { getEmptyRoomsByBuildingId } from "@/services/api/rooms.js";
 import { getTenantsByRoomId } from "@/services/api/tenants.js";
 import { Button, Spinner, Alert, Modal, Row, Col } from "react-bootstrap";
 import {
@@ -115,7 +115,7 @@ function CreateContractPage() {
         setTenants([]);
         if (bId) {
             try {
-                const res = await getRoomsByBuildingId(bId);
+                const res = await getEmptyRoomsByBuildingId(bId);
                 setRooms(Array.isArray(res) ? res : res.data || []);
             } catch (err) { console.error(err); }
         }
@@ -193,7 +193,7 @@ function CreateContractPage() {
             const buildingId = tenant_info?.room?.building_id;
             const roomId = contract_data?.room_id;
 
-            if (buildingId) await getRoomsByBuildingId(buildingId).then(r => setRooms(Array.isArray(r) ? r : r.data || [])).catch(()=>{});
+            if (buildingId) await getEmptyRoomsByBuildingId(buildingId).then(r => setRooms(Array.isArray(r) ? r : r.data || [])).catch(()=>{});
             if (roomId) await getTenantsByRoomId(roomId).then(t => setTenants(Array.isArray(t) ? t : [])).catch(()=>{});
 
             setForm(prev => ({

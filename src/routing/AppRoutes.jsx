@@ -81,6 +81,7 @@ import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
 
 // parking slots
 import SlotListPage from "../pages/parkingslot/SlotListPage";
+import CreateParkingSlotPage from "../pages/parkingslot/CreateParkingSlotPage";
 import RoomListPage from "@/pages/room/RoomListPage.jsx";
 
 const isAuthed = () =>
@@ -389,6 +390,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <SlotListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.CreateParkingSlotPage}
+          element={
+            <ProtectedRoute>
+              <CreateParkingSlotPage />
             </ProtectedRoute>
           }
         />

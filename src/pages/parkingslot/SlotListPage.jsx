@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   listParkingSlots,
   deleteParkingSlot,
@@ -42,13 +42,11 @@ export default function SlotListPage() {
     try {
       setLoading(true);
 
-      // OWNER → load buildings
       if (role === "OWNER") {
         const bRes = await listBuildingsForParking();
         setBuildings(bRes || []);
       }
 
-      // PARAMS THEO ROLE
       let params = {};
       if (role === "MANAGER" && userBuildingId) {
         params.building_id = userBuildingId;
@@ -69,11 +67,13 @@ export default function SlotListPage() {
   }, [role, userBuildingId]);
 
   /* ================= DELETE ================= */
-  async function handleDelete(id) {
+  async function handleDelete(slot) {
+    if (!slot.is_available) return;
+
     if (!window.confirm("Bạn có chắc muốn xóa chỗ đỗ này?")) return;
 
     try {
-      await deleteParkingSlot(id);
+      await deleteParkingSlot(slot.slot_id);
       alert("🗑️ Đã xóa chỗ đỗ.");
       fetchData();
     } catch (err) {
@@ -83,33 +83,56 @@ export default function SlotListPage() {
   }
 
   /* ================= FILTER ================= */
-  const filteredSlots = slots.filter((s) => {
-    const matchSearch = s.slot_number
-      ?.toLowerCase()
-      .includes(search.toLowerCase());
+  const filteredSlots = useMemo(() => {
+    return slots.filter((s) => {
+      const matchSearch = s.slot_number
+        ?.toLowerCase()
+        .includes(search.toLowerCase());
 
-    const matchBuilding =
+      const matchBuilding =
+        role === "OWNER" && ownerBuildingId
+          ? s.building_id === Number(ownerBuildingId)
+          : true;
+
+      const matchType = typeFilter ? s.slot_type === typeFilter : true;
+
+      const matchStatus =
+        statusFilter === ""
+          ? true
+          : statusFilter === "available"
+          ? s.is_available
+          : !s.is_available;
+
+      return matchSearch && matchBuilding && matchType && matchStatus;
+    });
+  }, [slots, search, ownerBuildingId, typeFilter, statusFilter, role]);
+
+  /* ================= STATISTICS ================= */
+  const statistics = useMemo(() => {
+    const baseSlots =
       role === "OWNER" && ownerBuildingId
-        ? s.building_id === Number(ownerBuildingId)
-        : true;
+        ? slots.filter((s) => s.building_id === Number(ownerBuildingId))
+        : slots;
 
-    const matchType = typeFilter ? s.slot_type === typeFilter : true;
+    const total = baseSlots.length;
+    const available = baseSlots.filter((s) => s.is_available).length;
+    const used = total - available;
 
-    const matchStatus =
-      statusFilter === ""
-        ? true
-        : statusFilter === "available"
-        ? s.is_available
-        : !s.is_available;
-
-    return matchSearch && matchBuilding && matchType && matchStatus;
-  });
+    return { total, available, used };
+  }, [slots, ownerBuildingId, role]);
 
   if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
 
   return (
     <div className="container">
       <h2 className="title">Danh sách Chỗ Đỗ Xe</h2>
+
+      {/* ================= STAT ================= */}
+      <div className="stat-box">
+        <span>📊 Tổng: {statistics.total}</span>
+        <span className="available">🟢 Trống: {statistics.available}</span>
+        <span className="unavailable">🔴 Đã dùng: {statistics.used}</span>
+      </div>
 
       {/* ================= FILTER BAR ================= */}
       <div className="filter-bar">
@@ -121,7 +144,6 @@ export default function SlotListPage() {
           className="search-input"
         />
 
-        {/* OWNER: CHỌN TÒA */}
         {role === "OWNER" && (
           <select
             value={ownerBuildingId}
@@ -163,25 +185,23 @@ export default function SlotListPage() {
         <table>
           <thead>
             <tr>
-              <th className="center">#</th>
-              <th className="center">Mã chỗ đỗ</th>
-              <th className="center">Loại xe</th>
-              <th className="center">Trạng thái</th>
-              <th className="center action-col">Hành động</th>
+              <th>#</th>
+              <th>Mã chỗ đỗ</th>
+              <th>Loại xe</th>
+              <th>Trạng thái</th>
+              <th className="action-col">Hành động</th>
             </tr>
           </thead>
 
           <tbody>
             {filteredSlots.map((slot, index) => (
               <tr key={slot.slot_id}>
-                <td className="center">{index + 1}</td>
-                <td className="center">{slot.slot_number}</td>
-
-                <td className="center">
+                <td>{index + 1}</td>
+                <td>{slot.slot_number}</td>
+                <td>
                   {slot.slot_type === "two_wheeler" ? "Xe máy" : "Ô tô"}
                 </td>
-
-                <td className="center">
+                <td>
                   <span
                     className={`status ${
                       slot.is_available ? "available" : "unavailable"
@@ -190,7 +210,6 @@ export default function SlotListPage() {
                     {slot.is_available ? "Còn trống" : "Đã sử dụng"}
                   </span>
                 </td>
-
                 <td className="action-buttons">
                   <button
                     className="btn edit"
@@ -202,8 +221,16 @@ export default function SlotListPage() {
                   </button>
 
                   <button
-                    className="btn delete"
-                    onClick={() => handleDelete(slot.slot_id)}
+                    className={`btn delete ${
+                      !slot.is_available ? "disabled" : ""
+                    }`}
+                    disabled={!slot.is_available}
+                    title={
+                      !slot.is_available
+                        ? "Không thể xóa slot đang được sử dụng"
+                        : ""
+                    }
+                    onClick={() => handleDelete(slot)}
                   >
                     <Trash size={14} /> Xóa
                   </button>

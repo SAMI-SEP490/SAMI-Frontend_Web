@@ -73,6 +73,15 @@ export async function getRoomsByBuildingId(buildingId, params = {}) {
     throw error;
   }
 }
+export async function getEmptyRoomsByBuildingId(buildingId, params = {}) {
+  try {
+    const response = await http.get(`/room/building/${buildingId}?onlyEmpty=true`, { params });
+    return unwrap(response);
+  } catch (error) {
+    console.error(`Lỗi khi lấy danh sách phòng của tòa nhà ${buildingId}:`, error);
+    throw error;
+  }
+}
 /** Lấy phòng của user theo userID */
 export async function getRoomsByUserId(userId) {
   try {

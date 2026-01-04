@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Spinner, Row, Col, Badge } from "react-bootstrap";
 import {
-  listBuildings,
+  getBuildingById,
   getBuildingManagers,
 } from "../../services/api/building";
 import "./EditBuildingPage.css"; // tái sử dụng CSS
@@ -12,29 +12,33 @@ function ViewBuildingDetail() {
   const navigate = useNavigate();
 
   const [building, setBuilding] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [managers, setManagers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // ===== LOAD DATA (GIỐNG HỆT EDIT) =====
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
 
-        const buildings = await listBuildings();
-        const b = buildings.find((i) => i.building_id === parseInt(id));
+        // 1️⃣ Lấy chi tiết tòa nhà
+        const b = await getBuildingById(id);
 
         if (!b) {
           alert("Tòa nhà không tồn tại");
-          return navigate("/buildings");
+          navigate("/buildings");
+          return;
         }
 
         setBuilding(b);
 
+        // 2️⃣ Lấy quản lý – GIỐNG EDIT
         const mgrs = await getBuildingManagers(b.building_id);
         setManagers(mgrs);
       } catch (err) {
         console.error(err);
-        alert("❌ Lỗi tải dữ liệu");
+        alert("❌ Lỗi tải dữ liệu tòa nhà");
+        navigate("/buildings");
       } finally {
         setLoading(false);
       }
@@ -120,6 +124,23 @@ function ViewBuildingDetail() {
                 ? `Ngày ${building.bill_due_day}`
                 : "Chưa thiết lập"}
             </div>
+          </Col>
+        </Row>
+      </div>
+
+      {/* ================= BÃI ĐỖ XE ================= */}
+      <div className="section-card">
+        <h5 className="section-title">Bãi đỗ xe</h5>
+
+        <Row>
+          <Col md={3}>
+            <label className="view-label">Xe 4 bánh</label>
+            <div className="view-value">{building.max_4_wheel_slot ?? 0}</div>
+          </Col>
+
+          <Col md={3}>
+            <label className="view-label">Xe 2 bánh</label>
+            <div className="view-value">{building.max_2_wheel_slot ?? 0}</div>
           </Col>
         </Row>
       </div>

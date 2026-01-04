@@ -194,3 +194,29 @@
     cursor: pointer;
 }
 .scanner-close-btn:hover { background: rgba(255,255,255,0.2); }
+
+.tenant-info-card {
+    background-color: #f0fdf4; /* Light green bg */
+    border: 1px solid #86efac;
+    transition: all 0.3s ease;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.avatar-placeholder {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}

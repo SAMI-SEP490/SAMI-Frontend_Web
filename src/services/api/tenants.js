@@ -107,7 +107,23 @@ export async function getTenantsByRoomId(roomId, params = {}) {
     throw error;
   }
 }
+export async function lookupTenant(identifier) {
+  try {
 
+    const response = await http.get(`/tenant/lookup`, {
+      params: { q: identifier }
+    });
+
+    return un(response);
+  } catch (error) {
+    // Log lỗi đúng ngữ cảnh
+    console.error(
+        `Lỗi khi tìm kiếm tenant với thông tin: "${identifier}"`,
+        error
+    );
+    throw error;
+  }
+}
 /**
  * ✅ Dùng cho CREATE BILL:
  * GET /tenant/moor/:roomId -> lấy TẤT CẢ tenant trong phòng

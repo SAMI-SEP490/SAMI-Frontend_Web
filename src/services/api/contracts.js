@@ -18,19 +18,20 @@ function _toISODate(d) {
   return `${year}-${month}-${day}`;
 }
 
-
-
 function _buildContractFormData(form) {
+  // Nếu form đã là FormData thì trả về luôn, không xử lý lại
+  if (form instanceof FormData) {
+    return form;
+  }
+
   const fd = new FormData();
 
-  // 1. Mapping các ID (Lưu ý: EditPage hiện tại của bạn chưa có logic chọn lại Room ID hay Tenant ID, nhưng cứ giữ lại để map)
-  // Kiểm tra cả snake_case và camelCase
+  // 1. Mapping các ID
   if (form.room_id || form.roomId) fd.append("room_id", form.room_id || form.roomId);
   if (form.tenant_user_id || form.tenantUserId) fd.append("tenant_user_id", form.tenant_user_id || form.tenantUserId);
   if (form.building_id || form.buildingId) fd.append("building_id", form.building_id || form.buildingId);
 
   // 2. Xử lý ngày tháng
-  // Lấy giá trị từ form.start_date (React gửi) hoặc form.startDate
   const startDate = form.start_date || form.startDate;
   if (startDate) fd.append("start_date", _toISODate(startDate));
 
@@ -38,7 +39,6 @@ function _buildContractFormData(form) {
   if (endDate) fd.append("end_date", _toISODate(endDate));
 
   // 3. Xử lý tiền tệ
-  // React gửi form.rent_amount, Service cũ tìm form.rentAmount
   const rentAmount = (form.rent_amount !== undefined && form.rent_amount !== "")
       ? form.rent_amount
       : form.rentAmount;
@@ -49,16 +49,24 @@ function _buildContractFormData(form) {
       : form.depositAmount;
   if (depositAmount !== undefined && depositAmount !== "") fd.append("deposit_amount", depositAmount);
 
+  // Xử lý penalty_rate (nếu có)
+  if (form.penalty_rate !== undefined) fd.append("penalty_rate", form.penalty_rate);
+  if (form.payment_cycle_months !== undefined) fd.append("payment_cycle_months", form.payment_cycle_months);
+
   // 4. Các trường chung (status, note)
   if (form.status) fd.append("status", form.status);
 
-  // Note có thể là chuỗi rỗng nhưng không được undefined
   const note = form.note !== undefined ? form.note : "";
   if (note !== undefined) fd.append("note", note);
 
-  // 5. File
+  // 5. File (Single file legacy support)
   if (form.file instanceof File) {
     fd.append(FILE_FIELD, form.file);
+  }
+
+  // Support mảng files nếu truyền dạng object (tuy nhiên CreateContractPage đã xử lý việc này rồi)
+  if (form.files && Array.isArray(form.files)) {
+    form.files.forEach(f => fd.append(FILE_FIELD, f));
   }
 
   return fd;
@@ -69,13 +77,13 @@ function _buildContractFormData(form) {
    ========================================================================== */
 
 /** Lấy danh sách hợp đồng */
-export async function listContracts() {
+export async function listContracts(params = {}) {
   try {
-    const response = await http.get("/contract", { });
+    const response = await http.get("/contract", { params }); // Pass params (filters)
     return unwrap(response);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách hợp đồng:", error);
-    return [];
+    return []; // Return empty array or object structure depending on backend pagination
   }
 }
 
@@ -91,8 +99,14 @@ export async function getContractById(id) {
 
 export async function createContract(contractData) {
   try {
-    const fd = _buildContractFormData(contractData);
-    const response = await http.post("/contract", fd);
+    // FIX: Kiểm tra nếu contractData đã là FormData thì dùng luôn
+    // Nếu là Object thường thì mới chạy qua _buildContractFormData
+    const payload = (contractData instanceof FormData)
+        ? contractData
+        : _buildContractFormData(contractData);
+
+    // Không cần set Content-Type thủ công, axios/browser tự set multipart/form-data khi payload là FormData
+    const response = await http.post("/contract", payload);
     return unwrap(response);
   } catch (error) {
     console.error("Lỗi khi tạo hợp đồng:", error);
@@ -102,8 +116,12 @@ export async function createContract(contractData) {
 
 export async function updateContract(id, contractData) {
   try {
-    const fd = _buildContractFormData(contractData);
-    const response = await http.put(`/contract/${id}`, fd);
+    // FIX: Tương tự như create, kiểm tra FormData
+    const payload = (contractData instanceof FormData)
+        ? contractData
+        : _buildContractFormData(contractData);
+
+    const response = await http.put(`/contract/${id}`, payload);
     return unwrap(response);
   } catch (error) {
     console.error(`Lỗi khi cập nhật hợp đồng ${id}:`, error);
@@ -121,14 +139,14 @@ export async function deleteContract(id) {
   }
 }
 
-/** Tải file trực tiếp (vẫn giữ hành vi tải) */
+/** Tải file trực tiếp */
 export async function downloadContractDirect(id, fileName = "contract.pdf") {
   try {
     const res = await http.get(`/contract/${id}/download/direct`, {
       responseType: "blob",
     });
 
-    const blob = new Blob([res.data], { type: res.data.type || "application/octet-stream" });
+    const blob = new Blob([res.data], { type: res.data.type || "application/pdf" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -146,23 +164,23 @@ export async function downloadContractDirect(id, fileName = "contract.pdf") {
   }
 }
 
-/** Lấy blob của file hợp đồng để preview (image/pdf/...) */
+/** Lấy blob của file hợp đồng để preview */
 export async function fetchContractFileBlob(id) {
   try {
     const res = await http.get(`/contract/${id}/download/direct`, {
       responseType: "blob",
     });
-    // trả về res.data (Blob)
     return res.data;
   } catch (error) {
     console.error(`Lỗi khi fetch blob file hợp đồng ${id}:`, error);
     throw error;
   }
 }
+
 export async function processContractWithAI(file) {
   try {
     const fd = new FormData();
-    fd.append("contract_file", file); // Key này phải khớp với upload.single('contract_file') ở router
+    fd.append("contract_file", file);
 
     const response = await http.post("/contract/import", fd, {
       headers: {
@@ -175,6 +193,7 @@ export async function processContractWithAI(file) {
     throw error;
   }
 }
+
 /* ==========================================================================
 // ADDENDUMS (PHỤ LỤC)
    ========================================================================== */

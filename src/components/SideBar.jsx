@@ -91,6 +91,11 @@ const SideBar = () => {
         onClick={() => navigate("/maintaince-requests")}
       />
       <MenuButton
+        label="Chỗ đậu xe"
+        active={isActive("/parking-slots")}
+        onClick={() => navigate("/parking-slots")}
+      />
+      <MenuButton
         label="Đăng ký xe"
         active={isActive("/vehicle-registrations")}
         onClick={() => navigate("/vehicle-registrations")}

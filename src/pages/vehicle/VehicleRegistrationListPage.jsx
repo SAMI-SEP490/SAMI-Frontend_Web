@@ -3,201 +3,446 @@ import {
   listVehicleRegistrations,
   approveVehicleRegistration,
   rejectVehicleRegistration,
+  deleteVehicleRegistration
 } from "../../services/api/vehicle";
-import { getUserById } from "../../services/api/users";
-import "./VehicleRegistrationList.css";
-
-const VEHICLE_TYPE_VN = {
-  car: "Ô tô",
-  motorcycle: "Xe máy",
-  truck: "Xe tải",
-  van: "Xe van",
-  other: "Khác",
-};
-
-const STATUS_VN = {
-  requested: "Đã yêu cầu",
-  pending: "Đang chờ",
-  approved: "Đã duyệt",
-  rejected: "Bị từ chối",
-};
-
-const formatDate = (d) => (d ? new Date(d).toLocaleDateString("vi-VN") : "—");
-
+import { listAvailableParkingSlots } from "../../services/api/parking-slots";
+import { createPortal } from "react-dom";
+import "./VehicleRegistrationListPage.css?x=1"
 export default function VehicleRegistrationListPage() {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState({});
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
 
-  const fetchRegistrations = async () => {
+  // approve modal
+  const [approveTarget, setApproveTarget] = useState(null);
+  const [slots, setSlots] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState("");
+
+  async function fetchData() {
     setLoading(true);
-    try {
-      const res = await listVehicleRegistrations();
-      const arr = Array.isArray(res?.registrations) ? res.registrations : [];
-
-      const parsed = await Promise.all(
-        arr.map(async (r) => {
-          let reason = {};
-          try {
-            reason = r.reason ? JSON.parse(r.reason) : {};
-          } catch {}
-
-          let requestedBy = "—";
-          if (r.requested_by) {
-            try {
-              const u = await getUserById(r.requested_by);
-              requestedBy = u?.full_name || r.requested_by;
-            } catch {
-              requestedBy = r.requested_by;
-            }
-          }
-
-          return {
-            id: r.assignment_id,
-            requestedBy,
-            plate: reason.license_plate || "—",
-            type: reason.type || "other",
-            brand: reason.brand || "—",
-            color: reason.color || "—",
-            status: r.status,
-            start: r.start_date,
-            end: r.end_date,
-            note: r.note || "",
-          };
-        })
-      );
-
-      setRegistrations(parsed);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const res = await listVehicleRegistrations();
+    setRegistrations(res?.registrations ?? res ?? []);
+    setLoading(false);
+  }
 
   useEffect(() => {
-    fetchRegistrations();
+    fetchData();
   }, []);
 
-  const handleApprove = async (id) => {
-    setActionLoading((p) => ({ ...p, [id]: true }));
-    await approveVehicleRegistration(id);
-    await fetchRegistrations();
-    setActionLoading((p) => ({ ...p, [id]: false }));
+  /* ================= APPROVE ================= */
+
+  const openApprove = (registration) => {
+  console.log("CLICK APPROVE", registration.registration_id);
+  setApproveTarget(registration);
+  setSelectedSlot("");
+};
+useEffect(() => {
+  if (!approveTarget) return;
+
+  const loadSlots = async () => {
+    const available = await listAvailableParkingSlots({
+      registration_id: approveTarget.registration_id
+    });
+    setSlots(available || []);
   };
+
+  loadSlots();
+}, [approveTarget]);
+  const handleApprove = async () => {
+    if (!selectedSlot) {
+      alert("Vui lòng chọn slot");
+      return;
+    }
+
+    await approveVehicleRegistration(
+      approveTarget.registration_id,
+      Number(selectedSlot)
+    );
+
+    setApproveTarget(null);
+    fetchData();
+  };
+
+  /* ================= REJECT ================= */
 
   const handleReject = async (id) => {
-    setActionLoading((p) => ({ ...p, [id]: true }));
-    await rejectVehicleRegistration(id);
-    await fetchRegistrations();
-    setActionLoading((p) => ({ ...p, [id]: false }));
+    if (!window.confirm("Từ chối đăng ký này?")) return;
+
+    await rejectVehicleRegistration(id, {
+      rejection_reason: "Không đủ điều kiện"
+    });
+
+    fetchData();
   };
 
-  const filtered = registrations.filter((r) => {
-    if (["canceled", "cancelled"].includes(r.status?.toLowerCase()))
-      return false;
+  /* ================= DELETE ================= */
 
-    const s = search.toLowerCase();
-    const matchSearch =
-      r.requestedBy.toLowerCase().includes(s) ||
-      r.plate.toLowerCase().includes(s);
+  const handleDelete = async (id) => {
+    if (!window.confirm("Xóa vĩnh viễn đơn đăng ký này?")) return;
+    await deleteVehicleRegistration(id);
+    fetchData();
+  };
 
-    const matchStatus = !statusFilter || r.status === statusFilter;
+  if (loading) return <p className="loading-text">Đang tải...</p>;
+const pageStyle = `
+#root {
+  isolation: isolate;
+  background: #f3f4f6;
+}
 
-    return matchSearch && matchStatus;
-  });
+/* ===============================
+   CONTAINER
+================================ */
+.container {
+  max-width: 1200px;
+  margin: 32px auto;
+  padding: 20px 28px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+}
 
-  if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1e3a8a;
+  border-bottom: 2px solid #3b82f6;
+  padding-bottom: 8px;
+  margin-bottom: 20px;
+}
+
+/* ===============================
+   FILTER BAR
+================================ */
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.search-input,
+.status-select {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  outline: none;
+  background: #f9fafb;
+}
+
+.search-input:focus,
+.status-select:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+}
+
+/* ===============================
+   TABLE
+================================ */
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead {
+  background: #f3f4f6;
+}
+
+th {
+  text-align: left;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #374151;
+  padding: 12px 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+td {
+  padding: 12px 10px;
+  font-size: 14px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #111827;
+}
+
+.center {
+  text-align: center;
+}
+
+tr:hover {
+  background: #f9fafb;
+}
+
+/* ===============================
+   STATUS BADGES
+================================ */
+.status {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-block;
+  text-transform: capitalize;
+}
+
+/* Requested = waiting for approve */
+.status.requested,
+.status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Approved */
+.status.approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* Rejected */
+.status.rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* ===============================
+   ACTION COLUMN
+================================ */
+.action-col {
+  min-width: 220px;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ===============================
+   BUTTONS
+================================ */
+.btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+/* Approve */
+.btn.approve {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.btn.approve:hover {
+  background: #a7f3d0;
+}
+
+/* Reject */
+.btn.reject {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.btn.reject:hover {
+  background: #fecaca;
+}
+
+/* Delete */
+.btn.delete {
+  background: #ef4444;
+  color: white;
+}
+
+.btn.delete:hover {
+  background: #dc2626;
+}
+
+/* ===============================
+   EMPTY & LOADING
+================================ */
+.loading-text,
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+  font-size: 15px;
+}
+
+/* ===============================
+   APPROVE MODAL
+================================ */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-content {
+  background: #ffffff;
+  padding: 22px 26px;
+  border-radius: 14px;
+  min-width: 340px;
+  max-width: 90vw;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+  animation: pop 0.18s ease-out;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.modal-content h3 {
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.modal select {
+  width: 100%;
+  padding: 9px 10px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+`;
 
   return (
-    <div className="container">
-      <h2 className="title">Danh sách đăng ký xe</h2>
+    <>
+    <style>{pageStyle}</style>
+      {/* ===== MAIN TABLE ===== */}
+      <div className="container">
+        <h2 className="title">Danh sách đăng ký xe</h2>
 
-      {/* FILTER */}
-      <div className="filter-bar">
-        <input
-          className="search-input"
-          placeholder="🔎 Tìm theo tên hoặc biển số..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        {registrations.length === 0 ? (
+          <p className="no-data">Không có dữ liệu</p>
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Người đăng ký</th>
+                  <th>Biển số</th>
+                  <th>Loại xe</th>
+                  <th>Trạng thái</th>
+                  <th className="center">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {registrations.map((r, i) => (
+                  <tr key={r.registration_id}>
+                    <td>{i + 1}</td>
+                    <td>{r.requester?.user?.full_name}</td>
+                    <td>{r.license_plate}</td>
+                    <td>{r.vehicle_type}</td>
+
+                    <td className="center">
+                      <span className={`status ${r.status}`}>
+                        {r.status.toUpperCase()}
+                      </span>
+                    </td>
+
+                    <td className="center action-col">
+                      <div className="action-buttons">
+                        {r.status === "requested" && (
+                          <>
+                            <button
+                              className="btn approve"
+                              onClick={() => openApprove(r)}
+                            >
+                              Approve
+                            </button>
+
+                            <button
+                              className="btn reject"
+                              onClick={() =>
+                                handleReject(r.registration_id)
+                              }
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ===== APPROVE MODAL (OUTSIDE CONTAINER) ===== */}
+      {approveTarget &&
+  createPortal(
+    <div className="modal">
+      <div className="modal-content">
+        <h3>
+          Chọn slot cho xe {approveTarget.license_plate}
+        </h3>
 
         <select
-          className="status-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          value={selectedSlot}
+          onChange={(e) => setSelectedSlot(e.target.value)}
         >
-          <option value="">Tất cả trạng thái</option>
-          <option value="requested">Đã yêu cầu</option>
-          <option value="pending">Đang chờ</option>
-          <option value="approved">Đã duyệt</option>
-          <option value="rejected">Bị từ chối</option>
+          <option value="">-- Chọn slot --</option>
+          {slots.map((s) => (
+            <option key={s.slot_id} value={s.slot_id}>
+              {s.slot_number}
+            </option>
+          ))}
         </select>
+
+        <div style={{ marginTop: 12, textAlign: "right" }}>
+          <button className="btn approve" onClick={handleApprove}>
+            Xác nhận
+          </button>
+
+          <button
+            className="btn reject"
+            onClick={() => setApproveTarget(null)}
+            style={{ marginLeft: 8 }}
+          >
+            Hủy
+          </button>
+        </div>
       </div>
-
-      {/* TABLE */}
-      <div className="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th className="center">#</th>
-              <th>Người đăng ký</th>
-              <th>Biển số</th>
-              <th>Loại xe</th>
-              <th>Hãng</th>
-              <th>Màu</th>
-              <th className="center">Bắt đầu</th>
-              <th className="center">Kết thúc</th>
-              <th className="center">Trạng thái</th>
-              <th>Ghi chú</th>
-              <th className="center action-col">Hành động</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filtered.map((r, i) => (
-              <tr key={r.id}>
-                <td className="center">{i + 1}</td>
-                <td>{r.requestedBy}</td>
-                <td>{r.plate}</td>
-                <td>{VEHICLE_TYPE_VN[r.type]}</td>
-                <td>{r.brand}</td>
-                <td>{r.color}</td>
-                <td className="center">{formatDate(r.start)}</td>
-                <td className="center">{formatDate(r.end)}</td>
-                <td className="center">
-                  <span className={`status ${r.status}`}>
-                    {STATUS_VN[r.status]}
-                  </span>
-                </td>
-                <td>{r.note}</td>
-                <td className="action-buttons">
-                  {r.status === "requested" && (
-                    <>
-                      <button
-                        className="btn publish"
-                        disabled={actionLoading[r.id]}
-                        onClick={() => handleApprove(r.id)}
-                      >
-                        Chấp nhận
-                      </button>
-                      <button
-                        className="btn delete"
-                        disabled={actionLoading[r.id]}
-                        onClick={() => handleReject(r.id)}
-                      >
-                        Từ chối
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {filtered.length === 0 && <p className="no-data">Không có dữ liệu</p>}
-      </div>
-    </div>
+    </div>,
+    document.body
+  )}
+    </>
   );
 }
+

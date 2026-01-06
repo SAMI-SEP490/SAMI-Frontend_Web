@@ -66,6 +66,8 @@ export const ROUTES = {
   //vehicle registrations
   vehicleRegistrations: "/vehicle-registrations",
   SlotListPage: "/parking-slots",
+  CreateParkingSlotPage: "/parking-slots/create",
+  VehicleManagementPage: "/vehicle",
   // Rooms
   rooms: "/rooms",
   roomDetail: "/rooms/:id",

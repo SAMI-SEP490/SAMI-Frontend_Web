@@ -759,7 +759,6 @@ function FloorplanEditor() {
         setTimeout(injectCallbacks, 0);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pxPerMeter, rf, gridGap, injectCallbacks, setNodes]
   );
 

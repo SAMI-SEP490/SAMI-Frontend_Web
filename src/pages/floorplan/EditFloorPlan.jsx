@@ -501,9 +501,8 @@ function FloorplanEdit() {
                         ...m,
                         data: {
                           ...m.data,
-                          label: roomNumber || m.data.label,
                           room_number: roomNumber,
-                          room_id: m.data.room_id, // 🔥 GIỮ NGUYÊN
+                          label: roomNumber || "Phòng", // ✅ luôn sync
                         },
                       };
                     }
@@ -540,7 +539,26 @@ function FloorplanEdit() {
         const n = Array.isArray(layout.nodes) ? layout.nodes : [];
         const e = Array.isArray(layout.edges) ? layout.edges : [];
 
-        setNodes(n);
+        // ✅ FIX: Sync label với room_number khi load data
+        const fixedNodes = n.map((node) => {
+          // Chỉ xử lý node phòng
+          if (
+            node.type === "block" &&
+            node.data?.icon === "room" &&
+            node.data?.room_number
+          ) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                label: node.data.room_number || "Phòng",
+              },
+            };
+          }
+          return node;
+        });
+
+        setNodes(fixedNodes);
         setEdges(e);
 
         if (layout.meta?.pxPerMeter) setPxPerMeter(layout.meta.pxPerMeter);
@@ -1132,22 +1150,26 @@ function FloorplanEdit() {
                     type="text"
                     value={selectedNode?.data?.room_number || ""}
                     onChange={(e) => {
-                      const v = e.target.value;
+                      const v = e.target.value.replace(/\D/g, ""); // chỉ cho số
+
                       setNodes((nds) =>
-                        nds.map((n) =>
-                          n.id === selectedId
-                            ? {
-                                ...n,
-                                data: {
-                                  ...n.data,
-                                  room_number: v,
-                                  label: v
-                                    ? `Phòng ${v}`
-                                    : n.data?.label || "Phòng",
-                                },
-                              }
-                            : n
-                        )
+                        nds.map((n) => {
+                          if (n.id !== selectedId) return n;
+
+                          const isRoom =
+                            n?.data?.icon === "room" ||
+                            n?.data?.room_number !== undefined;
+                          if (!isRoom) return n;
+
+                          return {
+                            ...n,
+                            data: {
+                              ...(n.data || {}),
+                              room_number: v,
+                              label: v || "Phòng", // <-- quan trọng: có số thì hiện số, không có thì hiện "Phòng"
+                            },
+                          };
+                        })
                       );
                     }}
                     placeholder="VD: 101"

@@ -55,7 +55,12 @@ function BuildingNodeView({ data }) {
 }
 
 function BlockNodeView({ data }) {
-  const { label = "Phòng", w = 120, h = 80, color = "#1e40af" } = data || {};
+  const { w = 120, h = 80, color = "#1e40af" } = data || {};
+
+  const isRoom = data?.icon === "room" || data?.room_number !== undefined;
+  const roomNo = data?.room_number ? String(data.room_number) : "";
+  const text = isRoom ? roomNo || "Phòng" : data?.label || "";
+
   return (
     <div
       style={{
@@ -71,7 +76,7 @@ function BlockNodeView({ data }) {
         color: "#0f172a",
       }}
     >
-      {label}
+      {text}
     </div>
   );
 }
@@ -287,12 +292,26 @@ function ViewerInner() {
         const rawNodes = Array.isArray(layout.nodes) ? layout.nodes : [];
         const rawEdges = Array.isArray(layout.edges) ? layout.edges : [];
 
-        const nn = rawNodes.map((n) => ({
-          ...n,
-          draggable: false,
-          selectable: false,
-          style: { ...(n.style || {}), zIndex: n.type === "building" ? 0 : 1 },
-        }));
+        const nn = rawNodes.map((n) => {
+          const isRoom =
+            n?.data?.icon === "room" || n?.data?.room_number !== undefined;
+          const roomNo = n?.data?.room_number ? String(n.data.room_number) : "";
+
+          return {
+            ...n,
+            draggable: false,
+            selectable: false,
+            data: {
+              ...(n.data || {}),
+              // nếu là room và có số phòng thì label cũng set về số (hỗ trợ dữ liệu cũ)
+              ...(isRoom && roomNo ? { label: roomNo } : {}),
+            },
+            style: {
+              ...(n.style || {}),
+              zIndex: n.type === "building" ? 0 : 1,
+            },
+          };
+        });
 
         setNodes(nn);
         setEdges(rawEdges);

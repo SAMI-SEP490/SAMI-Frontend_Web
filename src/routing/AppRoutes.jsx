@@ -77,6 +77,7 @@ import EditRegulationPage from "../pages/regulation/EditRegulationPage";
 
 // vehicle registrations
 import VehicleRegistrationListPage from "../pages/vehicle/VehicleRegistrationListPage";
+import VehicleManagementPage from "../pages/vehicle/VehicleManagementPage";
 import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
 
 // parking slots
@@ -386,6 +387,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <VehicleRegistrationListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.VehicleManagementPage}
+          element={
+            <ProtectedRoute>
+              <VehicleManagementPage />
             </ProtectedRoute>
           }
         />

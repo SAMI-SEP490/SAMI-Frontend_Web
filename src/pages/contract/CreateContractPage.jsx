@@ -1,608 +1,568 @@
-// src/pages/contract/ContractListPage.jsx
-import React, { useState, useEffect, useMemo } from "react";
-import { Table, Button, Modal, Spinner, OverlayTrigger, Tooltip, Form, Badge } from "react-bootstrap";
+// src/pages/contract/CreateContractPage.jsx
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { createContract, processContractWithAI } from "../../services/api/contracts";
+import { listBuildings, listAssignedBuildings } from "@/services/api/building.js";
+import { getEmptyRoomsByBuildingId } from "@/services/api/rooms.js";
+// [UPDATE] Import lookupTenant
+import { lookupTenant } from "@/services/api/tenants.js";
+import { Button, Spinner, Alert, Modal, Row, Col, Card, Image } from "react-bootstrap";
 import {
-    listContracts,
-    deleteContract,
-    downloadContractDirect,
-    fetchContractFileBlob,
-} from "../../services/api/contracts";
-
-import { listBuildings } from "@/services/api/building.js";
-import { getAccessToken } from "../../services/http";
-import {
-    PlusLg, Download, Eye, Trash,
-    ArrowClockwise, FileEarmarkPdf, Building, Person, Calendar3,
-    FilePlus, JournalText, FileEarmarkText
+    Building, Person, CashCoin, CalendarDate, FileEarmarkText,
+    Magic, XLg, CheckCircleFill, FileEarmarkPdf, FileEarmarkImage,
+    Search, Telephone, CardText, PersonBadge
 } from "react-bootstrap-icons";
-import "./ContractListPage.css";
+import { getAccessToken } from "@/services/http.js";
+import "./CreateContractPage.css";
 
-function ContractListPage() {
+function CreateContractPage() {
     const navigate = useNavigate();
+    const fileInputRef = useRef(null);
+    const scanIntervalRef = useRef(null);
 
-    // --- ROLE ---
     const [userRole, setUserRole] = useState("");
-
-    // --- DATA ---
-    const [allContracts, setAllContracts] = useState([]);
-    const [listBuildingsData, setListBuildingsData] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [loadingIds, setLoadingIds] = useState([]); // Cho việc download
+    const [submitting, setSubmitting] = useState(false);
 
-    // --- PAGINATION ---
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    // AI States
+    const [aiProcessing, setAiProcessing] = useState(false);
+    const [aiMessage, setAiMessage] = useState(null);
+    const [showScanner, setShowScanner] = useState(false);
+    const [pdfPreview, setPdfPreview] = useState(null);
+    const [scanProgress, setScanProgress] = useState(0);
 
-    // --- FILTERS ---
-    const [filters, setFilters] = useState({
-        status: "",
-        start_date: "",
+    // Data Selects
+    const [buildings, setBuildings] = useState([]);
+    const [rooms, setRooms] = useState([]);
+    // [UPDATE] Bỏ state tenants list, thêm state cho search
+    const [assignedBuilding, setAssignedBuilding] = useState(null);
+
+    // [NEW] Tenant Search States
+    const [searchQuery, setSearchQuery] = useState("");
+    const [foundTenant, setFoundTenant] = useState(null);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchError, setSearchError] = useState("");
+
+    // Form State
+    const [form, setForm] = useState({
+        building_id: "",
+        room_number: "",
+        room_id: "",
+        tenant_user_id: "", // Sẽ được set khi tìm thấy tenant
+        start_date: new Date().toISOString().split('T')[0],
+        duration_months: 12,
         end_date: "",
-        building: "",
-        q: ""
+        rent_amount: "",
+        deposit_amount: "",
+        penalty_rate: 0.1,
+        payment_cycle_months: 1,
+        status: "pending",
+        note: "",
+        files: []
     });
 
-    // --- MODALS STATE ---
-    const [showDetailModal, setShowDetailModal] = useState(false);
-    const [selectedContract, setSelectedContract] = useState(null);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [deleteId, setDeleteId] = useState(null);
-
-    // File Preview
-    const [showFilePreviewModal, setShowFilePreviewModal] = useState(false);
-    const [filePreviewUrl, setFilePreviewUrl] = useState(null);
-    const [filePreviewType, setFilePreviewType] = useState(null);
-    const [previewLoading, setPreviewLoading] = useState(false);
-
-    // --- ADDENDUM STATE (MỚI) ---
-    const [showAddendumListModal, setShowAddendumListModal] = useState(false);
-    const [showAddAddendumModal, setShowAddAddendumModal] = useState(false);
-    const [currentAddendums, setCurrentAddendums] = useState([]);
-    const [loadingAddendums, setLoadingAddendums] = useState(false);
-    const [newAddendumData, setNewAddendumData] = useState({ description: "", signed_date: "", file: null });
-
-    // --- INIT ---
+    // --- EFFECT: Calculate End Date automatically ---
     useEffect(() => {
-        try {
-            const token = getAccessToken();
-            if (token) {
-                const decoded = JSON.parse(atob(token.split(".")[1]));
-                const role = decoded.role || decoded.userRole || "";
-                setUserRole(role.toUpperCase());
+        if (form.start_date && form.duration_months) {
+            const start = new Date(form.start_date);
+            const duration = parseInt(form.duration_months);
+            if (!isNaN(start.getTime()) && !isNaN(duration) && duration > 0) {
+                const end = new Date(start);
+                end.setMonth(end.getMonth() + duration);
+                setForm(prev => ({ ...prev, end_date: end.toISOString().split('T')[0] }));
             }
-        } catch (error) {
-            console.error("JWT Error:", error);
         }
-        fetchContracts();
-        fetchBuildings();
+    }, [form.start_date, form.duration_months]);
+
+    // --- COLOR HELPER FOR SCANNER ---
+    const getScanColor = (progress) => {
+        if (progress < 35) return "#ef4444";
+        if (progress < 75) return "#f59e0b";
+        return "#10b981";
+    };
+    const currentColor = getScanColor(scanProgress);
+
+    // --- INIT DATA ---
+    useEffect(() => {
+        const token = getAccessToken();
+        if (token) {
+            try {
+                const decoded = JSON.parse(atob(token.split(".")[1]));
+                setUserRole((decoded.role || decoded.userRole || "").toUpperCase());
+            } catch (e) {}
+        }
     }, []);
 
-    const fetchContracts = async () => {
-        setLoading(true);
-        try {
-            const res = await listContracts();
-            setAllContracts(Array.isArray(res) ? res : (res.items || []));
-        } catch (err) { console.error(err); }
-        finally { setLoading(false); }
-    };
-
-    const fetchBuildings = async () => {
-        try {
-            const res = await listBuildings();
-            setListBuildingsData(Array.isArray(res) ? res : (res.items || []));
-        } catch (err) { console.error(err); }
-    };
-
-    // --- MEMOS ---
-    const uniqueBuildings = useMemo(() => {
-        if (listBuildingsData?.length > 0) {
-            return listBuildingsData.map(b => ({ id: b.id ?? b.building_id, name: b.name }));
+    useEffect(() => {
+        async function fetchBuildings() {
+            setLoading(true);
+            try {
+                if (userRole === "MANAGER") {
+                    const res = await listAssignedBuildings();
+                    const list = Array.isArray(res) ? res : res?.data;
+                    if (list?.length > 0) {
+                        setAssignedBuilding(list[0]);
+                        handleBuildingChange({ target: { value: list[0].building_id } });
+                    }
+                } else {
+                    const res = await listBuildings();
+                    const items = Array.isArray(res) ? res : (res.items || []);
+                    setBuildings(items.map(x => ({ id: x.id ?? x.building_id, name: x.name })));
+                }
+            } catch (error) { console.error(error); }
+            finally { setLoading(false); }
         }
-        const buildings = [...new Set(allContracts.map(c => c.building_name).filter(Boolean))];
-        return buildings.map(n => ({ id: n, name: n }));
-    }, [listBuildingsData, allContracts]);
-
-    const filteredContracts = useMemo(() => {
-        let result = [...allContracts];
-        if (filters.q) {
-            const lowerQ = filters.q.toLowerCase();
-            result = result.filter(c =>
-                (c.tenant_name?.toLowerCase().includes(lowerQ)) ||
-                (c.room_number?.toLowerCase().includes(lowerQ))
-            );
-        }
-        if (filters.status) result = result.filter(c => c.status === filters.status);
-        if (filters.building) {
-            result = result.filter(c =>
-                (String(c.building_id) === String(filters.building)) ||
-                (c.building_name === filters.building)
-            );
-        }
-        if (filters.start_date) result = result.filter(c => c.start_date && new Date(c.start_date) >= new Date(filters.start_date));
-        if (filters.end_date) result = result.filter(c => c.end_date && new Date(c.end_date) <= new Date(filters.end_date));
-        return result;
-    }, [allContracts, filters]);
-
-    const currentTableData = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        return filteredContracts.slice(startIndex, startIndex + itemsPerPage);
-    }, [filteredContracts, currentPage]);
-
-    const totalPages = Math.ceil(filteredContracts.length / itemsPerPage);
+        fetchBuildings();
+    }, [userRole]);
 
     // --- HANDLERS ---
-    const handleFilterChange = (e) => {
-        setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
-        setCurrentPage(1);
+    const handleBuildingChange = async (e) => {
+        const bId = e.target.value;
+        // Reset room & tenant form data only (keep found tenant UI if desired, or reset it too)
+        setForm(prev => ({ ...prev, building_id: bId, room_number: "", room_id: "" }));
+        setRooms([]);
+        if (bId) {
+            try {
+                const res = await getEmptyRoomsByBuildingId(bId);
+                setRooms(Array.isArray(res) ? res : res.data || []);
+            } catch (err) { console.error(err); }
+        }
     };
 
-    const handleDownload = async (c) => {
-        if (!c.has_file) return;
-        setLoadingIds(prev => [...prev, c.contract_id]);
-        try {
-            await downloadContractDirect(c.contract_id, c.file_name || `contract-${c.contract_id}.pdf`);
-        } catch (e) { alert("Lỗi tải file."); }
-        finally { setLoadingIds(prev => prev.filter(id => id !== c.contract_id)); }
+    const handleRoomChange = async (e) => {
+        const rId = e.target.value;
+        const selectedRoom = rooms.find(r => String(r.room_id) === String(rId));
+        setForm(prev => ({
+            ...prev,
+            room_id: rId,
+            room_number: selectedRoom ? selectedRoom.room_number : "",
+        }));
+        // [UPDATE] Không gọi getTenantsByRoomId nữa
     };
 
-    const handlePreviewFile = async (c) => {
-        if (!c.has_file) return;
-        setPreviewLoading(true);
-        try {
-            const blob = await fetchContractFileBlob(c.contract_id);
-            setFilePreviewUrl(URL.createObjectURL(blob));
-            setFilePreviewType(blob.type);
-            setShowFilePreviewModal(true);
-        } catch (e) { alert("Lỗi xem file."); }
-        finally { setPreviewLoading(false); }
-    };
+    // [NEW] Handler tìm kiếm Tenant
+    const handleSearchTenant = async () => {
+        if (!searchQuery.trim()) return;
 
-    const handleDelete = async () => {
-        if (!deleteId) return;
-        try {
-            await deleteContract(deleteId);
-            setAllContracts(prev => prev.filter(c => c.contract_id !== deleteId));
-            setShowDeleteModal(false);
-        } catch (e) { alert("Lỗi xóa: " + e.message); }
-    };
+        setSearchLoading(true);
+        setSearchError("");
+        setFoundTenant(null);
+        setForm(prev => ({...prev, tenant_user_id: ""}));
 
-    // --- ADDENDUM HANDLERS ---
-    const handleOpenAddendumList = async (contract) => {
-        setSelectedContract(contract);
-        setShowAddendumListModal(true);
-        setLoadingAddendums(true);
         try {
-            const res = await listContractAddendums(contract.contract_id);
-            // Giả sử API trả về mảng addendums hoặc { items: [] }
-            setCurrentAddendums(Array.isArray(res) ? res : (res.items || []));
-        } catch (error) {
-            console.error(error);
-            setCurrentAddendums([]);
+            const tenant = await lookupTenant(searchQuery);
+            if (tenant) {
+                setFoundTenant(tenant);
+                setForm(prev => ({...prev, tenant_user_id: tenant.user_id}));
+            } else {
+                setSearchError("Không tìm thấy khách thuê này.");
+            }
+        } catch (err) {
+            // Check 404
+            if (err.response && err.response.status === 404) {
+                setSearchError("Không tìm thấy dữ liệu (404).");
+            } else {
+                setSearchError("Lỗi hệ thống khi tìm kiếm.");
+            }
         } finally {
-            setLoadingAddendums(false);
+            setSearchLoading(false);
         }
     };
 
-    const handleOpenAddAddendum = (contract) => {
-        setSelectedContract(contract);
-        setNewAddendumData({ description: "", signed_date: new Date().toISOString().split('T')[0], file: null });
-        setShowAddAddendumModal(true);
+    const handleClearTenant = () => {
+        setFoundTenant(null);
+        setSearchQuery("");
+        setForm(prev => ({...prev, tenant_user_id: ""}));
     };
 
-    const handleSubmitAddendum = async () => {
-        if (!newAddendumData.description) return alert("Vui lòng nhập nội dung phụ lục");
+    const handleFileChange = (e) => {
+        const selectedFiles = Array.from(e.target.files || []);
+        if (selectedFiles.length === 0) return;
+        const hasPDF = selectedFiles.some(f => f.type === "application/pdf");
+        if (hasPDF && selectedFiles.length > 1) {
+            alert("Nếu chọn PDF, bạn chỉ được phép tải lên 1 file duy nhất.");
+            e.target.value = "";
+            return;
+        }
+        setForm(prev => ({ ...prev, files: selectedFiles }));
+    };
 
-        const formData = new FormData();
-        formData.append("description", newAddendumData.description);
-        formData.append("signed_date", newAddendumData.signed_date);
-        if (newAddendumData.file) formData.append("file", newAddendumData.file);
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    // --- AI HANDLER ---
+    const handleAiImportFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const fileURL = URL.createObjectURL(file);
+        setPdfPreview(fileURL);
+        setShowScanner(true);
+        setScanProgress(0);
+        setAiProcessing(true);
+        setAiMessage(null);
+
+        scanIntervalRef.current = setInterval(() => {
+            setScanProgress(prev => (prev >= 90 ? (prev < 95 ? prev + 0.5 : 95) : prev + Math.random() * 5));
+        }, 300);
 
         try {
-            await createContractAddendum(selectedContract.contract_id, formData);
-            alert("Thêm phụ lục thành công!");
-            setShowAddAddendumModal(false);
-            // Refresh list if needed or just close
+            const res = await processContractWithAI(file);
+            clearInterval(scanIntervalRef.current);
+            setScanProgress(100);
+
+            if (!res?.contract_data) throw new Error("Không tìm thấy dữ liệu hợp đồng.");
+
+            const { contract_data, tenant_info } = res;
+
+            const buildingId = tenant_info?.room?.building_id;
+            const roomId = contract_data?.room_id;
+
+            if (buildingId) await getEmptyRoomsByBuildingId(buildingId).then(r => setRooms(Array.isArray(r) ? r : r.data || [])).catch(()=>{});
+
+            // [UPDATE] Logic xử lý Tenant từ AI
+            if (tenant_info) {
+                // Nếu AI trả về thông tin tenant, ta set luôn vào state tìm thấy
+                // Để hiện thẻ thông tin luôn
+                setFoundTenant({
+                    user_id: tenant_info.user_id,
+                    full_name: tenant_info.full_name,
+                    phone: tenant_info.phone,
+                    id_number: tenant_info.id_number,
+                    email: tenant_info.email,
+                    avatar_url: tenant_info.avatar_url || null
+                });
+                // Điền SĐT vào ô search để đẹp UI
+                setSearchQuery(tenant_info.phone || tenant_info.id_number || "");
+            }
+
+            setForm(prev => ({
+                ...prev,
+                building_id: String(buildingId || ""),
+                room_id: String(roomId || ""),
+                tenant_user_id: String(contract_data?.tenant_user_id || ""),
+                start_date: contract_data?.start_date || prev.start_date,
+                duration_months: contract_data?.duration_months || 12,
+                rent_amount: contract_data?.rent_amount || "",
+                deposit_amount: contract_data?.deposit_amount || "",
+                penalty_rate: contract_data?.penalty_rate || 0.1,
+                payment_cycle_months: contract_data?.payment_cycle_months || 1,
+                note: contract_data?.note || "",
+                files: [file]
+            }));
+
+            setAiMessage({ type: 'success', text: "Đã trích xuất dữ liệu thành công!" });
+            setTimeout(() => handleCancelScan(), 800);
+
         } catch (error) {
-            alert("Lỗi thêm phụ lục: " + error.message);
+            clearInterval(scanIntervalRef.current);
+            setAiMessage({ type: 'danger', text: error.message });
+            setTimeout(() => handleCancelScan(), 2000);
         }
     };
 
-    const handleDeleteAddendum = async (addendumId) => {
-        if(!window.confirm("Bạn chắc chắn muốn xóa phụ lục này?")) return;
+    const handleCancelScan = () => {
+        if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+        setAiProcessing(false);
+        setShowScanner(false);
+        setScanProgress(0);
+        if (pdfPreview) URL.revokeObjectURL(pdfPreview);
+        setPdfPreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    // --- SUBMIT ---
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setSubmitting(true);
         try {
-            await deleteContractAddendum(selectedContract.contract_id, addendumId);
-            setCurrentAddendums(prev => prev.filter(a => a.id !== addendumId));
-        } catch (e) {
-            alert("Lỗi xóa phụ lục");
+            if (!form.room_id || !form.tenant_user_id) throw new Error("Vui lòng chọn phòng và xác nhận khách thuê.");
+
+            const rate = parseFloat(form.penalty_rate);
+            if (isNaN(rate) || rate < 0.01 || rate > 1) {
+                throw new Error("Tỷ lệ phạt phải từ 0.01% đến 1%.");
+            }
+
+            const formData = new FormData();
+            Object.keys(form).forEach(key => {
+                if (key === 'files') {
+                    form.files.forEach(file => {
+                        formData.append('contract_file', file);
+                    });
+                } else {
+                    formData.append(key, form[key]);
+                }
+            });
+
+            await createContract(formData);
+            alert("Tạo hợp đồng thành công!");
+            navigate("/contracts");
+        } catch (error) {
+            alert("Lỗi: " + (error?.response?.data?.message || error?.message));
+        } finally {
+            setSubmitting(false);
         }
-    }
-
-    // --- RENDER HELPERS ---
-    const formatDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
-
-    const renderStatus = (status) => {
-        const map = {
-            active: { label: "Hiệu lực", css: "status-active" },
-            pending: { label: "Chờ duyệt", css: "status-pending" },
-            expired: { label: "Hết hạn", css: "status-expired" },
-            terminated: { label: "Đã hủy", css: "status-terminated" },
-        };
-        const item = map[status] || { label: status, css: "status-expired" };
-        return (
-            <span className={`status-badge ${item.css}`}>
-        <span className="status-dot"></span> {item.label}
-      </span>
-        );
     };
-
-    const WithTooltip = ({ text, children }) => (
-        <OverlayTrigger placement="top" overlay={<Tooltip>{text}</Tooltip>}>
-            {children}
-        </OverlayTrigger>
-    );
 
     return (
-        <div className="contract-page-container">
+        <div className="create-contract-page-container container mt-4">
+
             {/* HEADER */}
             <div className="page-header">
-                <div className="page-title">
-                    <h2>Quản lý Hợp đồng</h2>
-                    <p>Danh sách tất cả hợp đồng thuê phòng hiện tại và lịch sử.</p>
+                <div>
+                    <h2>Tạo hợp đồng mới</h2>
+                    <p>Thiết lập thông tin hợp đồng thuê phòng cho khách hàng.</p>
                 </div>
-                <Button
-                    variant="primary"
-                    className="btn-create-contract shadow-sm d-flex align-items-center gap-2"
-                    onClick={() => navigate("/contracts/create")}
-                >
-                    <PlusLg /> Tạo hợp đồng mới
-                </Button>
-            </div>
-
-            {/* FILTER CARD */}
-            <div className="filter-card">
-                <div className="filter-row">
-                    <div className="filter-group search-input-wrapper">
-                        <label>Tìm kiếm</label>
-                        <input type="text" name="q" className="form-control form-control-sm" placeholder="Tên khách, số phòng..." value={filters.q} onChange={handleFilterChange} />
-                    </div>
-                    {userRole === "OWNER" && (
-                        <div className="filter-group">
-                            <label>Tòa nhà</label>
-                            <select name="building" className="form-select form-select-sm" value={filters.building} onChange={handleFilterChange}>
-                                <option value="">-- Tất cả --</option>
-                                {uniqueBuildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                            </select>
-                        </div>
-                    )}
-                    <div className="filter-group">
-                        <label>Trạng thái</label>
-                        <select name="status" className="form-select form-select-sm" value={filters.status} onChange={handleFilterChange}>
-                            <option value="">-- Tất cả --</option>
-                            <option value="active">Đang hiệu lực</option>
-                            <option value="pending">Chờ duyệt</option>
-                            <option value="expired">Hết hạn</option>
-                            <option value="terminated">Đã hủy</option>
-                        </select>
-                    </div>
-                    <div className="filter-group">
-                        <label>Bắt đầu từ</label>
-                        <input type="date" name="start_date" className="form-control form-control-sm" value={filters.start_date} onChange={handleFilterChange} />
-                    </div>
-                    <div className="filter-group">
-                        <label>Đến ngày</label>
-                        <input type="date" name="end_date" className="form-control form-control-sm" value={filters.end_date} onChange={handleFilterChange} />
-                    </div>
-                    {(filters.q || filters.status || filters.building || filters.start_date) && (
-                        <Button variant="light" size="sm" className="btn-reset-filter mb-1" onClick={() => setFilters({status:"", start_date:"", end_date:"", q:"", building:""})}>
-                            <ArrowClockwise /> Xóa lọc
-                        </Button>
-                    )}
+                <div>
+                    <input ref={fileInputRef} type="file" hidden accept=".pdf" onChange={handleAiImportFile} />
+                    <Button className="ai-import-btn d-flex align-items-center gap-2" onClick={() => fileInputRef.current.click()} disabled={aiProcessing}>
+                        {aiProcessing ? <Spinner size="sm"/> : <Magic />} Auto-fill từ PDF
+                    </Button>
                 </div>
             </div>
 
-            {/* TABLE */}
-            <div className="table-card">
-                <Table hover responsive className="custom-table align-middle">
-                    <thead>
-                    <tr>
-                        <th className="text-center" style={{width: '40px'}}>#</th>
-                        {userRole === "OWNER" && <th>Tòa nhà</th>}
-                        <th>Khách thuê & Phòng</th>
-                        <th>Thời hạn</th>
-                        <th>Giá trị HĐ</th>
-                        <th>Trạng thái</th>
-                        <th className="text-center" style={{minWidth: '220px'}}>Hành động</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {loading ? (
-                        <tr><td colSpan={10} className="text-center py-5"><Spinner animation="border" variant="primary" /></td></tr>
-                    ) : currentTableData.length === 0 ? (
-                        <tr><td colSpan={10} className="text-center py-5 text-muted fst-italic">Không có dữ liệu hợp đồng</td></tr>
-                    ) : (
-                        currentTableData.map((c, i) => {
-                            const idx = (currentPage - 1) * itemsPerPage + i + 1;
-                            const isDownloading = loadingIds.includes(c.contract_id);
-                            return (
-                                <tr key={c.contract_id}>
-                                    <td className="text-center text-muted">{idx}</td>
+            {aiMessage && !showScanner && (
+                <Alert variant={aiMessage.type} onClose={() => setAiMessage(null)} dismissible>
+                    {aiMessage.text}
+                </Alert>
+            )}
 
-                                    {userRole === "OWNER" && (
-                                        <td>
-                                            <div className="d-flex align-items-center gap-2">
-                                                <Building className="text-secondary" />
-                                                <span className="fw-medium">{c.building_name || "N/A"}</span>
-                                            </div>
-                                        </td>
+            {loading ? <div className="text-center py-5"><Spinner animation="border"/></div> : (
+                <div className="form-card">
+                    <form onSubmit={handleSubmit}>
+
+                        {/* SECTION 1: INFO */}
+                        <div className="form-section-title"><Building/> Thông tin Bất động sản</div>
+                        <Row className="mb-4">
+                            <Col md={4}>
+                                <label className="form-label">Tòa nhà <span className="required">*</span></label>
+                                {userRole === "MANAGER" ? (
+                                    <input className="form-control" value={assignedBuilding?.name || "..."} disabled />
+                                ) : (
+                                    <select name="building_id" className="form-select" value={form.building_id} onChange={handleBuildingChange} required>
+                                        <option value="">-- Chọn tòa nhà --</option>
+                                        {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                    </select>
+                                )}
+                            </Col>
+                            <Col md={4}>
+                                <label className="form-label">Phòng <span className="required">*</span></label>
+                                <select name="room_id" className="form-select" value={form.room_id} onChange={handleRoomChange} required disabled={!form.building_id}>
+                                    <option value="">-- Chọn phòng --</option>
+                                    {rooms.map(r => <option key={r.room_id} value={r.room_id}>Phòng {r.room_number}</option>)}
+                                </select>
+                            </Col>
+
+                            {/* [UPDATE] CỘT CHỌN KHÁCH THUÊ MỚI */}
+                            <Col md={4}>
+                                <label className="form-label">Khách thuê <span className="required">*</span></label>
+
+                                {/* 1. Ô Input tìm kiếm */}
+                                <div className="input-group mb-2">
+                                    <input
+                                        type="text"
+                                        className={`form-control ${searchError ? 'is-invalid' : ''}`}
+                                        placeholder="Nhập SĐT hoặc CCCD..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearchTenant())}
+                                        disabled={!!foundTenant} // Disable khi đã tìm thấy
+                                    />
+                                    {foundTenant ? (
+                                        <Button variant="outline-danger" onClick={handleClearTenant}>
+                                            <XLg /> Bỏ chọn
+                                        </Button>
+                                    ) : (
+                                        <Button variant="outline-primary" onClick={handleSearchTenant} disabled={searchLoading}>
+                                            {searchLoading ? <Spinner size="sm"/> : <Search />} Tìm
+                                        </Button>
                                     )}
+                                </div>
+                                {searchError && <div className="text-danger small mb-2">{searchError}</div>}
 
-                                    <td>
-                                        <span className="tenant-name">{c.tenant_name || "Unknown Tenant"}</span>
-                                        <div className="room-info mt-1">
-                                            <Badge bg="light" text="dark" className="border px-2">P.{c.room_number}</Badge>
-                                            {c.tenant_phone && <span className="small text-muted ms-1">• {c.tenant_phone}</span>}
-                                        </div>
-                                    </td>
-
-                                    <td>
-                                        <div className="date-range">
-                                            <div className="fw-medium">{formatDate(c.start_date)}</div>
-                                            <div className="text-muted small">đến {formatDate(c.end_date)}</div>
-                                        </div>
-                                    </td>
-
-                                    <td>
-                                        <div className="price-tag">{c.rent_amount?.toLocaleString()} ₫</div>
-                                        {c.deposit_amount > 0 && <div className="small text-muted">Cọc: {c.deposit_amount?.toLocaleString()}</div>}
-                                    </td>
-
-                                    <td>{renderStatus(c.status)}</td>
-
-                                    {/* --- CỘT HÀNH ĐỘNG MỚI --- */}
-                                    <td>
-                                        <div className="d-flex flex-column gap-2 py-1">
-                                            {/* Hàng nút trên: Các thao tác chính */}
-                                            <div className="d-flex justify-content-center gap-2">
-                                                <WithTooltip text="Xem chi tiết Hợp đồng">
-                                                    <Button variant="outline-primary" size="sm" className="action-btn" onClick={() => { setSelectedContract(c); setShowDetailModal(true); }}>
-                                                        <Eye /> Xem
-                                                    </Button>
-                                                </WithTooltip>
-
-                                                {c.has_file && (
-                                                    <WithTooltip text="Xem file PDF đính kèm">
-                                                        <Button variant="outline-secondary" size="sm" className="action-btn" onClick={() => handlePreviewFile(c)} disabled={previewLoading}>
-                                                            <FileEarmarkPdf /> File
-                                                        </Button>
-                                                    </WithTooltip>
-                                                )}
-                                            </div>
-
-                                            {/* Hàng nút giữa: Phụ lục */}
-                                            <div className="d-flex justify-content-center gap-2">
-                                                <WithTooltip text="Danh sách phụ lục">
-                                                    <Button variant="outline-info" size="sm" className="action-btn" onClick={() => handleOpenAddendumList(c)}>
-                                                        <JournalText /> DS P.Lục
-                                                    </Button>
-                                                </WithTooltip>
-                                                <WithTooltip text="Thêm phụ lục mới">
-                                                    <Button variant="outline-success" size="sm" className="action-btn" onClick={() => handleOpenAddAddendum(c)}>
-                                                        <FilePlus /> Thêm P.Lục
-                                                    </Button>
-                                                </WithTooltip>
-                                            </div>
-
-                                            {/* Hàng nút dưới: Admin/Owner Only */}
-                                            {userRole === "OWNER" && (
-                                                <div className="d-flex justify-content-center border-top pt-2 mt-1">
-                                                    <Button variant="outline-danger" size="sm" className="action-btn w-100" onClick={() => { setDeleteId(c.contract_id); setShowDeleteModal(true); }}>
-                                                        <Trash /> Xóa HĐ
-                                                    </Button>
+                                {/* 2. THẺ THÔNG TIN (USER CARD) */}
+                                {foundTenant && (
+                                    <Card className="tenant-info-card border-success">
+                                        <Card.Body className="p-2">
+                                            <div className="d-flex align-items-center gap-3">
+                                                {/* Avatar */}
+                                                <div className="avatar-placeholder">
+                                                    {foundTenant.avatar_url ? (
+                                                        <Image src={foundTenant.avatar_url} roundedCircle style={{width:40, height:40, objectFit:'cover'}} />
+                                                    ) : (
+                                                        <span className="fw-bold">{foundTenant.full_name?.charAt(0).toUpperCase()}</span>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            );
-                        })
-                    )}
-                    </tbody>
-                </Table>
-            </div>
 
-            {/* PAGINATION */}
-            {!loading && totalPages > 1 && (
-                <div className="pagination-container">
-                    <span className="text-muted small">Hiển thị {currentTableData.length} / {filteredContracts.length} kết quả</span>
-                    <div className="d-flex gap-1">
-                        <Button variant="light" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p=>p-1)}>Trước</Button>
-                        {[...Array(totalPages)].map((_, idx) => (
-                            <Button
-                                key={idx}
-                                variant={currentPage === idx + 1 ? "primary" : "light"}
-                                size="sm"
-                                onClick={() => setCurrentPage(idx + 1)}
-                            >
-                                {idx + 1}
+                                                {/* Info Text */}
+                                                <div className="flex-grow-1 overflow-hidden">
+                                                    <div className="fw-bold text-success text-truncate">{foundTenant.full_name}</div>
+                                                    <div className="small text-muted d-flex align-items-center gap-1">
+                                                        <Telephone size={10}/> {foundTenant.phone}
+                                                    </div>
+                                                    <div className="small text-muted d-flex align-items-center gap-1">
+                                                        <PersonBadge size={10}/> {foundTenant.id_number || "Chưa có CCCD"}
+                                                    </div>
+                                                </div>
+
+                                                {/* Icon Check */}
+                                                <div className="text-success fs-4 me-1">
+                                                    <CheckCircleFill />
+                                                </div>
+                                            </div>
+                                        </Card.Body>
+                                    </Card>
+                                )}
+
+                                {/* Hidden Input để đảm bảo validate HTML hoạt động (nếu cần) */}
+                                <input type="hidden" name="tenant_user_id" value={form.tenant_user_id} required />
+                            </Col>
+                        </Row>
+
+                        {/* SECTION 2: TERMS */}
+                        <div className="form-section-title"><CalendarDate/> Thời hạn & Chu kỳ</div>
+                        <Row className="mb-4">
+                            <Col md={4}>
+                                <label className="form-label">Ngày bắt đầu <span className="required">*</span></label>
+                                <input type="date" name="start_date" className="form-control" value={form.start_date} onChange={handleChange} required />
+                            </Col>
+                            <Col md={4}>
+                                <label className="form-label">Thời hạn (Tháng) <span className="required">*</span></label>
+                                <input type="number" name="duration_months" className="form-control" value={form.duration_months} onChange={handleChange} min="1" required />
+                            </Col>
+                            <Col md={4}>
+                                <label className="form-label">Ngày kết thúc (Dự kiến)</label>
+                                <input type="text" className="form-control" value={form.end_date} readOnly />
+                            </Col>
+                        </Row>
+                        <Row className="mb-4">
+                            <Col md={6}>
+                                <label className="form-label">Chu kỳ thanh toán (Tháng) <span className="required">*</span></label>
+                                <select name="payment_cycle_months" className="form-select" value={form.payment_cycle_months} onChange={handleChange}>
+                                    <option value="1">1 tháng / lần</option>
+                                    <option value="2">2 tháng / lần</option>
+                                    <option value="3">3 tháng / lần</option>
+                                    <option value="6">6 tháng / lần</option>
+                                    <option value="12">1 năm / lần</option>
+                                </select>
+                            </Col>
+                        </Row>
+
+                        {/* SECTION 3: FINANCE */}
+                        <div className="form-section-title"><CashCoin/> Tài chính & Điều khoản</div>
+                        <Row className="mb-4">
+                            <Col md={4}>
+                                <label className="form-label">Giá thuê (VNĐ) <span className="required">*</span></label>
+                                <div className="input-group">
+                                    <input type="number" name="rent_amount" className="form-control" value={form.rent_amount} onChange={handleChange} required placeholder="Ví dụ: 5000000" />
+                                    <span className="input-group-text">₫</span>
+                                </div>
+                            </Col>
+                            <Col md={4}>
+                                <label className="form-label">Tiền đặt cọc (VNĐ)</label>
+                                <div className="input-group">
+                                    <input type="number" name="deposit_amount" className="form-control" value={form.deposit_amount} onChange={handleChange} placeholder="0" />
+                                    <span className="input-group-text">₫</span>
+                                </div>
+                            </Col>
+                            <Col md={4}>
+                                <label className="form-label">Phạt quá hạn (%) <span className="required">*</span></label>
+                                <div className="input-group">
+                                    <input
+                                        type="number"
+                                        name="penalty_rate"
+                                        className="form-control"
+                                        value={form.penalty_rate}
+                                        onChange={handleChange}
+                                        min="0.01"
+                                        max="1"
+                                        step="0.01"
+                                        required
+                                    />
+                                    <span className="input-group-text">% / ngày</span>
+                                </div>
+                                <small className="text-muted" style={{fontSize: '11px'}}>Từ 0.01% - 1%</small>
+                            </Col>
+                        </Row>
+
+                        {/* SECTION 4: FILE & NOTE */}
+                        <div className="form-section-title"><FileEarmarkText/> Hồ sơ đính kèm</div>
+                        <Row className="mb-4">
+                            <Col md={6}>
+                                <label className="form-label">File Hợp đồng (PDF / Nhiều ảnh)</label>
+                                <div className="file-upload-area" onClick={() => document.getElementById('manual-file').click()} style={{cursor:'pointer'}}>
+                                    <input id="manual-file" type="file" name="file" accept=".pdf,image/*" multiple hidden onChange={handleFileChange} />
+                                    <div className="text-muted">Nhấn để tải file (1 PDF hoặc nhiều Ảnh)</div>
+
+                                    {form.files && form.files.length > 0 && (
+                                        <div className="mt-2 text-start d-inline-block">
+                                            {form.files.map((f, idx) => (
+                                                <div key={idx} className="file-info">
+                                                    {f.type === 'application/pdf' ? <FileEarmarkPdf/> : <FileEarmarkImage/>}
+                                                    {f.name}
+                                                </div>
+                                            ))}
+                                            <div className="text-center mt-1 text-success small fw-bold">
+                                                <CheckCircleFill/> Đã chọn {form.files.length} file
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </Col>
+                            <Col md={6}>
+                                <label className="form-label">Ghi chú bổ sung</label>
+                                <textarea name="note" className="form-control" rows={3} value={form.note} onChange={handleChange} placeholder="Ghi chú thêm về hợp đồng..."></textarea>
+                            </Col>
+                        </Row>
+
+                        {/* ACTIONS */}
+                        <div className="d-flex justify-content-end gap-3 mt-5 pt-3 border-top">
+                            <Button variant="light" onClick={() => navigate("/contracts")} className="px-4">Hủy bỏ</Button>
+                            <Button type="submit" variant="primary" className="px-4 fw-bold" disabled={submitting}>
+                                {submitting ? <><Spinner size="sm" className="me-2"/> Đang lưu...</> : "Tạo Hợp Đồng"}
                             </Button>
-                        ))}
-                        <Button variant="light" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p=>p+1)}>Sau</Button>
-                    </div>
+                        </div>
+                    </form>
                 </div>
             )}
 
-            {/* --- MODAL 1: CHI TIẾT HỢP ĐỒNG --- */}
-            <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} size="lg" centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>Chi tiết Hợp đồng</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {selectedContract && (
-                        <div className="d-flex flex-column gap-3">
-                            <div className="alert alert-light border d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>Mã HĐ:</strong> #{selectedContract.contract_number || selectedContract.contract_id}
-                                </div>
-                                {renderStatus(selectedContract.status)}
-                            </div>
-
-                            <div className="row g-3">
-                                <div className="col-md-6">
-                                    <div className="p-3 bg-light rounded h-100">
-                                        <h6 className="text-primary border-bottom pb-2"><Person className="me-2"/>Bên thuê</h6>
-                                        <p className="mb-1"><strong>Tên:</strong> {selectedContract.tenant_name}</p>
-                                        <p className="mb-1"><strong>SĐT:</strong> {selectedContract.tenant_phone}</p>
-                                        <p className="mb-0"><strong>Email:</strong> {selectedContract.tenant_email || "N/A"}</p>
-                                    </div>
-                                </div>
-                                <div className="col-md-6">
-                                    <div className="p-3 bg-light rounded h-100">
-                                        <h6 className="text-primary border-bottom pb-2"><Building className="me-2"/>Phòng</h6>
-                                        <p className="mb-1"><strong>Tòa nhà:</strong> {selectedContract.building_name}</p>
-                                        <p className="mb-1"><strong>Phòng số:</strong> {selectedContract.room_number}</p>
-                                        <p className="mb-0 text-success fw-bold">Giá: {selectedContract.rent_amount?.toLocaleString()} ₫</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="p-3 border rounded">
-                                <h6 className="text-primary"><Calendar3 className="me-2"/>Thời gian & Ghi chú</h6>
-                                <p className="mb-1">Từ <strong>{formatDate(selectedContract.start_date)}</strong> đến <strong>{formatDate(selectedContract.end_date)}</strong></p>
-                                <p className="mb-0 text-muted fst-italic mt-2">"{selectedContract.note || "Không có ghi chú"}"</p>
-                            </div>
-                        </div>
-                    )}
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowDetailModal(false)}>Đóng</Button>
-                    <Button variant="primary" onClick={() => navigate(`/contracts/${selectedContract?.contract_id}`)}>Chỉnh sửa</Button>
-                </Modal.Footer>
-            </Modal>
-
-            {/* --- MODAL 2: DANH SÁCH PHỤ LỤC --- */}
-            <Modal show={showAddendumListModal} onHide={() => setShowAddendumListModal(false)} size="lg" centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>Danh sách Phụ lục <small className="text-muted fs-6">(HĐ #{selectedContract?.contract_number || selectedContract?.contract_id})</small></Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {loadingAddendums ? (
-                        <div className="text-center py-4"><Spinner animation="border" variant="primary"/></div>
-                    ) : (
-                        <div className="table-responsive">
-                            <Table striped hover size="sm" className="mb-0">
-                                <thead className="bg-light">
-                                <tr>
-                                    <th>Ngày ký</th>
-                                    <th>Nội dung</th>
-                                    <th>File</th>
-                                    <th className="text-end">Xóa</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {currentAddendums.length === 0 ? (
-                                    <tr><td colSpan={4} className="text-center py-3 text-muted">Chưa có phụ lục nào.</td></tr>
+            {/* SCANNER MODAL (Giữ nguyên) */}
+            <Modal show={showScanner} centered size="lg" backdrop="static" className="scanner-modal">
+                {/* ... (Giữ nguyên nội dung modal) */}
+                <Modal.Body className="scanner-body">
+                    <button className="scanner-close-btn" onClick={handleCancelScan}><XLg/></button>
+                    <div className="scanner-container">
+                        {pdfPreview && (
+                            form.files?.[0]?.type?.startsWith('image/')
+                                ? <img src={pdfPreview} className="pdf-preview" style={{objectFit:'contain'}} alt="preview"/>
+                                : <iframe src={pdfPreview} className="pdf-preview" title="preview"/>
+                        )}
+                        <div className="scanner-overlay">
+                            <div className="scan-line" style={{ top: `${scanProgress}%`, color: currentColor }} />
+                            <div className="scanner-status" style={{borderColor: `${currentColor}40`}}>
+                                {scanProgress < 100 ? (
+                                    <>
+                                        <Spinner animation="border" style={{color: currentColor, width:'3rem', height:'3rem'}} className="mb-3"/>
+                                        <h5 style={{color: currentColor}}>AI đang phân tích...</h5>
+                                        <div className="text-white-50 small mb-2">Đang đọc cấu trúc hợp đồng</div>
+                                        <h2 style={{color: currentColor}}>{Math.floor(scanProgress)}%</h2>
+                                    </>
                                 ) : (
-                                    currentAddendums.map(add => (
-                                        <tr key={add.id}>
-                                            <td>{formatDate(add.signed_date)}</td>
-                                            <td>{add.description}</td>
-                                            <td>
-                                                {add.file_url ? (
-                                                    <a href={add.file_url} target="_blank" rel="noreferrer" className="text-decoration-none">
-                                                        <FileEarmarkText /> Xem
-                                                    </a>
-                                                ) : <span className="text-muted small">Không có</span>}
-                                            </td>
-                                            <td className="text-end">
-                                                <Button variant="link" className="text-danger p-0" onClick={() => handleDeleteAddendum(add.id)}>
-                                                    <Trash />
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))
+                                    <>
+                                        <CheckCircleFill size={50} className="text-success mb-3"/>
+                                        <h4 className="text-success">Hoàn tất!</h4>
+                                        <p className="text-white-50">Đang điền dữ liệu...</p>
+                                    </>
                                 )}
-                                </tbody>
-                            </Table>
+                            </div>
                         </div>
-                    )}
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowAddendumListModal(false)}>Đóng</Button>
-                    <Button variant="primary" onClick={() => { setShowAddendumListModal(false); handleOpenAddAddendum(selectedContract); }}>
-                        <PlusLg /> Thêm mới
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-
-            {/* --- MODAL 3: THÊM PHỤ LỤC --- */}
-            <Modal show={showAddAddendumModal} onHide={() => setShowAddAddendumModal(false)} centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>Thêm Phụ lục mới</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Ngày ký</Form.Label>
-                            <Form.Control
-                                type="date"
-                                value={newAddendumData.signed_date}
-                                onChange={(e) => setNewAddendumData({...newAddendumData, signed_date: e.target.value})}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Nội dung tóm tắt</Form.Label>
-                            <Form.Control
-                                as="textarea"
-                                rows={3}
-                                placeholder="Ví dụ: Gia hạn thêm 6 tháng..."
-                                value={newAddendumData.description}
-                                onChange={(e) => setNewAddendumData({...newAddendumData, description: e.target.value})}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>File đính kèm (PDF/Ảnh)</Form.Label>
-                            <Form.Control
-                                type="file"
-                                onChange={(e) => setNewAddendumData({...newAddendumData, file: e.target.files[0]})}
-                            />
-                        </Form.Group>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowAddAddendumModal(false)}>Hủy</Button>
-                    <Button variant="success" onClick={handleSubmitAddendum}>Lưu Phụ lục</Button>
-                </Modal.Footer>
-            </Modal>
-
-            {/* --- MODAL PREVIEW & DELETE (CŨ) --- */}
-            <Modal show={showFilePreviewModal} onHide={() => {setShowFilePreviewModal(false); setFilePreviewUrl(null);}} size="xl" centered>
-                <Modal.Body className="p-0 bg-dark position-relative" style={{height:'85vh'}}>
-                    <Button variant="light" size="sm" className="position-absolute top-0 end-0 m-3 z-3" onClick={()=>setShowFilePreviewModal(false)}>✕</Button>
-                    {previewLoading ? <div className="d-flex h-100 justify-content-center align-items-center"><Spinner variant="light"/></div> : (
-                        filePreviewUrl && (
-                            filePreviewType?.startsWith("image/")
-                                ? <img src={filePreviewUrl} alt="preview" className="w-100 h-100 object-fit-contain" />
-                                : <iframe title="pdf-viewer" src={filePreviewUrl} className="w-100 h-100 border-0" />
-                        )
-                    )}
-                </Modal.Body>
-            </Modal>
-
-            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
-                <Modal.Body className="text-center p-4">
-                    <div className="text-danger mb-3"><Trash size={40}/></div>
-                    <h5>Xác nhận xóa hợp đồng?</h5>
-                    <p className="text-muted">Dữ liệu sẽ bị xóa vĩnh viễn.</p>
-                    <div className="d-flex justify-content-center gap-2 mt-4">
-                        <Button variant="light" onClick={() => setShowDeleteModal(false)}>Hủy bỏ</Button>
-                        <Button variant="danger" onClick={handleDelete}>Xóa vĩnh viễn</Button>
                     </div>
                 </Modal.Body>
             </Modal>
-
         </div>
     );
 }
 
-export default ContractListPage;
+export default CreateContractPage;

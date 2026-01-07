@@ -34,9 +34,9 @@ import CreateUserPage from "../pages/user/CreateUserPage";
 
 // ===== Contracts =====
 import ContractListPage from "../pages/contract/ContractListPage";
-import ContractAddendumPage from "../pages/contract/AddendumListPage.jsx";
-import CreateAddendumPage from "../pages/contract/CreateAddendumPage.jsx";
-import EditAddendumPage from "../pages/contract/EditAddendumPage.jsx";
+//import ContractAddendumPage from "../pages/contract/AddendumListPage.jsx";
+//import CreateAddendumPage from "../pages/contract/CreateAddendumPage.jsx";
+//import EditAddendumPage from "../pages/contract/EditAddendumPage.jsx";
 import CreateContractPage from "../pages/contract/CreateContractPage";
 import EditContractPage from "../pages/contract/EditContractPage";
 
@@ -159,30 +159,30 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-          <Route
-          path={ROUTES.contractAddendum}
-          element={
-            <ProtectedRoute>
-              <ContractAddendumPage/>
-            </ProtectedRoute>
-          }
-        />
-          <Route
-              path={ROUTES.createAddendum}
-              element={
-                  <ProtectedRoute>
-                      <CreateAddendumPage />
-                  </ProtectedRoute>
-              }
-          />
-          <Route
-              path={ROUTES.editAddendum}
-              element={
-                  <ProtectedRoute>
-                      <EditAddendumPage />
-                  </ProtectedRoute>
-              }
-          />
+        {/*  <Route*/}
+        {/*  path={ROUTES.contractAddendum}*/}
+        {/*  element={*/}
+        {/*    <ProtectedRoute>*/}
+        {/*      <ContractAddendumPage/>*/}
+        {/*    </ProtectedRoute>*/}
+        {/*  }*/}
+        {/*/>*/}
+        {/*  <Route*/}
+        {/*      path={ROUTES.createAddendum}*/}
+        {/*      element={*/}
+        {/*          <ProtectedRoute>*/}
+        {/*              <CreateAddendumPage />*/}
+        {/*          </ProtectedRoute>*/}
+        {/*      }*/}
+        {/*  />*/}
+        {/*  <Route*/}
+        {/*      path={ROUTES.editAddendum}*/}
+        {/*      element={*/}
+        {/*          <ProtectedRoute>*/}
+        {/*              <EditAddendumPage />*/}
+        {/*          </ProtectedRoute>*/}
+        {/*      }*/}
+        {/*  />*/}
         <Route
           path={ROUTES.editContract}
           element={

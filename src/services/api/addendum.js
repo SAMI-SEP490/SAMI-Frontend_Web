@@ -1,19 +1,18 @@
 // src/services/api/addendum.js
-// Updated: 2026-01-05
-// By: Assistant (Based on Datnb's backend)
+// Updated: 2026-01-07
+// By: Assistant (Refactored to match addendum.routes.js with File Upload)
 
 import { http, unwrap } from "../http";
 
 /* ==========================================================================
-// helpers
+// HELPERS
    ========================================================================== */
 
 /**
- * Format ngày về YYYY-MM-DD để gửi lên backend
- * (Copy từ contracts.js để đảm bảo đồng bộ)
+ * Format ngày về YYYY-MM-DD
  */
 function _toISODate(d) {
-  if (!d) return null; // Backend service chấp nhận null
+  if (!d) return null;
   const date = new Date(d);
   if (isNaN(date.getTime())) return null;
   const year = date.getFullYear();
@@ -23,31 +22,51 @@ function _toISODate(d) {
 }
 
 /**
- * Xử lý dữ liệu trước khi tạo/update phụ lục
+ * Chuyển object dữ liệu thành FormData để gửi Multipart (hỗ trợ upload file)
+ * @param {Object} form - Dữ liệu form đầu vào
+ * @returns {FormData}
  */
-function _buildAddendumPayload(form) {
-  const payload = { ...form };
+function _buildFormData(form) {
+  const formData = new FormData();
 
-  // Xử lý ngày hiệu lực
-  if (form.effective_from) {
-    payload.effective_from = _toISODate(form.effective_from);
-  }
+  Object.keys(form).forEach((key) => {
+    const value = form[key];
 
-  if (form.effective_to) {
-    payload.effective_to = _toISODate(form.effective_to);
-  }
+    // Bỏ qua nếu value là null/undefined
+    if (value === null || value === undefined) return;
 
-  // Đảm bảo changes là object (Backend service có thể handle string JSON,
-  // nhưng gửi object trực tiếp để axios tự stringify là an toàn nhất)
-  if (typeof form.changes === 'string') {
-    try {
-      payload.changes = JSON.parse(form.changes);
-    } catch (e) {
-      // Nếu không parse được thì giữ nguyên, để backend validate
+    // 1. Xử lý File Upload
+    // Backend đang mong đợi key là 'addendum_file'
+    // Frontend có thể truyền vào mảng file qua key 'files' hoặc 'addendum_file'
+    if (key === 'files' || key === 'addendum_file') {
+      if (Array.isArray(value)) {
+        value.forEach((file) => {
+          formData.append('addendum_file', file);
+        });
+      } else if (value instanceof File) {
+        formData.append('addendum_file', value);
+      }
+      return; // Đã xử lý xong key này
     }
-  }
 
-  return payload;
+    // 2. Xử lý Object 'changes' (cần stringify để gửi qua form-data)
+    if (key === 'changes' && typeof value === 'object') {
+      formData.append(key, JSON.stringify(value));
+      return;
+    }
+
+    // 3. Xử lý Date (effective_from, effective_to, signing_date, etc.)
+    if (['effective_from', 'effective_to', 'signing_date'].includes(key)) {
+      const dateStr = _toISODate(value);
+      if (dateStr) formData.append(key, dateStr);
+      return;
+    }
+
+    // 4. Các trường dữ liệu thông thường
+    formData.append(key, value);
+  });
+
+  return formData;
 }
 
 /* ==========================================================================
@@ -63,7 +82,6 @@ export async function listAddendums(params = {}) {
     return unwrap(response);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách phụ lục:", error);
-    // Trả về cấu trúc mặc định để tránh crash UI
     return { data: [], pagination: {} };
   }
 }
@@ -94,13 +112,17 @@ export async function getAddendumsByContract(contractId) {
   }
 }
 
-/** * Tạo phụ lục hợp đồng mới
+/** * Tạo phụ lục hợp đồng mới (Có upload file)
  * Route: POST /
+ * @param {Object} addendumData - Object chứa thông tin và mảng 'files'
  */
 export async function createAddendum(addendumData) {
   try {
-    const payload = _buildAddendumPayload(addendumData);
-    const response = await http.post("/addendum", payload);
+    // Chuyển sang FormData để upload file
+    const formData = _buildFormData(addendumData);
+
+    // Axios tự động set Content-Type: multipart/form-data khi nhận FormData
+    const response = await http.post("/addendum", formData);
     return unwrap(response);
   } catch (error) {
     console.error("Lỗi khi tạo phụ lục:", error);
@@ -108,13 +130,13 @@ export async function createAddendum(addendumData) {
   }
 }
 
-/** * Cập nhật phụ lục
+/** * Cập nhật phụ lục (Có thể thay đổi file)
  * Route: PUT /:id
  */
 export async function updateAddendum(id, addendumData) {
   try {
-    const payload = _buildAddendumPayload(addendumData);
-    const response = await http.put(`/addendum/${id}`, payload);
+    const formData = _buildFormData(addendumData);
+    const response = await http.put(`/addendum/${id}`, formData);
     return unwrap(response);
   } catch (error) {
     console.error(`Lỗi khi cập nhật phụ lục ${id}:`, error);
@@ -135,7 +157,7 @@ export async function deleteAddendum(id) {
   }
 }
 
-/** * Duyệt phụ lục (Apply changes to contract)
+/** * Duyệt phụ lục (Tenant)
  * Route: POST /:id/approve
  */
 export async function approveAddendum(id) {
@@ -148,9 +170,8 @@ export async function approveAddendum(id) {
   }
 }
 
-/** * Từ chối phụ lục
+/** * Từ chối phụ lục (Tenant)
  * Route: POST /:id/reject
- * @param {string} reason - Lý do từ chối
  */
 export async function rejectAddendum(id, reason = "") {
   try {
@@ -172,6 +193,35 @@ export async function getAddendumStatistics(contractId = null) {
     return unwrap(response);
   } catch (error) {
     console.error("Lỗi khi lấy thống kê phụ lục:", error);
+    throw error;
+  }
+}
+
+/** * Lấy URL download (Presigned URL)
+ * Route: GET /:id/download
+ */
+export async function downloadAddendum(id) {
+  try {
+    const response = await http.get(`/addendum/${id}/download`);
+    return unwrap(response); // Thường trả về { downloadUrl: "..." }
+  } catch (error) {
+    console.error(`Lỗi khi lấy link download phụ lục ${id}:`, error);
+    throw error;
+  }
+}
+
+/** * Download file trực tiếp (Stream/Blob)
+ * Route: GET /:id/download/direct
+ */
+export async function downloadAddendumDirect(id) {
+  try {
+    // Cần set responseType là blob để nhận file binary
+    const response = await http.get(`/addendum/${id}/download/direct`, {
+      responseType: 'blob'
+    });
+    return response.data; // Trả về Blob object trực tiếp
+  } catch (error) {
+    console.error(`Lỗi khi download trực tiếp phụ lục ${id}:`, error);
     throw error;
   }
 }

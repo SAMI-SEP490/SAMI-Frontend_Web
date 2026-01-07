@@ -2,7 +2,7 @@
 import { http, unwrap } from "../http";
 
 const FILE_FIELD = "contract_file";
-const ADDENDUM_URL = "/addendum";
+
 
 /* ==========================================================================
 // helpers
@@ -194,14 +194,3 @@ export async function processContractWithAI(file) {
   }
 }
 
-/* ==========================================================================
-// ADDENDUMS (PHỤ LỤC)
-   ========================================================================== */
-export async function getAddendumsByContractId(contractId) {
-  try {
-    const response = await http.get(`${ADDENDUM_URL}/contract/${contractId}`);
-    return unwrap(response) || [];
-  } catch (error) {
-    return [];
-  }
-}

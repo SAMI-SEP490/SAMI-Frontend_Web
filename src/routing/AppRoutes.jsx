@@ -77,10 +77,12 @@ import EditRegulationPage from "../pages/regulation/EditRegulationPage";
 
 // vehicle registrations
 import VehicleRegistrationListPage from "../pages/vehicle/VehicleRegistrationListPage";
+import VehicleManagementPage from "../pages/vehicle/VehicleManagementPage";
 import ViewRegulationPage from "../pages/regulation/ViewRegulationPage";
 
 // parking slots
 import SlotListPage from "../pages/parkingslot/SlotListPage";
+import CreateParkingSlotPage from "../pages/parkingslot/CreateParkingSlotPage";
 // rooms
 import RoomListPage from "@/pages/room/RoomListPage.jsx";
 
@@ -389,10 +391,26 @@ export default function AppRoutes() {
           }
         />
         <Route
+          path={ROUTES.VehicleManagementPage}
+          element={
+            <ProtectedRoute>
+              <VehicleManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path={ROUTES.SlotListPage}
           element={
             <ProtectedRoute>
               <SlotListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.CreateParkingSlotPage}
+          element={
+            <ProtectedRoute>
+              <CreateParkingSlotPage />
             </ProtectedRoute>
           }
         />

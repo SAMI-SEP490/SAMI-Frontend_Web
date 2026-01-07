@@ -97,3 +97,17 @@ export async function listAvailableParkingSlots(params = {}) {
     return [];
   }
 }
+export async function listAvailableSlotsForVehicle(vehicleId) {
+  try {
+    const res = await http.get("/parking-slots/available-for-vehicle", {
+      params: { vehicle_id: vehicleId }
+    });
+
+    const data = unwrap(res);
+    // backend: { success, data: { slots: [] } }
+    return data?.slots || [];
+  } catch (err) {
+    console.error("Lỗi khi lấy available slots for vehicle", err);
+    return [];
+  }
+}

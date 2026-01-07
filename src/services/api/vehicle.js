@@ -1,154 +1,147 @@
 // src/services/api/vehicle.js
 import { http } from "../http";
 
-/** -----------------------------
+/* =============================
  * VEHICLE REGISTRATIONS
- * ----------------------------- */
+ * ============================= */
 
 /**
  * Lấy danh sách đăng ký xe
- * Có thể truyền filter params: status, tenantId, page, limit...
+ * Filters: status, requested_by, start_date_from, start_date_to, page, limit
  */
 export async function listVehicleRegistrations(params = {}) {
-  try {
-    const res = await http.get("/vehicle/registrations", { params });
-    return res?.data?.data ?? res?.data ?? [];
-  } catch (error) {
-    console.error("Lỗi khi lấy danh sách đăng ký xe:", error);
-    throw error;
-  }
+  const res = await http.get("/vehicle/registrations", { params });
+  return res?.data?.data ?? res?.data ?? [];
 }
 
 /**
- * Lấy chi tiết đăng ký xe theo ID
+ * Lấy chi tiết đăng ký xe
  */
 export async function getVehicleRegistrationById(id) {
-  try {
-    const res = await http.get(`/vehicle/registrations/${id}`);
-    return res?.data?.data ?? res?.data ?? null;
-  } catch (error) {
-    console.error(`Lỗi khi lấy đăng ký xe id=${id}:`, error);
-    throw error;
-  }
+  const res = await http.get(`/vehicle/registrations/${id}`);
+  return res?.data?.data ?? null;
 }
 
 /**
- * Tạo đăng ký xe mới
+ * Tạo đăng ký xe (TENANT)
  */
 export async function createVehicleRegistration(payload) {
-  try {
-    const res = await http.post("/vehicle/registrations", payload);
-    return res?.data?.data ?? res?.data ?? null;
-  } catch (error) {
-    console.error("Lỗi khi tạo đăng ký xe:", error);
-    throw error;
-  }
+  const res = await http.post("/vehicle/registrations", payload);
+  return res?.data?.data ?? null;
 }
 
 /**
- * Cập nhật đăng ký xe theo ID
+ * Cập nhật đăng ký xe (TENANT – chỉ khi REQUESTED)
  */
 export async function updateVehicleRegistration(id, payload) {
-  try {
-    const res = await http.put(`/vehicle/registrations/${id}`, payload);
-    return res?.data?.data ?? res?.data ?? null;
-  } catch (error) {
-    console.error(`Lỗi khi cập nhật đăng ký xe id=${id}:`, error);
-    throw error;
-  }
+  const res = await http.put(`/vehicle/registrations/${id}`, payload);
+  return res?.data?.data ?? null;
 }
 
 /**
- * Xóa đăng ký xe theo ID
+ * Xóa đăng ký xe
  */
 export async function deleteVehicleRegistration(id) {
-  try {
-    const res = await http.delete(`/vehicle/registrations/${id}`);
-    return res?.data?.data ?? res?.data ?? null;
-  } catch (error) {
-    console.error(`Lỗi khi xóa đăng ký xe id=${id}:`, error);
-    throw error;
-  }
+  const res = await http.delete(`/vehicle/registrations/${id}`);
+  return res?.data?.data ?? null;
 }
 
 /**
- * Duyệt đăng ký xe (MANAGER/OWNER)
+ * Approve đăng ký xe + gán slot (MANAGER / OWNER)
+ * ⚠️ BẮT BUỘC slot_id
  */
-export async function approveVehicleRegistration(id) {
-  try {
-    const res = await http.post(`/vehicle/registrations/${id}/approve`);
-    return res?.data?.data ?? res?.data ?? null;
-  } catch (error) {
-    console.error(`Lỗi khi duyệt đăng ký xe id=${id}:`, error);
-    throw error;
-  }
+export async function approveVehicleRegistration(id, slot_id) {
+  const res = await http.post(`/vehicle/registrations/${id}/approve`, {
+    slot_id,
+  });
+  return res?.data?.data ?? null;
 }
 
 /**
- * Từ chối đăng ký xe (MANAGER/OWNER)
+ * Reject đăng ký xe
  */
-export async function rejectVehicleRegistration(id) {
-  try {
-    const res = await http.post(`/vehicle/registrations/${id}/reject`);
-    return res?.data?.data ?? res?.data ?? null;
-  } catch (error) {
-    console.error(`Lỗi khi từ chối đăng ký xe id=${id}:`, error);
-    throw error;
-  }
+export async function rejectVehicleRegistration(id, payload) {
+  const res = await http.post(
+    `/vehicle/registrations/${id}/reject`,
+    payload
+  );
+  return res?.data?.data ?? null;
 }
 
 /**
- * Hủy đăng ký xe
+ * Cancel đăng ký xe
  */
 export async function cancelVehicleRegistration(id, payload) {
-  try {
-    const res = await http.post(`/vehicle/registrations/${id}/cancel`, payload);
-    return res?.data?.data ?? res?.data ?? null;
-  } catch (error) {
-    console.error(`Lỗi khi hủy đăng ký xe id=${id}:`, error);
-    throw error;
-  }
+  const res = await http.post(
+    `/vehicle/registrations/${id}/cancel`,
+    payload
+  );
+  return res?.data?.data ?? null;
 }
 
 /**
  * Thống kê đăng ký xe
  */
 export async function getVehicleRegistrationStats() {
-  try {
-    const res = await http.get("/vehicle/registrations/stats");
-    return res?.data?.data ?? res?.data ?? {};
-  } catch (error) {
-    console.error("Lỗi khi lấy thống kê đăng ký xe:", error);
-    throw error;
-  }
+  const res = await http.get("/vehicle/registrations/stats");
+  return res?.data?.data ?? {};
 }
 
-/** -----------------------------
- * VEHICLES
- * ----------------------------- */
+/* =============================
+ * VEHICLES (QUẢN LÝ PHƯƠNG TIỆN)
+ * ============================= */
 
 /**
  * Lấy danh sách xe
+ * Filters: status, type, tenant_user_id, license_plate, page, limit
  */
-export async function listVehicles() {
-  try {
-    const res = await http.get("/vehicle");
-    return res?.data?.data ?? res?.data ?? [];
-  } catch (error) {
-    console.error("Lỗi khi lấy danh sách xe:", error);
-    throw error;
-  }
+export async function listVehicles(params = {}) {
+  const res = await http.get("/vehicle", { params });
+  return res?.data?.data?.vehicles ?? [];
 }
 
 /**
- * Lấy chi tiết xe theo ID
+ * Lấy chi tiết xe
  */
 export async function getVehicleById(id) {
-  try {
-    const res = await http.get(`/vehicle/${id}`);
-    return res?.data?.data ?? res?.data ?? null;
-  } catch (error) {
-    console.error(`Lỗi khi lấy xe id=${id}:`, error);
-    throw error;
-  }
+  const res = await http.get(`/vehicle/${id}`);
+  return res?.data?.data ?? null;
+}
+
+/**
+ * Deactivate xe (tự nhả slot)
+ */
+export async function deactivateVehicle(id, payload = {}) {
+  const res = await http.post(`/vehicle/${id}/deactivate`, payload);
+  return res?.data?.data ?? null;
+}
+
+/**
+ * Reactivate xe (BẮT BUỘC gán slot)
+ */
+export async function reactivateVehicle(id, slot_id) {
+  const res = await http.post(`/vehicle/${id}/reactivate`, {
+    slot_id,
+  });
+  return res?.data?.data ?? null;
+}
+
+/**
+ * Đổi slot cho xe
+ */
+export async function changeVehicleSlot(id, new_slot_id) {
+  const res = await http.post(`/vehicle/${id}/change-slot`, {
+    new_slot_id,
+  });
+  return res?.data?.data ?? null;
+}
+
+/**
+ * Gán slot cho xe (fallback / admin)
+ */
+export async function assignVehicleToSlot(id, slot_id) {
+  const res = await http.post(`/vehicle/${id}/assign-slot`, {
+    slot_id,
+  });
+  return res?.data?.data ?? null;
 }

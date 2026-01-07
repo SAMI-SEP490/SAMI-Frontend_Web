@@ -688,6 +688,7 @@ function FloorplanEdit() {
             label: "Phòng",
             w: 4 * pxPerMeter,
             h: 3 * pxPerMeter,
+            size: null,
             color: "#1e40af",
             icon: "room",
           },

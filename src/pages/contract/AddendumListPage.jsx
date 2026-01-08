@@ -1,7 +1,7 @@
 // src/pages/addendum/AddendumListPage.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { Table, Button, Modal, Spinner, OverlayTrigger, Tooltip, Form, Badge } from "react-bootstrap";
-import { useNavigate } from "react-router-dom";
+import { useNavigate,useParams  } from "react-router-dom";
 import {
     listAddendums,
     deleteAddendum,
@@ -20,7 +20,7 @@ import "./AddendumListPage.css"; // Có thể dùng chung CSS hoặc copy từ C
 
 function AddendumListPage() {
     const navigate = useNavigate();
-
+    const { id } = useParams();
     // --- ROLE ---
     const [userRole, setUserRole] = useState("");
 
@@ -246,7 +246,7 @@ function AddendumListPage() {
                     <Button
                         variant="primary"
                         className="shadow-sm d-flex align-items-center gap-2"
-                        onClick={() => navigate("/addendums/create")}
+                        onClick={() => navigate(`/contracts/${id}/addendum/create`)}
                     >
                         <PlusLg /> Tạo phụ lục mới
                     </Button>

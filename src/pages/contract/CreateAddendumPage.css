@@ -141,3 +141,19 @@
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
 }
+.cursor-pointer {
+    cursor: pointer;
+}
+.border-dashed {
+    border-style: dashed !important;
+}
+.transition-all {
+    transition: all 0.2s ease-in-out;
+}
+.hover-bg-light:hover {
+    background-color: #f8f9fa;
+    border-color: #dee2e6 !important;
+}
+.file-upload-wrapper:hover {
+    background-color: #e9ecef !important;
+}

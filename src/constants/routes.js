@@ -26,7 +26,7 @@ export const ROUTES = {
   editContract: "/contracts/:id",
   contractAddendum: "/contracts/:id/addendum",
   createAddendum: "/contracts/:id/addendum/create",
-  editAddendum: "/contracts/:id/addendum/:aid",
+  editAddendum: "/contracts/:contractId/addendum/:aid",
   createContract: "/contracts/create",
 
   // Bills

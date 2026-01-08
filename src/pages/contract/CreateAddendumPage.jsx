@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Form, Button, Card, Row, Col, Spinner, Alert, InputGroup, Badge } from "react-bootstrap";
+import { Form, Button, Card, Row, Col, Spinner, Alert, InputGroup } from "react-bootstrap";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { listContracts, getContractById, requestTermination } from "../../services/api/contracts";
 import { createAddendum } from "../../services/api/addendum";
 import {
     ArrowLeft, Upload, FileEarmarkText,
     CurrencyDollar, CalendarDate, JournalCheck,
-    ExclamationTriangle, ClockHistory,
-    XCircle
+    ClockHistory,
+    XCircle,
+    ExclamationTriangle
 } from "react-bootstrap-icons";
 import "./CreateAddendumPage.css";
 
@@ -138,7 +139,9 @@ const CreateAddendumPage = () => {
         }
     };
 
-    // --- AUTO SELECT FIELDS ---
+    // --- AUTO SELECT FIELDS & DEFAULTS ---
+
+    // 1. Reset fields khi đổi loại Addendum
     useEffect(() => {
         const typeConfig = ADDENDUM_TYPES.find(t => t.value === addendumType);
         if (typeConfig) {
@@ -151,6 +154,7 @@ const CreateAddendumPage = () => {
         setNote("");
     }, [addendumType]);
 
+    // 2. Điền giá trị cũ cho các trường thay đổi
     useEffect(() => {
         if (selectedContract && selectedFields.length > 0) {
             selectedFields.forEach(key => {
@@ -159,6 +163,19 @@ const CreateAddendumPage = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedContract, selectedFields]);
+
+    // 3. [MỚI] Tự động set Ngày hết hiệu lực (Effective To) bằng ngày kết thúc hợp đồng
+    useEffect(() => {
+        if (selectedContract && selectedContract.end_date) {
+            // Chỉ set nếu effectiveTo đang trống để tránh ghi đè người dùng nhập
+            if (!effectiveTo) {
+                setEffectiveTo(selectedContract.end_date.split('T')[0]);
+            }
+        } else if (!selectedContract) {
+            setEffectiveTo("");
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedContract]);
 
     // --- HANDLERS ---
     const handleFieldToggle = (fieldKey) => {
@@ -190,7 +207,7 @@ const CreateAddendumPage = () => {
         try {
             if (!selectedContractId) throw new Error("Vui lòng chọn hợp đồng.");
 
-            // === CASE 1: TERMINATION (Thanh lý) - Gọi API riêng ===
+            // === CASE 1: TERMINATION ===
             if (addendumType === 'early_termination') {
                 if (!note || note.trim() === "") {
                     throw new Error("Vui lòng nhập lý do chấm dứt hợp đồng.");
@@ -206,18 +223,26 @@ const CreateAddendumPage = () => {
                 return;
             }
 
-            // === CASE 2: ADDENDUM (Phụ lục) - Gọi API createAddendum ===
+            // === CASE 2: ADDENDUM ===
+            // [VALIDATION] Check Effective From
+            if (!effectiveFrom) {
+                throw new Error("Vui lòng chọn ngày hiệu lực.");
+            }
+
             if (selectedFields.length === 0) throw new Error("Vui lòng chọn ít nhất một nội dung thay đổi.");
 
             const changesObj = {};
-            selectedFields.forEach(key => {
-                if (newValues[key] === undefined || newValues[key] === "") {
-                    throw new Error(`Vui lòng nhập giá trị mới cho: ${FIELD_DEFINITIONS.find(f=>f.key===key)?.label}`);
+            // [VALIDATION] Loop qua các trường đã chọn và check rỗng
+            for (const key of selectedFields) {
+                const val = newValues[key];
+                if (val === undefined || val === null || String(val).trim() === "") {
+                    const label = FIELD_DEFINITIONS.find(f => f.key === key)?.label;
+                    throw new Error(`Trường bắt buộc: Vui lòng nhập giá trị cho "${label}".`);
                 }
-                changesObj[key] = newValues[key];
-            });
+                changesObj[key] = val;
+            }
 
-            // Logic tính end_date khi gia hạn
+            // Logic tính end_date khi gia hạn (Giữ nguyên)
             if (changesObj.duration_months && selectedContract?.end_date) {
                 const oldEndDate = new Date(selectedContract.end_date);
                 const monthsToAdd = parseInt(changesObj.duration_months);
@@ -228,24 +253,13 @@ const CreateAddendumPage = () => {
                 }
             }
 
-            // === [FIXED] Mapping Payload theo đúng addendum.service.js ===
             const payload = {
                 contract_id: selectedContractId,
-
-                // 1. Dùng 'addendum_type' chuẩn service (không dùng 'type')
                 addendum_type: addendumType,
-
-                // 2. Dùng 'effective_from' chuẩn service (không dùng 'effective_date')
                 effective_from: effectiveFrom,
-
-                // 3. Dùng 'note' chuẩn service (không dùng 'summary')
                 note: note || "",
-
-                effective_to: effectiveTo || null,
-
-                // 4. Serialize changes object thành string JSON để gửi qua FormData an toàn
+                effective_to: effectiveTo || null, // Có thể null, nhưng mặc định đã điền từ useEffect
                 changes: JSON.stringify(changesObj),
-
                 files: files
             };
 
@@ -257,6 +271,8 @@ const CreateAddendumPage = () => {
         } catch (err) {
             console.error(err);
             setError(err.message || "Có lỗi xảy ra khi tạo phụ lục.");
+            // Scroll to top to see error
+            window.scrollTo(0, 0);
         } finally {
             setSubmitting(false);
         }
@@ -290,7 +306,9 @@ const CreateAddendumPage = () => {
                 </div>
             </div>
 
-            {error && <Alert variant="danger">{error}</Alert>}
+            {error && <Alert variant="danger" className="shadow-sm border-danger">
+                <ExclamationTriangle className="me-2"/> {error}
+            </Alert>}
 
             <Form onSubmit={handleSubmit}>
                 <Row>
@@ -310,6 +328,7 @@ const CreateAddendumPage = () => {
                                                 onChange={e => setSelectedContractId(e.target.value)}
                                                 disabled={!!initialContractId}
                                                 className={!!initialContractId ? "bg-light fw-bold text-dark" : ""}
+                                                required
                                             >
                                                 <option value="">-- Chọn hợp đồng --</option>
                                                 {contracts.map(c => (
@@ -363,13 +382,18 @@ const CreateAddendumPage = () => {
                                             </Col>
                                             <Col md={6}>
                                                 <Form.Group className="mt-2">
-                                                    <Form.Label>Ngày hết hiệu lực <span className="text-muted">(Tùy chọn)</span></Form.Label>
+                                                    {/* Đã xóa label (Tùy chọn) để người dùng hiểu đây là field quan trọng, mặc dù code vẫn cho phép null nhưng logic mặc định đã điền */}
+                                                    <Form.Label>Ngày hết hiệu lực <span className="text-danger">*</span></Form.Label>
                                                     <Form.Control
                                                         type="date"
                                                         value={effectiveTo}
                                                         onChange={e => setEffectiveTo(e.target.value)}
                                                         min={effectiveFrom}
+                                                        required // Bắt buộc nhập trên giao diện
                                                     />
+                                                    <Form.Text className="text-muted small">
+                                                        Mặc định là ngày kết thúc của HĐ gốc.
+                                                    </Form.Text>
                                                 </Form.Group>
                                             </Col>
                                         </>
@@ -428,15 +452,18 @@ const CreateAddendumPage = () => {
                                                                     </Col>
                                                                     <Col md={1} className="text-center text-muted">➔</Col>
                                                                     <Col md={6}>
-                                                                        <InputGroup>
+                                                                        <InputGroup className="has-validation">
                                                                             <Form.Control
                                                                                 type={fieldConfig.type}
                                                                                 value={newValues[key] || ''}
                                                                                 onChange={e => handleValueChange(key, e.target.value)}
                                                                                 placeholder="Nhập giá trị mới"
-                                                                                required
+                                                                                required // Bắt buộc nhập HTML5
                                                                             />
                                                                             {fieldConfig.suffix && <InputGroup.Text>{fieldConfig.suffix}</InputGroup.Text>}
+                                                                            <Form.Control.Feedback type="invalid">
+                                                                                Vui lòng nhập giá trị
+                                                                            </Form.Control.Feedback>
                                                                         </InputGroup>
                                                                     </Col>
                                                                 </Row>

@@ -10,7 +10,7 @@ import { Button, Spinner, Alert, Modal, Row, Col, Card, Image } from "react-boot
 import {
     Building, Person, CashCoin, CalendarDate, FileEarmarkText,
     Magic, XLg, CheckCircleFill, FileEarmarkPdf, FileEarmarkImage,
-    Search, Telephone, CardText, PersonBadge
+    Search, Telephone, CardText, PersonBadge, ArrowLeft
 } from "react-bootstrap-icons";
 import { getAccessToken } from "@/services/http.js";
 import "./CreateContractPage.css";
@@ -312,6 +312,9 @@ function CreateContractPage() {
             {/* HEADER */}
             <div className="page-header">
                 <div>
+                    <Button variant="light" className="border shadow-sm" onClick={() => navigate(-1)}>
+                        <ArrowLeft />
+                    </Button>
                     <h2>Tạo hợp đồng mới</h2>
                     <p>Thiết lập thông tin hợp đồng thuê phòng cho khách hàng.</p>
                 </div>

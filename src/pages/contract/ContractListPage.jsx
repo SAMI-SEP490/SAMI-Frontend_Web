@@ -12,7 +12,8 @@ import { listBuildings } from "@/services/api/building.js";
 import { getAccessToken } from "../../services/http";
 import {
   PlusLg, Download, Eye, Trash,
-  ArrowClockwise, FileEarmarkPdf, Building, Person, Calendar3
+  ArrowClockwise, FileEarmarkPdf, Building, Person, Calendar3,
+  JournalText
 } from "react-bootstrap-icons";
 import "./ContractListPage.css";
 
@@ -319,7 +320,14 @@ function ContractListPage() {
                                 <Eye />
                               </button>
                             </WithTooltip>
-
+                            <WithTooltip text="Phụ lục hợp đồng">
+                              <button
+                                  className="btn-icon info"
+                                  onClick={() => navigate(`/contracts/${c.contract_id}/addendum`)}
+                              >
+                                <JournalText />
+                              </button>
+                            </WithTooltip>
                             {c.has_file && (
                                 <>
                                   <WithTooltip text="Xem file gốc">

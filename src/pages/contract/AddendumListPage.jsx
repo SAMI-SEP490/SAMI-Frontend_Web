@@ -13,8 +13,9 @@ import { listContracts } from "../../services/api/contracts";
 import { getAccessToken } from "../../services/http";
 import {
     PlusLg, Download, Eye, Trash,
-    ArrowClockwise, CheckCircle, XCircle,
-    PencilSquare, Journals
+    CheckCircle, XCircle,
+    PencilSquare, Journals,
+    Building, Person, Calendar3, FileEarmarkPdf, ArrowLeft // <--- Đã thêm các icon mới
 } from "react-bootstrap-icons";
 import "./AddendumListPage.css";
 
@@ -39,6 +40,7 @@ function AddendumListPage() {
         q: ""
     });
 
+    // --- MODALS ADDENDUM (Phụ lục) ---
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedAddendum, setSelectedAddendum] = useState(null);
 
@@ -47,6 +49,10 @@ function AddendumListPage() {
 
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
+
+    // --- MODAL CONTRACT (Hợp đồng - MỚI) ---
+    const [showContractModal, setShowContractModal] = useState(false);
+    const [selectedContractDetail, setSelectedContractDetail] = useState(null);
 
     useEffect(() => {
         try {
@@ -61,13 +67,13 @@ function AddendumListPage() {
         }
         fetchAddendums();
         fetchContractList();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const fetchAddendums = async () => {
         setLoading(true);
         try {
             const res = await listAddendums();
-            // Backend trả về data trực tiếp hoặc trong res.data
             setAllAddendums(Array.isArray(res) ? res : (res.data || []));
         } catch (err) { console.error(err); }
         finally { setLoading(false); }
@@ -88,8 +94,8 @@ function AddendumListPage() {
             const lowerQ = filters.q.toLowerCase();
             result = result.filter(a =>
                 (String(a.addendum_number).toLowerCase().includes(lowerQ)) ||
-                (a.contract?.contract_number?.toLowerCase().includes(lowerQ)) || // SỬA: truy cập vào a.contract
-                (a.contract?.tenant_name?.toLowerCase().includes(lowerQ))        // SỬA: truy cập vào a.contract
+                (a.contract?.contract_number?.toLowerCase().includes(lowerQ)) ||
+                (a.contract?.tenant_name?.toLowerCase().includes(lowerQ))
             );
         }
 
@@ -127,7 +133,6 @@ function AddendumListPage() {
     const handleDownload = async (addendum) => {
         setActionLoading(true);
         try {
-            // SỬA: Dùng addendum.addendum_id thay vì .id
             const fileName = `PLHD-${addendum.addendum_number}.pdf`;
             const blob = await downloadAddendumDirect(addendum.addendum_id);
             const url = window.URL.createObjectURL(blob);
@@ -145,7 +150,6 @@ function AddendumListPage() {
         if (!deleteId) return;
         try {
             await deleteAddendum(deleteId);
-            // SỬA: Filter theo addendum_id
             setAllAddendums(prev => prev.filter(item => item.addendum_id !== deleteId));
             setShowDeleteModal(false);
         } catch (e) { alert("Lỗi xóa: " + e.message); }
@@ -156,7 +160,6 @@ function AddendumListPage() {
         setActionLoading(true);
         try {
             await approveAddendum(id);
-            // SỬA: Map theo addendum_id
             setAllAddendums(prev => prev.map(item =>
                 item.addendum_id === id ? { ...item, status: 'approved' } : item
             ));
@@ -170,7 +173,6 @@ function AddendumListPage() {
         if (!selectedAddendum) return;
         setActionLoading(true);
         try {
-            // SỬA: Dùng addendum_id
             await rejectAddendum(selectedAddendum.addendum_id, rejectReason);
             setAllAddendums(prev => prev.map(item =>
                 item.addendum_id === selectedAddendum.addendum_id ? { ...item, status: 'rejected' } : item
@@ -183,6 +185,13 @@ function AddendumListPage() {
         finally { setActionLoading(false); }
     };
 
+    // Hàm mở modal chi tiết hợp đồng
+    const handleViewContractDetail = (contractData) => {
+        if (!contractData) return;
+        setSelectedContractDetail(contractData);
+        setShowContractModal(true);
+    };
+
     // --- RENDER HELPERS ---
     const formatDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
 
@@ -191,18 +200,21 @@ function AddendumListPage() {
             approved: { label: "Đã duyệt", css: "bg-success" },
             pending_approval: { label: "Chờ duyệt", css: "bg-warning text-dark" },
             rejected: { label: "Đã từ chối", css: "bg-danger" },
-            expired: { label: "Đã hết hạn", css: "bg-secondary" }, // Thêm trạng thái expired
+            expired: { label: "Đã hết hạn", css: "bg-secondary" },
+            // Status của hợp đồng
+            active: { label: "Hiệu lực", css: "bg-success" },
+            pending: { label: "Chờ duyệt", css: "bg-warning text-dark" },
+            terminated: { label: "Đã hủy", css: "bg-secondary" },
         };
         const item = map[status] || { label: status, css: "bg-secondary" };
         return <Badge className={item.css}>{item.label}</Badge>;
     };
 
     const renderChangesSummary = (changes) => {
-        // SỬA: Backend trả về changes_snapshot, có thể là Object sẵn hoặc String JSON
         if (!changes) return <span className="text-muted">Không có dữ liệu</span>;
         try {
             const changesObj = typeof changes === 'string' ? JSON.parse(changes) : changes;
-            const keys = Object.keys(changesObj).filter(k => k !== 'previous_values'); // Lọc bỏ previous_values nếu có
+            const keys = Object.keys(changesObj).filter(k => k !== 'previous_values');
             if (keys.length === 0) return <span className="text-muted">Không thay đổi</span>;
 
             return (
@@ -212,8 +224,10 @@ function AddendumListPage() {
                             rent_amount: "Giá thuê",
                             end_date: "Ngày kết thúc",
                             deposit_amount: "Tiền cọc",
+                            duration_months: "Thời hạn (tháng)",
                             payment_cycle_months: "Chu kỳ thanh toán",
-                            penalty_rate: "Phạt quá hạn"
+                            penalty_rate: "Phạt quá hạn",
+                            start_date: "Ngày bắt đầu"
                         };
                         return labelMap[k] || k;
                     }).join(", ")}
@@ -231,9 +245,12 @@ function AddendumListPage() {
 
     return (
         <div className="contract-page-container">
-            {/* ... (HEADER giữ nguyên) ... */}
+            {/* PAGE HEADER */}
             <div className="page-header">
                 <div className="page-title">
+                    <Button variant="light" className="border shadow-sm" onClick={() => navigate(-1)}>
+                        <ArrowLeft />
+                    </Button>
                     <h2>Quản lý Phụ lục Hợp đồng</h2>
                     <p>Danh sách các phụ lục, gia hạn và điều chỉnh hợp đồng.</p>
                 </div>
@@ -248,9 +265,8 @@ function AddendumListPage() {
                 )}
             </div>
 
-            {/* ... (FILTER giữ nguyên) ... */}
+            {/* FILTERS */}
             <div className="filter-card">
-                {/* ... code filter giữ nguyên ... */}
                 <div className="filter-row">
                     <div className="filter-group search-input-wrapper">
                         <label>Tìm kiếm</label>
@@ -263,7 +279,7 @@ function AddendumListPage() {
                             onChange={handleFilterChange}
                         />
                     </div>
-                    {/* ... các filter khác giữ nguyên ... */}
+
                     <div className="filter-group">
                         <label>Trạng thái</label>
                         <select name="status" className="form-select form-select-sm" value={filters.status} onChange={handleFilterChange}>
@@ -274,7 +290,16 @@ function AddendumListPage() {
                             <option value="expired">Đã hết hạn</option>
                         </select>
                     </div>
-                    {/* ... */}
+
+                    <div className="filter-group">
+                        <label>Từ ngày</label>
+                        <input type="date" name="start_date" className="form-control form-control-sm" value={filters.start_date} onChange={handleFilterChange} />
+                    </div>
+
+                    <div className="filter-group">
+                        <label>Đến ngày</label>
+                        <input type="date" name="end_date" className="form-control form-control-sm" value={filters.end_date} onChange={handleFilterChange} />
+                    </div>
                 </div>
             </div>
 
@@ -300,13 +325,12 @@ function AddendumListPage() {
                     ) : (
                         currentTableData.map((item, i) => {
                             const idx = (currentPage - 1) * itemsPerPage + i + 1;
-                            // SỬA: Truy cập item.contract...
                             const contractNumber = item.contract?.contract_number || "N/A";
                             const tenantName = item.contract?.tenant_name || "N/A";
-                            const changes = item.changes_snapshot; // SỬA: Tên trường trong DB/Service
+                            const changes = item.changes_snapshot;
 
                             return (
-                                <tr key={item.addendum_id}> {/* SỬA: key là addendum_id */}
+                                <tr key={item.addendum_id}>
                                     <td className="text-center text-muted">{idx}</td>
 
                                     <td>
@@ -316,7 +340,12 @@ function AddendumListPage() {
 
                                     <td>
                                         <div className="d-flex flex-column">
-                                            <span className="fw-medium text-primary" style={{cursor:'pointer'}} onClick={() => navigate(`/contracts/${item.contract_id}`)}>
+                                            {/* SỬA ĐỔI: Gọi handleViewContractDetail thay vì navigate */}
+                                            <span
+                                                className="fw-medium text-primary"
+                                                style={{cursor:'pointer', textDecoration: 'underline'}}
+                                                onClick={() => handleViewContractDetail(item.contract)}
+                                            >
                                                 HĐ: {contractNumber}
                                             </span>
                                             <small className="text-muted">{tenantName}</small>
@@ -337,7 +366,6 @@ function AddendumListPage() {
                                                 </button>
                                             </WithTooltip>
 
-                                            {/* DOWNLOAD: chỉ hiện nếu có file (has_file) */}
                                             {item.has_file && (
                                                 <WithTooltip text="Tải phụ lục">
                                                     <button className="btn-icon download" onClick={() => handleDownload(item)} disabled={actionLoading}>
@@ -346,17 +374,17 @@ function AddendumListPage() {
                                                 </WithTooltip>
                                             )}
 
-                                            {/* OWNER ACTIONS */}
                                             {(userRole === "OWNER" || userRole === "MANAGER") && ['pending_approval', 'rejected'].includes(item.status) && (
                                                 <>
                                                     <WithTooltip text="Chỉnh sửa">
-                                                        {/* SỬA: Link đúng param */}
-                                                        <button className="btn-icon edit" onClick={() => navigate(`/contracts/${item.contract_id}/addendum/${item.addendum_id}/edit`)}>
+                                                        <button
+                                                            className="btn-icon edit"
+                                                            onClick={() => navigate(`/contracts/${item.contract_id}/addendum/${item.addendum_id}`)}
+                                                        >
                                                             <PencilSquare />
                                                         </button>
                                                     </WithTooltip>
                                                     <WithTooltip text="Xóa">
-                                                        {/* SỬA: setDeleteId dùng addendum_id */}
                                                         <button className="btn-icon delete" onClick={() => { setDeleteId(item.addendum_id); setShowDeleteModal(true); }}>
                                                             <Trash />
                                                         </button>
@@ -364,7 +392,6 @@ function AddendumListPage() {
                                                 </>
                                             )}
 
-                                            {/* TENANT ACTIONS */}
                                             {userRole === "TENANT" && item.status === 'pending_approval' && (
                                                 <>
                                                     <WithTooltip text="Đồng ý">
@@ -389,35 +416,41 @@ function AddendumListPage() {
                 </Table>
             </div>
 
-            {/* ... (PAGINATION giữ nguyên) ... */}
+            {/* PAGINATION */}
+            {totalPages > 1 && (
+                <div className="pagination-container">
+                    <Button variant="light" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
+                        Trước
+                    </Button>
+                    <span className="page-info">Trang {currentPage} / {totalPages}</span>
+                    <Button variant="light" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
+                        Sau
+                    </Button>
+                </div>
+            )}
 
-            {/* --- MODAL DETAIL --- */}
+            {/* --- MODAL DETAIL ADDENDUM --- */}
             <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} size="lg" centered>
-                {/* ... Header ... */}
                 <Modal.Header closeButton>
                     <Modal.Title className="h5 fw-bold">Chi tiết Phụ lục</Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="pt-2">
                     {selectedAddendum && (
                         <div className="d-flex flex-column gap-3">
-                            {/* Info Header */}
                             <div className="d-flex justify-content-between align-items-center bg-light p-3 rounded">
                                 <div>
                                     <div className="d-flex align-items-center gap-2">
                                         <Journals /> <span className="fw-bold fs-5">PL-{selectedAddendum.addendum_number}</span>
                                     </div>
-                                    {/* SỬA: Truy cập đúng contract info */}
                                     <div className="small text-muted">Hợp đồng gốc: {selectedAddendum.contract?.contract_number}</div>
                                 </div>
                                 {renderStatus(selectedAddendum.status)}
                             </div>
 
-                            {/* Changes Detail */}
                             <div className="border p-3 rounded">
                                 <h6 className="text-primary border-bottom pb-2">Nội dung thay đổi</h6>
                                 {(() => {
                                     try {
-                                        // SỬA: Dùng changes_snapshot
                                         const changes = typeof selectedAddendum.changes_snapshot === 'string'
                                             ? JSON.parse(selectedAddendum.changes_snapshot)
                                             : selectedAddendum.changes_snapshot;
@@ -444,7 +477,7 @@ function AddendumListPage() {
                                                 </thead>
                                                 <tbody>
                                                 {Object.entries(changes).map(([key, val]) => {
-                                                    if (key === 'previous_values') return null; // Ẩn previous values
+                                                    if (key === 'previous_values') return null;
                                                     return (
                                                         <tr key={key}>
                                                             <td>{dict[key] || key}</td>
@@ -474,7 +507,6 @@ function AddendumListPage() {
                                     <strong>Lý do từ chối:</strong> {selectedAddendum.note}
                                 </div>
                             )}
-
                         </div>
                     )}
                 </Modal.Body>
@@ -496,8 +528,91 @@ function AddendumListPage() {
                 </Modal.Footer>
             </Modal>
 
+            {/* --- MODAL DETAIL CONTRACT (MỚI - Giống ContractListPage) --- */}
+            <Modal show={showContractModal} onHide={() => setShowContractModal(false)} size="lg" centered>
+                <Modal.Header closeButton className="border-bottom-0 pb-0">
+                    <Modal.Title className="h5 fw-bold">Thông tin Hợp đồng</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="pt-2">
+                    {selectedContractDetail && (
+                        <div className="d-flex flex-column gap-4">
+                            {/* Header Info */}
+                            <div className="d-flex justify-content-between align-items-center bg-light p-3 rounded">
+                                <div>
+                                    <span className="text-muted small text-uppercase">Mã hợp đồng</span>
+                                    <div className="fw-bold fs-5">#{selectedContractDetail.contract_number || selectedContractDetail.contract_id}</div>
+                                </div>
+                                {renderStatus(selectedContractDetail.status)}
+                            </div>
+
+                            <div className="detail-grid">
+                                {/* Cột trái: Thông tin thuê */}
+                                <div className="d-flex flex-column gap-3">
+                                    <h6 className="border-bottom pb-2 mb-0 text-primary"><Person className="me-2"/>Bên thuê</h6>
+                                    <div className="detail-item">
+                                        <div className="detail-label">Khách thuê</div>
+                                        <div className="detail-value">{selectedContractDetail.tenant_name}</div>
+                                    </div>
+                                    <div className="detail-item">
+                                        <div className="detail-label">Liên hệ</div>
+                                        <div className="detail-value">{selectedContractDetail.tenant_phone || "N/A"}</div>
+                                        <div className="small text-muted">{selectedContractDetail.tenant_email}</div>
+                                    </div>
+                                </div>
+
+                                {/* Cột phải: Thông tin phòng & Giá */}
+                                <div className="d-flex flex-column gap-3">
+                                    <h6 className="border-bottom pb-2 mb-0 text-primary"><Building className="me-2"/>Phòng & Chi phí</h6>
+                                    <div className="detail-item">
+                                        <div className="detail-label">Vị trí</div>
+                                        <div className="detail-value">
+                                            {selectedContractDetail.building_name ? <span>{selectedContractDetail.building_name} - </span> : ""}
+                                            Phòng {selectedContractDetail.room_number}
+                                        </div>
+                                    </div>
+                                    <div className="d-flex gap-2">
+                                        <div className="detail-item w-50">
+                                            <div className="detail-label">Tiền thuê</div>
+                                            <div className="detail-value text-success">{selectedContractDetail.rent_amount?.toLocaleString()} ₫</div>
+                                        </div>
+                                        <div className="detail-item w-50">
+                                            <div className="detail-label">Đặt cọc</div>
+                                            <div className="detail-value">{selectedContractDetail.deposit_amount?.toLocaleString()} ₫</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Hàng dưới: Thời hạn & Ghi chú */}
+                            <div className="d-flex flex-column gap-3">
+                                <h6 className="border-bottom pb-2 mb-0 text-primary"><Calendar3 className="me-2"/>Thời hạn & Ghi chú</h6>
+                                <div className="detail-grid">
+                                    <div className="detail-item">
+                                        <div className="detail-label">Ngày bắt đầu - Kết thúc</div>
+                                        <div className="detail-value">
+                                            {formatDate(selectedContractDetail.start_date)} - {formatDate(selectedContractDetail.end_date)}
+                                        </div>
+                                        {selectedContractDetail.duration_months && (
+                                            <div className="small text-muted mt-1">({selectedContractDetail.duration_months} tháng)</div>
+                                        )}
+                                    </div>
+                                    <div className="detail-item">
+                                        <div className="detail-label">Ghi chú</div>
+                                        <div className="detail-value text-break" style={{fontSize:'14px'}}>
+                                            {selectedContractDetail.note || "Không có ghi chú"}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </Modal.Body>
+                <Modal.Footer className="border-top-0 pt-0">
+                    <Button variant="light" onClick={() => setShowContractModal(false)}>Đóng</Button>
+                </Modal.Footer>
+            </Modal>
+
             {/* --- MODAL REJECT --- */}
-            {/* Giữ nguyên logic modal reject, chỉ lưu ý handleRejectSubmit đã sửa ở trên dùng addendum_id */}
             <Modal show={showRejectModal} onHide={() => setShowRejectModal(false)} centered>
                 <Modal.Header closeButton>
                     <Modal.Title>Từ chối Phụ lục</Modal.Title>
@@ -522,7 +637,7 @@ function AddendumListPage() {
                 </Modal.Footer>
             </Modal>
 
-            {/* ... Modal Delete giữ nguyên (đã sửa handleDelete dùng addendum_id) ... */}
+            {/* --- MODAL DELETE --- */}
             <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
                 <Modal.Body className="text-center p-4">
                     <div className="text-danger mb-3"><Trash size={40}/></div>

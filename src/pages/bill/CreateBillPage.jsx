@@ -1,452 +1,246 @@
 // src/pages/bill/CreateBillPage.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-
-import { createDraftBill, precheckDuplicateBill } from "@/services/api/bills";
-import { listBuildings, listAssignedBuildings } from "@/services/api/building";
-import { getRoomsByBuildingId, listRooms } from "@/services/api/rooms";
-
-// ✅ đổi import sang API lấy TẤT CẢ tenant trong phòng
-import { getAllTenantsByRoomId } from "@/services/api/tenants";
-
+import { createDraftBill } from "@/services/api/bills";
+import { listAssignedBuildings, listBuildings } from "@/services/api/building";
+import { getRoomsByBuildingId, getRoomById } from "@/services/api/rooms"; // [1] Import getRoomById
 import { getAccessToken } from "@/services/http";
+import { Trash } from "react-bootstrap-icons";
 
-// ===== Helpers =====
-const toNum = (v, d = 0) => {
-  if (v === "" || v === null || v === undefined) return d;
-  const n = Number(v);
-  return Number.isNaN(n) ? d : n;
-};
-
-function toISODate(v) {
-  if (!v) return "";
-  const s = String(v);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  if (s.includes("T")) return s.split("T")[0];
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
-}
-
-function decodeRoleFromToken() {
+// Helpers
+const getRole = () => {
   try {
-    const token = getAccessToken?.();
-    if (!token) return "";
-    const decoded = JSON.parse(atob(token.split(".")[1]));
-    const r = decoded?.role || decoded?.userRole || "";
-    return String(r).toUpperCase();
-  } catch {
-    return "";
-  }
-}
-
-// unwrap “đủ kiểu” (res / res.data / res.data.data)
-function unwrapAny(x) {
-  if (!x) return x;
-  if (Array.isArray(x)) return x;
-  if (Array.isArray(x?.data)) return x.data;
-  if (Array.isArray(x?.data?.data)) return x.data.data;
-  if (Array.isArray(x?.data?.items)) return x.data.items;
-  if (Array.isArray(x?.items)) return x.items;
-  if (Array.isArray(x?.data?.rooms)) return x.data.rooms;
-  if (Array.isArray(x?.rooms)) return x.rooms;
-  return x?.data?.data ?? x?.data ?? x;
-}
+    const t = getAccessToken();
+    return JSON.parse(atob(t.split(".")[1])).role;
+  } catch { return ""; }
+};
 
 export default function CreateBillPage() {
   const nav = useNavigate();
+  const role = getRole();
 
-  // ===== ROLE =====
-  const [role, setRole] = useState("");
-
-  // ===== Filter / Select =====
+  // Selection State
   const [buildings, setBuildings] = useState([]);
-  const [buildingId, setBuildingId] = useState(""); // owner chọn / manager auto
+  const [selectedBuilding, setSelectedBuilding] = useState("");
   const [rooms, setRooms] = useState([]);
-  const [roomId, setRoomId] = useState("");
+  const [selectedRoom, setSelectedRoom] = useState("");
+  
+  // Contract & Tenant State
+  const [activeContract, setActiveContract] = useState(null); 
+  const [tenantUserId, setTenantUserId] = useState(""); // [NEW] Track selected payer
 
-  const [tenantsInRoom, setTenantsInRoom] = useState([]);
-  const [tenantUserId, setTenantUserId] = useState("");
-
-  // ===== Bill form =====
+  // Bill State
+  const [billType, setBillType] = useState("monthly_rent");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
-  const [description, setDescription] = useState("");
-  const [baseAmount, setBaseAmount] = useState("");
-  const [penaltyAmount, setPenaltyAmount] = useState("0");
   const [dueDate, setDueDate] = useState("");
+  const [description, setDescription] = useState("");
 
-  // ===== UX =====
-  const [loadingBuilding, setLoadingBuilding] = useState(true);
-  const [loadingRooms, setLoadingRooms] = useState(false);
-  const [loadingTenants, setLoadingTenants] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  // Service Charges
+  const [charges, setCharges] = useState([
+    { service_type: "Tiền thuê phòng", amount: 0, quantity: 1, description: "" }
+  ]);
 
-  const [error, setError] = useState("");
-  const [warn, setWarn] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const totalAmount = useMemo(() => {
-    const base = toNum(baseAmount, 0);
-    const pen = toNum(penaltyAmount, 0);
-    return base + pen;
-  }, [baseAmount, penaltyAmount]);
-
-  // ===== 1) Role from token =====
+  // 1. Fetch Buildings
   useEffect(() => {
-    const r = decodeRoleFromToken();
-    setRole(r);
-  }, []);
-
-  // ===== 2) Load buildings (GIỐNG CreateContract) =====
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchBuildings() {
-      if (!role) return;
-      setLoadingBuilding(true);
-      setError("");
-      setWarn("");
-
+    (async () => {
       try {
-        if (role === "MANAGER") {
-          const res = await listAssignedBuildings();
-          const assignedList = unwrapAny(res);
-
-          if (!Array.isArray(assignedList) || assignedList.length === 0) {
-            throw new Error("Tài khoản quản lý chưa được gán tòa nhà");
-          }
-
-          const b = assignedList[0];
-          const bId = b?.building_id;
-          if (!bId)
-            throw new Error("Không lấy được building_id từ assigned building");
-
-          if (!cancelled) {
-            setBuildings([b]);
-            setBuildingId(String(bId));
-          }
-          return;
-        }
-
-        if (role === "OWNER") {
-          const res = await listBuildings();
-          const list = unwrapAny(res);
-          if (!cancelled) setBuildings(Array.isArray(list) ? list : []);
-          return;
-        }
-
-        if (!cancelled) {
-          setBuildings([]);
-          setBuildingId("");
-          setRooms([]);
-          setRoomId("");
-          setTenantsInRoom([]);
-          setTenantUserId("");
-          setError("Bạn không có quyền tạo hóa đơn.");
-        }
-      } catch (e) {
-        if (!cancelled)
-          setError(e?.message || "Không tải được danh sách tòa nhà");
-      } finally {
-        if (!cancelled) setLoadingBuilding(false);
-      }
-    }
-
-    fetchBuildings();
-    return () => (cancelled = true);
+        const api = role === "MANAGER" ? listAssignedBuildings : listBuildings;
+        const res = await api();
+        setBuildings(Array.isArray(res) ? res : []);
+      } catch (e) { console.error(e); }
+    })();
   }, [role]);
 
-  // ===== 3) Load rooms theo building =====
+  // 2. Fetch Rooms List (Lite version)
   useEffect(() => {
-    let cancelled = false;
+    if (!selectedBuilding) { setRooms([]); return; }
+    (async () => {
+      const res = await getRoomsByBuildingId(selectedBuilding);
+      setRooms(Array.isArray(res) ? res : []);
+    })();
+  }, [selectedBuilding]);
 
-    async function fetchRooms() {
-      if (!buildingId) {
-        setRooms([]);
-        return;
-      }
-
-      setLoadingRooms(true);
-      setError("");
-      setWarn("");
-
-      try {
-        const res = await getRoomsByBuildingId(buildingId);
-        let list = unwrapAny(res);
-        list = Array.isArray(list) ? list : [];
-
-        if (list.length === 0) {
-          const all = unwrapAny(await listRooms());
-          const arr = Array.isArray(all) ? all : [];
-          list = arr.filter(
-            (r) => String(r?.building_id) === String(buildingId)
-          );
-        }
-
-        if (!cancelled) setRooms(list);
-      } catch (e) {
-        if (!cancelled) {
-          setRooms([]);
-          setError(e?.message || "Không tải được danh sách phòng");
-        }
-      } finally {
-        if (!cancelled) setLoadingRooms(false);
-      }
-    }
-
-    fetchRooms();
-    return () => (cancelled = true);
-  }, [buildingId]);
-
-  // ===== 4) Load tenants theo room (✅ dùng /tenant/moor/:roomId) =====
+  // 3. [FIXED] Fetch Room Detail to get Contract
   useEffect(() => {
-    let cancelled = false;
-
-    async function fetchTenants() {
-      setTenantUserId("");
-      if (!roomId) {
-        setTenantsInRoom([]);
-        return;
-      }
-
-      setLoadingTenants(true);
-      setWarn("");
-
-      try {
-        // ✅ LẤY TẤT CẢ tenant trong phòng
-        const res = await getAllTenantsByRoomId(roomId);
-        const list = unwrapAny(res);
-        const arr = Array.isArray(list) ? list : [];
-
-        const normalized = arr
-          .map((t) => ({
-            user_id: t?.user_id ?? t?.users?.user_id ?? t?.id,
-            full_name: t?.full_name ?? t?.users?.full_name ?? "(Không tên)",
-          }))
-          .filter((x) => x.user_id);
-
-        if (!cancelled) setTenantsInRoom(normalized);
-      } catch {
-        if (!cancelled) setWarn("Không lấy được người thuê của phòng");
-      } finally {
-        if (!cancelled) setLoadingTenants(false);
-      }
+    if(!selectedRoom) { 
+        setActiveContract(null); 
+        setTenantUserId("");
+        return; 
     }
 
-    fetchTenants();
-    return () => (cancelled = true);
-  }, [roomId]);
+    (async () => {
+        try {
+            // Call API to get full room details (including current_contract)
+            const roomDetail = await getRoomById(selectedRoom);
+            
+            if (roomDetail?.current_contract) {
+                console.log(`found contract`);
+                setActiveContract(roomDetail.current_contract);
+                // Auto-select the primary tenant from contract
+                setTenantUserId(roomDetail.current_contract.tenant_user_id);
+            } else {
+                console.log(`not found contract`);
+                setActiveContract(null);
+                setTenantUserId("");
+            }
+        } catch (e) {
+            console.error("Failed to load room details:", e);
+            setActiveContract(null);
+        }
+    })();
+  }, [selectedRoom]);
 
-  // ===== Submit =====
-  async function onSubmit(e) {
-    e.preventDefault();
-    setError("");
-    setWarn("");
+  // Calc Total
+  const totalAmount = useMemo(() => {
+    return charges.reduce((sum, c) => sum + (Number(c.amount) * Number(c.quantity)), 0);
+  }, [charges]);
 
-    if (role !== "OWNER" && role !== "MANAGER") {
-      setError("Bạn không có quyền tạo hóa đơn.");
-      return;
-    }
+  // Handlers
+  const addCharge = () => {
+    setCharges([...charges, { service_type: "", amount: 0, quantity: 1, description: "" }]);
+  };
 
-    if (!roomId || !tenantUserId || !periodStart || !periodEnd || !dueDate) {
-      setError("Vui lòng nhập đầy đủ thông tin bắt buộc");
-      return;
-    }
+  const removeCharge = (index) => {
+    setCharges(charges.filter((_, i) => i !== index));
+  };
 
+  const updateCharge = (index, field, value) => {
+    const newCharges = [...charges];
+    newCharges[index][field] = value;
+    setCharges(newCharges);
+  };
+
+  const onSubmit = async (status) => {
+    if (!activeContract) return alert("Phòng này chưa có hợp đồng/người thuê!");
+    if (!tenantUserId) return alert("Không xác định được người thanh toán!");
+
+    setLoading(true);
     try {
-      setSubmitting(true);
-
-      const ok = await precheckDuplicateBill(roomId, periodStart);
-      if (!ok) {
-        setWarn("Phòng này đã có hóa đơn cho kỳ này");
-        return;
-      }
-
       const payload = {
-        roomId: Number(roomId),
-        tenantUserId: Number(tenantUserId),
-        billing_period_start: toISODate(periodStart),
-        billing_period_end: toISODate(periodEnd),
+        contract_id: activeContract.contract_id,
+        tenant_user_id: tenantUserId, // Send the selected payer
+        bill_type: billType,
+        billing_period_start: periodStart,
+        billing_period_end: periodEnd,
+        due_date: dueDate,
         description,
-        due_date: toISODate(dueDate),
-        penalty_amount: toNum(penaltyAmount, 0),
         total_amount: totalAmount,
-        status: "draft",
+        status: status,
+        service_charges: charges
       };
 
-      const created = await createDraftBill(payload);
+      if (status === 'draft') await createDraftBill(payload);
+      else await createDraftBill(payload); 
 
-      const id =
-        created?.bill_id ??
-        created?.id ??
-        created?.data?.bill_id ??
-        created?.data?.id;
-
-      alert("Lưu hóa đơn nháp thành công");
-      nav(id ? `/bills/${id}/edit` : "/bills");
+      alert("Thành công!");
+      nav("/bills");
     } catch (e) {
-      setError(e?.message || "Tạo hóa đơn thất bại");
+      alert(e.message || "Lỗi tạo hóa đơn");
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="container py-3">
-      <h3>Tạo hóa đơn (Nháp)</h3>
-
-      {error && <div className="alert alert-danger">{error}</div>}
-      {warn && <div className="alert alert-warning">{warn}</div>}
-
-      <form className="row g-3" onSubmit={onSubmit}>
-        {role === "OWNER" && (
-          <div className="col-md-4">
-            <label className="form-label">Tòa nhà *</label>
-            <select
-              className="form-select"
-              value={buildingId}
-              disabled={loadingBuilding}
-              onChange={(e) => {
-                setBuildingId(e.target.value);
-                setRoomId("");
-              }}
-            >
-              <option value="">-- Chọn tòa nhà --</option>
-              {buildings.map((b) => (
-                <option
-                  key={b?.building_id ?? b?.id}
-                  value={b?.building_id ?? b?.id}
-                >
-                  {b?.name}
-                </option>
-              ))}
+    <div className="container py-4">
+      <h3>Tạo Hóa Đơn Mới</h3>
+      
+      <div className="card p-3 mb-4">
+        <h5>1. Chọn Phòng</h5>
+        <div className="row g-3">
+          <div className="col-md-6">
+            <label>Tòa nhà</label>
+            <select className="form-select" onChange={e => { setSelectedBuilding(e.target.value); setSelectedRoom(""); }}>
+              <option value="">-- Chọn --</option>
+              {buildings.map(b => <option key={b.building_id} value={b.building_id}>{b.name}</option>)}
             </select>
           </div>
+          <div className="col-md-6">
+            <label>Phòng</label>
+            <select className="form-select" value={selectedRoom} onChange={e => setSelectedRoom(e.target.value)}>
+              <option value="">-- Chọn --</option>
+              {rooms.map(r => <option key={r.room_id} value={r.room_id}>{r.room_number}</option>)}
+            </select>
+          </div>
+        </div>
+        
+        {/* Status Indicators */}
+        {selectedRoom && !activeContract && (
+            <div className="alert alert-warning mt-3">
+                <i className="bi bi-exclamation-triangle"></i> Phòng này hiện đang trống (chưa có Hợp đồng Active).
+            </div>
         )}
+        
+        {activeContract && (
+            <div className="alert alert-success mt-3 py-2">
+                <strong>Hợp đồng:</strong> {activeContract.contract_number} <br/>
+                <strong>Người thuê (Chính):</strong> User ID #{activeContract.tenant_user_id}
+            </div>
+        )}
+      </div>
 
-        <div className="col-md-4">
-          <label className="form-label">Phòng *</label>
-          <select
-            className="form-select"
-            value={roomId}
-            disabled={
-              !buildingId ||
-              loadingRooms ||
-              (role !== "OWNER" && role !== "MANAGER")
-            }
-            onChange={(e) => setRoomId(e.target.value)}
-          >
-            <option value="">-- Chọn phòng --</option>
-            {rooms.map((r) => (
-              <option key={r?.room_id ?? r?.id} value={r?.room_id ?? r?.id}>
-                {r?.room_number ??
-                  r?.name ??
-                  r?.number ??
-                  `Phòng ${r?.room_id ?? r?.id}`}
-              </option>
-            ))}
-          </select>
+      <div className="card p-3 mb-4">
+        <h5>2. Thông tin chung</h5>
+        <div className="row g-3">
+          <div className="col-md-3">
+            <label>Loại</label>
+            <select className="form-select" value={billType} onChange={e => setBillType(e.target.value)}>
+                <option value="monthly_rent">Tiền nhà</option>
+                <option value="utilities">Điện nước</option>
+                <option value="other">Khác</option>
+            </select>
+          </div>
+          <div className="col-md-3"><label>Từ ngày</label><input type="date" className="form-control" onChange={e=>setPeriodStart(e.target.value)}/></div>
+          <div className="col-md-3"><label>Đến ngày</label><input type="date" className="form-control" onChange={e=>setPeriodEnd(e.target.value)}/></div>
+          <div className="col-md-3"><label>Hạn chót</label><input type="date" className="form-control" onChange={e=>setDueDate(e.target.value)}/></div>
+          <div className="col-12"><label>Mô tả</label><input className="form-control" onChange={e=>setDescription(e.target.value)}/></div>
         </div>
+      </div>
 
-        <div className="col-md-4">
-          <label className="form-label">Người thanh toán *</label>
-          <select
-            className="form-select"
-            value={tenantUserId}
-            disabled={!roomId || loadingTenants}
-            onChange={(e) => setTenantUserId(e.target.value)}
-          >
-            <option value="">-- Chọn người thuê --</option>
-            {tenantsInRoom.map((t) => (
-              <option key={t.user_id} value={t.user_id}>
-                {t.full_name}
-              </option>
-            ))}
-          </select>
+      <div className="card p-3 mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-2">
+            <h5>3. Chi tiết (Service Charges)</h5>
+            <button className="btn btn-sm btn-outline-primary" onClick={addCharge}>+ Thêm dòng</button>
         </div>
+        
+        <table className="table">
+            <thead>
+                <tr>
+                    <th style={{width: '35%'}}>Loại phí</th>
+                    <th style={{width: '15%'}}>Số lượng</th>
+                    <th style={{width: '20%'}}>Đơn giá</th>
+                    <th style={{width: '20%'}}>Thành tiền</th>
+                    <th style={{width: '10%'}}></th>
+                </tr>
+            </thead>
+            <tbody>
+                {charges.map((c, i) => (
+                    <tr key={i}>
+                        <td><input className="form-control" value={c.service_type} onChange={e=>updateCharge(i, 'service_type', e.target.value)} placeholder="Tên phí..." /></td>
+                        <td><input type="number" className="form-control" value={c.quantity} onChange={e=>updateCharge(i, 'quantity', e.target.value)} /></td>
+                        <td><input type="number" className="form-control" value={c.amount} onChange={e=>updateCharge(i, 'amount', e.target.value)} /></td>
+                        <td className="align-middle">{(Number(c.quantity) * Number(c.amount)).toLocaleString()}</td>
+                        <td className="text-center align-middle"><button className="btn btn-sm text-danger" onClick={()=>removeCharge(i)}><Trash/></button></td>
+                    </tr>
+                ))}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colSpan={3} className="text-end fw-bold">TỔNG CỘNG:</td>
+                    <td className="fw-bold text-primary fs-5">{totalAmount.toLocaleString()} VND</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+      </div>
 
-        <div className="col-md-3">
-          <label className="form-label">Ngày bắt đầu kỳ *</label>
-          <input
-            type="date"
-            className="form-control"
-            value={periodStart}
-            onChange={(e) => setPeriodStart(e.target.value)}
-          />
-        </div>
-
-        <div className="col-md-3">
-          <label className="form-label">Ngày kết thúc kỳ *</label>
-          <input
-            type="date"
-            className="form-control"
-            value={periodEnd}
-            onChange={(e) => setPeriodEnd(e.target.value)}
-          />
-        </div>
-
-        <div className="col-12">
-          <label className="form-label">Mô tả hóa đơn</label>
-          <textarea
-            className="form-control"
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-
-        <div className="col-md-4">
-          <label className="form-label">Tổng tiền tháng *</label>
-          <input
-            type="number"
-            className="form-control"
-            value={baseAmount}
-            onChange={(e) => setBaseAmount(e.target.value)}
-            placeholder="VD: 3200000"
-          />
-        </div>
-
-        <div className="col-md-4">
-          <label className="form-label">Tiền phạt</label>
-          <input
-            type="number"
-            className="form-control"
-            value={penaltyAmount}
-            onChange={(e) => setPenaltyAmount(e.target.value)}
-          />
-        </div>
-
-        <div className="col-md-4">
-          <label className="form-label">Tổng phải thu</label>
-          <input className="form-control" readOnly value={totalAmount} />
-        </div>
-
-        <div className="col-md-4">
-          <label className="form-label">Hạn thanh toán *</label>
-          <input
-            type="date"
-            className="form-control"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-        </div>
-
-        <div className="col-12 d-flex gap-2">
-          <button
-            type="button"
-            className="btn btn-outline-secondary"
-            onClick={() => nav(-1)}
-          >
-            Hủy
-          </button>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={submitting}
-          >
-            {submitting ? "Đang lưu..." : "Lưu nháp"}
-          </button>
-        </div>
-      </form>
+      <div className="d-flex gap-2 justify-content-end">
+        <button className="btn btn-secondary" onClick={()=>nav('/bills')}>Hủy</button>
+        <button className="btn btn-warning" onClick={()=>onSubmit('draft')} disabled={loading || !activeContract}>Lưu Nháp</button>
+      </div>
     </div>
   );
 }

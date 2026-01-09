@@ -19,21 +19,36 @@ function isPublished(status) {
 
 function renderPublishStatus(status) {
   if (status === "draft") return <span className="status draft">Nháp</span>;
-
   return <span className="status published">Đã xuất bản</span>;
 }
 
 function renderPaymentStatus(status) {
-  if (status === "paid")
-    return <span className="status paid">Đã thanh toán</span>;
-
-  if (status === "partially_paid")
-    return <span className="status partial">Thanh toán một phần</span>;
-
-  if (status === "overdue")
-    return <span className="status overdue">Quá hạn</span>;
-
+  if (status === "paid") return <span className="status paid">Đã thanh toán</span>;
+  if (status === "partially_paid") return <span className="status partial">Thanh toán một phần</span>;
+  if (status === "overdue") return <span className="status overdue">Quá hạn</span>;
   return <span className="status unpaid">Chưa thanh toán</span>;
+}
+
+// Find room number from nested contract data
+function getRoomLabel(bill) {
+  if (bill.room?.room_number) return bill.room.room_number;
+  const contract = bill.contract;
+  if (!contract) return "—";
+  const room = contract.room_current || contract.room_history;
+  return room?.room_number || "—";
+}
+
+// Auto-generate title if description is missing
+function getBillTitle(bill) {
+  if (bill.description && bill.description.trim() !== "") {
+    return bill.description;
+  }
+  // Fallback: "Hóa đơn tháng X/YYYY"
+  if (bill.billing_period_start) {
+    const d = new Date(bill.billing_period_start);
+    return `Hóa đơn tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+  }
+  return "Hóa đơn";
 }
 
 /* ================= Page ================= */
@@ -62,7 +77,6 @@ export default function BillDetailPage() {
 
   async function onPublish() {
     if (!bill) return;
-
     const ok = window.confirm(
       "Bạn có chắc muốn xuất bản hóa đơn này?\nSau khi xuất bản sẽ KHÔNG thể chỉnh sửa hoặc hoàn tác."
     );
@@ -70,8 +84,9 @@ export default function BillDetailPage() {
 
     await updateDraftBill(id, { status: "issued" });
     alert("Xuất bản hóa đơn thành công.");
-
-    setBill({ ...bill, status: "issued" });
+    
+    const updated = await getBillById(id);
+    setBill(updated);
   }
 
   async function onDelete() {
@@ -93,50 +108,138 @@ export default function BillDetailPage() {
     <div className="container">
       <h2 className="title">Chi tiết hóa đơn</h2>
 
-      {/* STATUS */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+      {/* HEADER: STATUS & ID */}
+      <div className="d-flex align-items-center gap-3 mb-4">
+        <h4 className="m-0 text-primary">#{bill.bill_number}</h4>
         {renderPublishStatus(status)}
         {published && renderPaymentStatus(status)}
       </div>
 
-      {/* INFO */}
-      <div className="card">
-        <p>
-          <b>Tên hóa đơn:</b> {bill.description || "—"}
-        </p>
-        <p>
-          <b>Phòng:</b> {bill.room?.room_number || bill.room_id}
-        </p>
-        <p>
-          <b>Tổng tiền:</b> {bill.total_amount?.toLocaleString()} đ
-        </p>
-        <p>
-          <b>Thời gian:</b> {bill.billing_period_start} →{" "}
-          {bill.billing_period_end}
-        </p>
+      {/* INFO CARD */}
+      <div className="card mb-4 p-3 shadow-sm border-0">
+        <div className="row g-3">
+          <div className="col-md-6">
+            <label className="text-muted small">Tên hóa đơn / Mô tả</label>
+            <div className="fw-bold fs-5">{getBillTitle(bill)}</div>
+          </div>
+          
+          <div className="col-md-3">
+            <label className="text-muted small">Phòng</label>
+            <div className="fw-bold">{getRoomLabel(bill)}</div>
+          </div>
+
+          <div className="col-md-3">
+            <label className="text-muted small">Khách thuê</label>
+            <div className="fw-bold">{bill.tenant?.user?.full_name || `User ID: ${bill.tenant_user_id}`}</div>
+          </div>
+
+          <div className="col-md-6">
+            <label className="text-muted small">Kỳ thanh toán</label>
+            <div>
+              {new Date(bill.billing_period_start).toLocaleDateString('vi-VN')} 
+              <span className="mx-2">➔</span> 
+              {new Date(bill.billing_period_end).toLocaleDateString('vi-VN')}
+            </div>
+          </div>
+
+          <div className="col-md-6">
+            <label className="text-muted small">Hạn thanh toán (Due Date)</label>
+            <div className={status === 'overdue' ? 'text-danger fw-bold' : ''}>
+              {new Date(bill.due_date).toLocaleDateString('vi-VN')}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* ACTION */}
-      <div className="action-buttons" style={{ marginTop: 20 }}>
-        <button className="btn view" onClick={() => navigate("/bills")}>
-          <Eye size={14} /> Quay lại
+      {/* SERVICE CHARGES TABLE */}
+      <div className="card shadow-sm border-0">
+        <div className="card-header bg-white py-3">
+          <h5 className="m-0">Chi tiết phí dịch vụ</h5>
+        </div>
+        <table className="table table-hover mb-0">
+            <thead className="table-light">
+                <tr>
+                    <th style={{width: '40%'}}>Khoản mục</th>
+                    <th className="text-center" style={{width: '15%'}}>SL</th>
+                    <th className="text-end" style={{width: '20%'}}>Đơn giá</th>
+                    <th className="text-end" style={{width: '25%'}}>Thành tiền</th>
+                </tr>
+            </thead>
+            <tbody>
+                {bill.service_charges?.map((item, idx) => (
+                    <tr key={idx}>
+                        <td>
+                            <div className="fw-medium">{item.service_type}</div>
+                            {item.description && (
+                                <div className="text-muted small fst-italic mt-1">
+                                    <i className="bi bi-info-circle me-1"></i>
+                                    {item.description}
+                                </div>
+                            )}
+                        </td>
+                        <td className="text-center align-middle">{item.quantity}</td>
+                        <td className="text-end align-middle">{Number(item.unit_price || item.amount).toLocaleString()}</td>
+                        <td className="text-end align-middle fw-bold">{Number(item.amount).toLocaleString()}</td>
+                    </tr>
+                ))}
+                {(!bill.service_charges || bill.service_charges.length === 0) && (
+                    <tr>
+                        <td colSpan={4} className="text-center py-4 text-muted">
+                            Không có chi tiết (Hóa đơn cũ hoặc chưa cập nhật)
+                        </td>
+                    </tr>
+                )}
+            </tbody>
+            <tfoot>
+                {/* Penalty Row */}
+                {Number(bill.penalty_amount) > 0 && (
+                    <tr>
+                        <td colSpan={3} className="text-end text-danger">Phạt quá hạn:</td>
+                        <td className="text-end text-danger fw-bold">
+                            + {Number(bill.penalty_amount).toLocaleString()} đ
+                        </td>
+                    </tr>
+                )}
+                
+                {/* Total Row */}
+                <tr className="table-primary">
+                    <td colSpan={3} className="text-end fw-bold fs-6 pt-3">TỔNG CỘNG:</td>
+                    <td className="text-end fw-bold text-primary fs-5 pt-3">
+                        {(Number(bill.total_amount) + Number(bill.penalty_amount || 0)).toLocaleString()} đ
+                    </td>
+                </tr>
+
+                {/* Paid Row */}
+                {Number(bill.paid_amount) > 0 && (
+                   <tr className="table-success">
+                      <td colSpan={3} className="text-end fw-bold text-success">Đã thanh toán:</td>
+                      <td className="text-end fw-bold text-success">
+                          - {Number(bill.paid_amount).toLocaleString()} đ
+                      </td>
+                   </tr>
+                )}
+            </tfoot>
+        </table>
+      </div>
+
+      {/* ACTION BUTTONS */}
+      <div className="action-buttons d-flex gap-2 mt-4 justify-content-end">
+        <button className="btn btn-secondary" onClick={() => navigate("/bills")}>
+          <Eye size={14} className="me-2"/> Quay lại
         </button>
 
         {status === "draft" && (
           <>
-            <button
-              className="btn edit"
-              onClick={() => navigate(`/bills/edit/${id}`)}
-            >
-              <Pencil size={14} /> Sửa
+            <button className="btn btn-warning text-white" onClick={() => navigate(`/bills/${id}/edit`)}>
+              <Pencil size={14} className="me-2"/> Sửa
             </button>
 
-            <button className="btn publish" onClick={onPublish}>
-              <Send size={14} /> Xuất bản
+            <button className="btn btn-primary" onClick={onPublish}>
+              <Send size={14} className="me-2"/> Xuất bản
             </button>
 
-            <button className="btn delete" onClick={onDelete}>
-              <Trash size={14} /> Xóa
+            <button className="btn btn-danger" onClick={onDelete}>
+              <Trash size={14} className="me-2"/> Xóa
             </button>
           </>
         )}

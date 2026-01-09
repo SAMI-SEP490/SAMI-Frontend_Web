@@ -1,55 +1,29 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { colors } from "../../constants/colors";
-import { ROUTES } from "../../constants/routes";
+import { Trash, Plus, ArrowLeft, Save, Pencil } from "react-bootstrap-icons";
 import { getBillById, updateDraftBill } from "../../services/api/bills";
-import { http } from "../../services/http";
 import { listUsers } from "../../services/api/users";
+import { http } from "../../services/http";
 
-/* ================== Helper ================== */
+/* ================== Helpers ================== */
 function parseDate(d) {
   if (!d) return "";
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return "";
   return dt.toISOString().slice(0, 10);
 }
-function extractRoomId(detail) {
-  return (
-    detail?.room_id ??
-    detail?.roomId ??
-    detail?.room?.room_id ??
-    detail?.room?.id ??
-    null
-  );
-}
-function extractPayerId(detail) {
-  return (
-    detail?.tenant_user_id ??
-    detail?.tenantUserId ??
-    detail?.tenant_id ??
-    detail?.tenantId ??
-    detail?.user_id ??
-    detail?.payer_id ??
-    null
-  );
-}
-function extractCreatorId(detail) {
-  return (
-    detail?.created_by_user_id ??
-    detail?.created_by ??
-    detail?.creator_id ??
-    detail?.staff_id ??
-    null
-  );
-}
-function extractUserId(u) {
-  return u?.id ?? u?.user_id ?? null;
-}
-function extractUserName(u) {
-  return u?.full_name ?? u?.name ?? u?.username ?? u?.email ?? null;
-}
+
 function getBillStatus(b) {
   return String(b?.status || b?.bill_status || "").toLowerCase();
+}
+
+function extractRoomLabel(bill) {
+  // Try flattened first, then nested contract
+  if (bill.room?.room_number) return bill.room.room_number;
+  const contract = bill.contract;
+  if (!contract) return "—";
+  const room = contract.room_current || contract.room_history;
+  return room?.room_number || "—";
 }
 
 /* ================== EDIT PAGE ================== */
@@ -59,24 +33,35 @@ export default function EditBillPage() {
   const location = useLocation();
 
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState("");
 
-  const [roomLabel, setRoomLabel] = useState("—");
-  const [payerName, setPayerName] = useState("—");
+  const [staticInfo, setStaticInfo] = useState({
+    roomLabel: "—",
+    payerName: "—",
+    creatorName: "—"
+  });
 
+  // Form Data
   const [form, setForm] = useState({
+    bill_type: "monthly_rent",
     billing_period_start: "",
     billing_period_end: "",
     due_date: "",
-    penalty_amount: 0,
-    total_amount: 0,
     description: "",
-    tenant_user_id: null,
-    created_by_user_id: null,
-    room_id: null,
+    penalty_amount: 0,
   });
 
-  /* ========== LOAD BILL ========== */
+  // Dynamic Service Charges
+  const [charges, setCharges] = useState([]);
+
+  // Auto-Calc Total
+  const totalAmount = useMemo(() => {
+    const servicesTotal = charges.reduce((sum, c) => sum + (Number(c.amount) * Number(c.quantity)), 0);
+    return servicesTotal + Number(form.penalty_amount || 0);
+  }, [charges, form.penalty_amount]);
+
+  /* ========== LOAD DATA ========== */
   useEffect(() => {
     let cancelled = false;
 
@@ -85,19 +70,13 @@ export default function EditBillPage() {
         setLoading(true);
         setErr("");
 
-        const rawId = id ?? location?.state?.billId;
-        const numId = Number(rawId);
-        if (!Number.isFinite(numId) || numId <= 0) {
-          setErr("Invalid Bill ID");
-          return;
-        }
+        const numId = Number(id);
+        if (!Number.isFinite(numId)) throw new Error("Invalid Bill ID");
 
-        const detailFromApi = await getBillById(numId);
-        const detail = { ...detailFromApi, ...(location?.state?.bill || {}) };
+        // 1. Get Bill
+        const detail = await getBillById(numId);
 
-        // ✅ chặn sửa nếu không còn draft
-        const st = getBillStatus(detail);
-        if (st !== "draft") {
+        if (getBillStatus(detail) !== "draft") {
           alert("Hóa đơn đã xuất bản thì không thể chỉnh sửa.");
           navigate(`/bills/${numId}`);
           return;
@@ -105,236 +84,255 @@ export default function EditBillPage() {
 
         if (cancelled) return;
 
-        const roomId = extractRoomId(detail);
-        if (roomId) {
-          try {
-            const res = await http.get(`/room/${roomId}`);
-            const rd = res?.data?.data ?? res?.data ?? {};
-            const label =
-              rd?.room_number ?? rd?.name ?? rd?.number ?? `Phòng ${roomId}`;
-            setRoomLabel(label);
-          } catch {
-            setRoomLabel(`Phòng ${roomId}`);
-          }
-        }
+        // 2. Prepare Static Info
+        const roomLbl = extractRoomLabel(detail);
+        const payerNm = detail.tenant?.user?.full_name || `User #${detail.tenant_user_id}`;
+        const creatorNm = detail.creator?.full_name || "System";
 
-        // users map
-        let userMap = new Map();
-        try {
-          const res = await listUsers();
-          const arr = Array.isArray(res) ? res : res?.items ?? [];
-          arr.forEach((u) => {
-            const uid = extractUserId(u);
-            const nm = extractUserName(u);
-            if (uid && nm) userMap.set(Number(uid), nm);
-          });
-          // eslint-disable-next-line no-empty
-        } catch {}
+        setStaticInfo({ roomLabel: roomLbl, payerName: payerNm, creatorName: creatorNm });
 
-        const payerId = extractPayerId(detail);
-        payerId &&
-          setPayerName(userMap.get(Number(payerId)) || `User #${payerId}`);
-
-        const creatorId = extractCreatorId(detail);
-
+        // 3. Populate Form
         setForm({
+          bill_type: detail.bill_type || "monthly_rent",
           billing_period_start: parseDate(detail.billing_period_start),
           billing_period_end: parseDate(detail.billing_period_end),
           due_date: parseDate(detail.due_date),
-          penalty_amount: detail.penalty_amount ?? 0,
-          total_amount: detail.total_amount ?? 0,
-          description: detail.description ?? "",
-          tenant_user_id: payerId ?? null,
-          created_by_user_id: creatorId ?? null,
-          room_id: roomId ?? null,
+          description: detail.description || "",
+          penalty_amount: detail.penalty_amount || 0,
         });
+
+        // 4. Populate Charges
+        if (detail.service_charges && detail.service_charges.length > 0) {
+          setCharges(detail.service_charges.map(c => ({
+            service_type: c.service_type,
+            quantity: c.quantity,
+            amount: c.amount, // Note: Schema calls it 'amount' (total for line) or unit_price? 
+            // BE usually stores 'amount' as final line total. 
+            // Let's assume UI edits 'amount' as Unit Price or Final Amount depending on logic.
+            // For simplicity: We edit 'amount' as UNIT PRICE here, or assume quantity=1.
+            // Actually, standard is: Unit Price * Quantity = Amount.
+            // Let's check API payload builder. It sends: quantity, unit_price, amount.
+            // Let's load 'unit_price' if available, else amount.
+            unit_price: c.unit_price || c.amount,
+            description: c.description || ""
+          })));
+        } else {
+          // Default if empty
+          setCharges([{ service_type: "Tiền thuê", quantity: 1, amount: detail.total_amount || 0, unit_price: detail.total_amount || 0 }]);
+        }
+
       } catch (e) {
-        if (!cancelled) setErr(e?.message || "Không thể tải dữ liệu");
+        if (!cancelled) setErr(e.message || "Lỗi tải dữ liệu");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [id, location?.state, navigate]);
+    return () => { cancelled = true; };
+  }, [id, navigate]);
 
-  /* ========== HANDLE INPUT ========== */
-  const onChange = (e) => {
+  /* ========== HANDLERS ========== */
+  const onFormChange = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({
-      ...f,
-      [name]: value,
-    }));
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  /* ========== SUBMIT ========== */
-  async function onSubmit() {
-    try {
-      setLoading(true);
-      const numId = Number(id);
-      await updateDraftBill(numId, form);
+  const updateCharge = (index, field, value) => {
+    const newCharges = [...charges];
+    newCharges[index][field] = value;
 
-      alert("Cập nhật nháp thành công!");
+    // Sync amount if unit_price changes
+    if (field === 'unit_price' || field === 'quantity') {
+      const q = Number(field === 'quantity' ? value : newCharges[index].quantity);
+      const p = Number(field === 'unit_price' ? value : newCharges[index].unit_price);
+      newCharges[index].amount = q * p;
+    }
+    setCharges(newCharges);
+  };
+
+  const addCharge = () => {
+    setCharges([...charges, { service_type: "", quantity: 1, unit_price: 0, amount: 0, description: "" }]);
+  };
+
+  const removeCharge = (index) => {
+    setCharges(charges.filter((_, i) => i !== index));
+  };
+
+  const onSubmit = async () => {
+    try {
+      setSubmitting(true);
+
+      const payload = {
+        ...form,
+        total_amount: totalAmount,
+        service_charges: charges.map(c => ({
+          service_type: c.service_type,
+          quantity: Number(c.quantity),
+          unit_price: Number(c.unit_price),
+          amount: Number(c.quantity) * Number(c.unit_price), // Recalculate to be safe
+          description: c.description
+        }))
+      };
+
+      await updateDraftBill(id, payload);
+      alert("Cập nhật thành công!");
       navigate("/bills");
     } catch (e) {
-      alert(e?.message || "Lỗi cập nhật");
+      alert(e.message || "Lỗi cập nhật");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
-  }
+  };
 
-  if (loading) return <div style={{ padding: 24 }}>Đang tải…</div>;
-  if (err)
-    return (
-      <div style={{ padding: 24 }}>
-        <div className="alert alert-danger">{err}</div>
-        <button className="btn btn-secondary" onClick={() => navigate(-1)}>
-          Quay lại
-        </button>
-      </div>
-    );
+  if (loading) return <div className="p-5 text-center">Đang tải dữ liệu...</div>;
+  if (err) return <div className="alert alert-danger m-4">{err}</div>;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: colors.background,
-        padding: 24,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-      }}
-    >
-      <div style={cardWrap}>
-        <div style={cardHeader}>
-          <div style={{ fontWeight: 800 }}>Chỉnh sửa hóa đơn (Nháp)</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              className="btn btn-light"
-              onClick={() => navigate(ROUTES.bills)}
-            >
-              Đóng
-            </button>
-            <button className="btn btn-primary" onClick={onSubmit}>
-              Lưu thay đổi
-            </button>
+    <div className="container py-4" style={{ maxWidth: '900px' }}>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h3><Pencil className="me-2" /> Chỉnh Sửa Hóa Đơn (Nháp)</h3>
+        <button className="btn btn-outline-secondary" onClick={() => navigate('/bills')}>
+          <ArrowLeft className="me-2" /> Quay lại
+        </button>
+      </div>
+
+      <div className="card shadow-sm p-4 mb-4">
+        {/* STATIC INFO */}
+        <div className="row mb-4 p-3 bg-light rounded">
+          <div className="col-md-4">
+            <small className="text-muted">Phòng</small>
+            <div className="fw-bold">{staticInfo.roomLabel}</div>
+          </div>
+          <div className="col-md-4">
+            <small className="text-muted">Người thanh toán</small>
+            <div className="fw-bold">{staticInfo.payerName}</div>
+          </div>
+          <div className="col-md-4">
+            <small className="text-muted">Người tạo</small>
+            <div className="fw-bold">{staticInfo.creatorName}</div>
           </div>
         </div>
 
-        <div style={cardBody}>
-          <div style={row}>
-            <div style={cellLeft}>Phòng:</div>
-            <div style={cellRight}>{roomLabel}</div>
-
-            <div style={cellLeft}>Người thanh toán:</div>
-            <div style={cellRight}>{payerName}</div>
+        {/* FORM FIELDS */}
+        <div className="row g-3 mb-4">
+          <div className="col-md-3">
+            <label className="form-label fw-bold">Loại hóa đơn</label>
+            <select className="form-select" name="bill_type" value={form.bill_type} onChange={onFormChange}>
+              <option value="monthly_rent">Tiền phòng</option>
+              <option value="utilities">Điện nước</option>
+              <option value="other">Khác</option>
+            </select>
           </div>
-
-          <div style={row}>
-            <div style={cellLeft}>Bắt đầu kỳ:</div>
-            <input
-              type="date"
-              name="billing_period_start"
-              value={form.billing_period_start}
-              onChange={onChange}
-              style={inputBox}
-            />
-
-            <div style={cellLeft}>Kết thúc kỳ:</div>
-            <input
-              type="date"
-              name="billing_period_end"
-              value={form.billing_period_end}
-              onChange={onChange}
-              style={inputBox}
-            />
+          <div className="col-md-3">
+            <label className="form-label fw-bold">Từ ngày</label>
+            <input type="date" className="form-control" name="billing_period_start" value={form.billing_period_start} onChange={onFormChange} />
           </div>
-
-          <div style={row}>
-            <div style={cellLeft}>Hạn thanh toán:</div>
-            <input
-              type="date"
-              name="due_date"
-              value={form.due_date}
-              onChange={onChange}
-              style={inputBox}
-            />
-            <div />
-            <div />
+          <div className="col-md-3">
+            <label className="form-label fw-bold">Đến ngày</label>
+            <input type="date" className="form-control" name="billing_period_end" value={form.billing_period_end} onChange={onFormChange} />
           </div>
-
-          <div style={row}>
-            <div style={cellLeft}>Tiền phạt:</div>
-            <input
-              type="number"
-              name="penalty_amount"
-              value={form.penalty_amount}
-              onChange={onChange}
-              style={inputBox}
-            />
-
-            <div style={cellLeft}>Tổng tiền:</div>
-            <input
-              type="number"
-              name="total_amount"
-              value={form.total_amount}
-              onChange={onChange}
-              style={inputBox}
-            />
+          <div className="col-md-3">
+            <label className="form-label fw-bold">Hạn thanh toán</label>
+            <input type="date" className="form-control" name="due_date" value={form.due_date} onChange={onFormChange} />
           </div>
-
-          <div>
-            <div style={{ color: "#475569", marginBottom: 6 }}>Mô tả</div>
-            <textarea
-              name="description"
-              value={form.description}
-              onChange={onChange}
-              style={{
-                width: "100%",
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #E5E7EB",
-                height: 140,
-                resize: "vertical",
-              }}
-            />
+          <div className="col-12">
+            <label className="form-label fw-bold">Mô tả / Ghi chú</label>
+            <textarea className="form-control" rows="2" name="description" value={form.description} onChange={onFormChange} />
           </div>
         </div>
+
+        {/* SERVICE CHARGES */}
+        <div className="mb-3">
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <label className="form-label fw-bold mb-0">Chi tiết phí</label>
+            <button className="btn btn-sm btn-outline-primary" onClick={addCharge}>
+              <Plus size={18} /> Thêm dòng
+            </button>
+          </div>
+          <table className="table table-bordered align-middle">
+            <thead className="table-light">
+              <tr>
+                <th style={{ width: '35%' }}>Tên phí</th>
+                <th style={{ width: '15%' }}>Số lượng</th>
+                <th style={{ width: '20%' }}>Đơn giá</th>
+                <th style={{ width: '20%' }}>Thành tiền</th>
+                <th style={{ width: '10%' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {charges.map((c, i) => (
+                <tr key={i}>
+                  <td>
+                    <input className="form-control form-control-sm mb-1"
+                      value={c.service_type}
+                      onChange={e => updateCharge(i, 'service_type', e.target.value)}
+                      placeholder="VD: Điện"
+                    />
+                    <input className="form-control form-control-sm text-muted fst-italic"
+                      value={c.description}
+                      onChange={e => updateCharge(i, 'description', e.target.value)}
+                      placeholder="Ghi chú (tùy chọn)"
+                    />
+                  </td>
+                  <td>
+                    <input type="number" className="form-control form-control-sm"
+                      value={c.quantity}
+                      onChange={e => updateCharge(i, 'quantity', e.target.value)}
+                      min="0"
+                    />
+                  </td>
+                  <td>
+                    <input type="number" className="form-control form-control-sm"
+                      value={c.unit_price}
+                      onChange={e => updateCharge(i, 'unit_price', e.target.value)}
+                      min="0"
+                    />
+                  </td>
+                  <td className="text-end">
+                    {(Number(c.quantity) * Number(c.unit_price)).toLocaleString()}
+                  </td>
+                  <td className="text-center">
+                    <button className="btn btn-sm text-danger" onClick={() => removeCharge(i)}>
+                      <Trash />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* TOTALS */}
+        <div className="row justify-content-end">
+          <div className="col-md-5">
+            <div className="d-flex justify-content-between mb-2 align-items-center">
+              <span>Phạt quá hạn:</span>
+              <div style={{ width: '120px' }}>
+                <input type="number" className="form-control form-control-sm text-end"
+                  name="penalty_amount"
+                  value={form.penalty_amount}
+                  onChange={onFormChange}
+                />
+              </div>
+            </div>
+            <div className="d-flex justify-content-between border-top pt-2">
+              <span className="fw-bold fs-5">TỔNG CỘNG:</span>
+              <span className="fw-bold fs-5 text-primary">{totalAmount.toLocaleString()} đ</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ACTIONS */}
+      <div className="d-flex justify-content-end gap-3">
+        <button className="btn btn-secondary px-4" onClick={() => navigate('/bills')}>
+          Hủy bỏ
+        </button>
+        <button className="btn btn-primary px-4" onClick={onSubmit} disabled={submitting}>
+          <Save className="me-2" /> {submitting ? "Đang lưu..." : "Lưu thay đổi"}
+        </button>
       </div>
     </div>
   );
 }
-
-/* ================== STYLES ================== */
-const cardWrap = {
-  width: 860,
-  background: "#fff",
-  borderRadius: 16,
-  boxShadow: "0 6px 18px rgba(0,0,0,.08)",
-};
-const cardHeader = {
-  padding: "16px 18px",
-  borderBottom: "1px solid #EEF2F7",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-};
-const cardBody = { padding: 24, display: "grid", gap: 20 };
-const row = {
-  display: "grid",
-  gridTemplateColumns: "160px 1fr 160px 1fr",
-  gap: 10,
-  alignItems: "center",
-};
-const cellLeft = { color: "#475569", textAlign: "right" };
-const cellRight = { color: "#0F172A", fontWeight: 700 };
-const inputBox = {
-  width: "100%",
-  borderRadius: 8,
-  padding: "8px 10px",
-  border: "1px solid #CBD5E1",
-  fontWeight: 600,
-};

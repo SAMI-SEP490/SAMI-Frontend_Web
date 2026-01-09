@@ -265,6 +265,13 @@ function RoomListPage() {
     }
   };
 
+  const handleResetFilters = () => {
+    setStatusFilter("");
+    setBuildingFilter("");
+    setFloorFilter("");
+    setSearchTerm("");
+  };
+
   // ===== FILTER =====
   const filteredRooms = rooms.filter((room) => {
     const matchesStatus = statusFilter

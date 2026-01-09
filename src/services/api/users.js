@@ -91,33 +91,16 @@ export async function registerUser({
  *  CHANGE TO TENANT (POST /user/change-to-tenant)
  *  Cho phép truyền cả roomId, idNumber, emergencyContactPhone, note...
  * ========================= */
-export async function changeToTenant({ userId, idNumber, note }) {
+export async function changeToTenant({ userId, buildingId, idNumber, note }) {
   const res = await http.post("/user/change-to-tenant", {
     userId: Number(userId),
+    buildingId: Number(buildingId),
     idNumber,
     note: note || undefined,
   });
   return unwrap(res);
 }
-export async function assignTenantToRoom({
-  tenantUserId,
-  roomId,
-  movedInAt,
-  tenantType = "PRIMARY",
-  note,
-}) {
-  const res = await http.post("/room-tenants/assign", {
-    tenantUserId: Number(tenantUserId),
-    roomId: Number(roomId),
-    movedInAt: movedInAt
-      ? new Date(movedInAt).toISOString()
-      : new Date().toISOString(),
-    tenantType,
-    note,
-  });
 
-  return unwrap(res);
-}
 /** =========================
  *  REGISTER TENANT QUICK
  *  (gộp register user -> change-to-tenant)
@@ -137,19 +120,10 @@ export async function registerTenantQuick(form) {
   // Tạo TENANT
   await changeToTenant({
     userId,
+    buildingId: form.buildingId,
     idNumber: form.idNumber,
     note: form.note || undefined,
   });
-
-  // Gán phòng
-  if (form.roomId) {
-    await assignTenantToRoom({
-      tenantUserId: userId,
-      roomId: form.roomId,
-      movedInAt: form.startDate,
-    });
-  }
-
   return userId;
 }
 

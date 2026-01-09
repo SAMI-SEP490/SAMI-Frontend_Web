@@ -25,6 +25,8 @@ const normalizeUser = (u) => {
     email: pick(u?.email, ""),
     role: pick(u?.role, ""),
     status: pick(u?.status, "active"),
+    building_id: u?.building_id ?? null,
+    building_name: u?.building_name ?? null,
   };
 };
 
@@ -38,19 +40,17 @@ const [buildingFilter, setBuildingFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
 
   /* ================= Fetch ================= */
-  useEffect(() => {
+useEffect(() => {
   (async () => {
     try {
       setLoading(true);
-      const data = await listUsers({
-        building_id: buildingFilter || undefined,
-      });
+      const data = await listUsers();
       setUsers((Array.isArray(data) ? data : []).map(normalizeUser));
     } finally {
       setLoading(false);
     }
   })();
-}, [buildingFilter]);
+}, []);
 useEffect(() => {
   (async () => {
     const data = await listBuildings();
@@ -82,22 +82,37 @@ useEffect(() => {
   };
 
   /* ================= Filter ================= */
-  const filteredUsers = useMemo(() => {
-    return users
-      .filter((u) => String(u?.role).toLowerCase() !== "owner")
-      .filter((u) => {
-        if (!search) return true;
-        const s = search.toLowerCase();
-        return (
-          u.full_name.toLowerCase().includes(s) ||
-          u.email.toLowerCase().includes(s)
-        );
-      })
-      .filter((u) => {
-        if (!roleFilter) return true;
-        return String(u.role).toLowerCase() === roleFilter;
-      });
-  }, [users, search, roleFilter]);
+const filteredUsers = useMemo(() => {
+  return users
+    // Không hiển thị OWNER
+    .filter((u) => String(u?.role).toLowerCase() !== "owner")
+
+    // Search
+    .filter((u) => {
+      if (!search) return true;
+      const s = search.toLowerCase();
+      return (
+        u.full_name.toLowerCase().includes(s) ||
+        u.email.toLowerCase().includes(s)
+      );
+    })
+
+    // Role
+    .filter((u) => {
+      if (!roleFilter) return true;
+      return String(u.role).toLowerCase() === roleFilter;
+    })
+
+    // Building (NEW)
+    .filter((u) => {
+      if (!buildingFilter) return true;
+
+      // USER không có building → vẫn hiển thị
+      if (!u.building_id) return true;
+
+      return String(u.building_id) === String(buildingFilter);
+    });
+}, [users, search, roleFilter, buildingFilter]);
 
   /* ================= Actions ================= */
   const handleDelete = async (id) => {

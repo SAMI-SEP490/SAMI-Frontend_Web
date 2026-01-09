@@ -15,6 +15,7 @@ import {
   deleteFloorPlan,
   getNextFloorNumber,
 } from "../../services/api/floorplan";
+import { getUserRole } from "../../utils/auth";
 
 /* ===== Simple SVG building (no handles) ===== */
 const pathFromPoints = (pts) =>
@@ -29,6 +30,8 @@ const bboxOf = (pts = []) => {
   const maxY = Math.max(...ys);
   return { w: maxX - minX, h: maxY - minY };
 };
+const role = getUserRole();
+const isOwner = role === "OWNER";
 
 function BuildingNodeView({ data }) {
   const {
@@ -421,56 +424,60 @@ function ViewerInner() {
 
             {/* ====== ACTION BUTTONS ====== */}
             <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={gotoCreate}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  background: "#10b981",
-                  color: "#fff",
-                  fontWeight: 700,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-                title={`Tạo tầng ${maxFloor + 1}`}
-              >
-                Tạo mới
-              </button>
+              {isOwner && (
+                <>
+                  <button
+                    onClick={gotoCreate}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      background: "#10b981",
+                      color: "#fff",
+                      fontWeight: 700,
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    title={`Tạo tầng ${maxFloor + 1}`}
+                  >
+                    Tạo mới
+                  </button>
 
-              <button
-                onClick={gotoEdit}
-                disabled={!hasPlan}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  background: hasPlan ? "#0ea5e9" : "#94a3b8",
-                  color: "#fff",
-                  fontWeight: 700,
-                  border: "none",
-                  cursor: hasPlan ? "pointer" : "not-allowed",
-                }}
-                title="Chỉnh sửa tầng đã có"
-              >
-                Chỉnh sửa
-              </button>
+                  <button
+                    onClick={gotoEdit}
+                    disabled={!hasPlan}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      background: hasPlan ? "#0ea5e9" : "#94a3b8",
+                      color: "#fff",
+                      fontWeight: 700,
+                      border: "none",
+                      cursor: hasPlan ? "pointer" : "not-allowed",
+                    }}
+                    title="Chỉnh sửa tầng đã có"
+                  >
+                    Chỉnh sửa
+                  </button>
 
-              {/* ====== ✅ NÚT XÓA TẦNG CAO NHẤT ====== */}
-              {canDeleteFloor && (
-                <button
-                  onClick={handleDeleteFloor}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    background: "#ef4444",
-                    color: "#fff",
-                    fontWeight: 700,
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                  title="Chỉ được xóa tầng cao nhất"
-                >
-                  Xóa tầng
-                </button>
+                  {/* ====== ✅ NÚT XÓA TẦNG CAO NHẤT ====== */}
+                  {canDeleteFloor && (
+                    <button
+                      onClick={handleDeleteFloor}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        background: "#ef4444",
+                        color: "#fff",
+                        fontWeight: 700,
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      title="Chỉ được xóa tầng cao nhất"
+                    >
+                      Xóa tầng
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

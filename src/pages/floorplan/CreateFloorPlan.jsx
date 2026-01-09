@@ -19,6 +19,7 @@ import {
   createFloorPlan,
   getNextFloorNumber,
 } from "../../services/api/floorplan";
+import { getUserRole } from "../../utils/auth";
 
 const API_BASE = "/api/floor-plan";
 
@@ -487,6 +488,13 @@ function FloorplanEditor() {
       }
     }
   }, [floorOptions, activeFloor]);
+
+  useEffect(() => {
+  const role = getUserRole();
+  if (role === "MANAGER") {
+    navigate("/floorplan/view");
+  }
+}, [navigate]);
 
   useEffect(() => {
     if (!activeBuilding) return;

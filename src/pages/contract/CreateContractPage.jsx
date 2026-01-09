@@ -4,11 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { createContract, processContractWithAI } from "../../services/api/contracts";
 import { listBuildings, listAssignedBuildings } from "@/services/api/building.js";
 import { getEmptyRoomsByBuildingId } from "@/services/api/rooms.js";
-import { getTenantsByRoomId } from "@/services/api/tenants.js";
-import { Button, Spinner, Alert, Modal, Row, Col } from "react-bootstrap";
+// [UPDATE] Import lookupTenant
+import { lookupTenant } from "@/services/api/tenants.js";
+import { Button, Spinner, Alert, Modal, Row, Col, Card, Image } from "react-bootstrap";
 import {
     Building, Person, CashCoin, CalendarDate, FileEarmarkText,
-    Magic, XLg, CheckCircleFill, FileEarmarkPdf, FileEarmarkImage
+    Magic, XLg, CheckCircleFill, FileEarmarkPdf, FileEarmarkImage,
+    Search, Telephone, CardText, PersonBadge, ArrowLeft
 } from "react-bootstrap-icons";
 import { getAccessToken } from "@/services/http.js";
 import "./CreateContractPage.css";
@@ -32,25 +34,31 @@ function CreateContractPage() {
     // Data Selects
     const [buildings, setBuildings] = useState([]);
     const [rooms, setRooms] = useState([]);
-    const [tenants, setTenants] = useState([]);
+    // [UPDATE] Bỏ state tenants list, thêm state cho search
     const [assignedBuilding, setAssignedBuilding] = useState(null);
+
+    // [NEW] Tenant Search States
+    const [searchQuery, setSearchQuery] = useState("");
+    const [foundTenant, setFoundTenant] = useState(null);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchError, setSearchError] = useState("");
 
     // Form State
     const [form, setForm] = useState({
         building_id: "",
         room_number: "",
         room_id: "",
-        tenant_user_id: "",
+        tenant_user_id: "", // Sẽ được set khi tìm thấy tenant
         start_date: new Date().toISOString().split('T')[0],
         duration_months: 12,
         end_date: "",
         rent_amount: "",
         deposit_amount: "",
-        penalty_rate: 0.1, // Default hợp lệ (0.01 - 1)
+        penalty_rate: 0.1,
         payment_cycle_months: 1,
         status: "pending",
         note: "",
-        files: [] // Đổi từ 'file' sang 'files' (array)
+        files: []
     });
 
     // --- EFFECT: Calculate End Date automatically ---
@@ -110,9 +118,9 @@ function CreateContractPage() {
     // --- HANDLERS ---
     const handleBuildingChange = async (e) => {
         const bId = e.target.value;
-        setForm(prev => ({ ...prev, building_id: bId, room_number: "", room_id: "", tenant_user_id: "" }));
+        // Reset room & tenant form data only (keep found tenant UI if desired, or reset it too)
+        setForm(prev => ({ ...prev, building_id: bId, room_number: "", room_id: "" }));
         setRooms([]);
-        setTenants([]);
         if (bId) {
             try {
                 const res = await getEmptyRoomsByBuildingId(bId);
@@ -128,35 +136,54 @@ function CreateContractPage() {
             ...prev,
             room_id: rId,
             room_number: selectedRoom ? selectedRoom.room_number : "",
-            tenant_user_id: ""
         }));
-        setTenants([]);
-        if (rId) {
-            try {
-                const res = await getTenantsByRoomId(rId);
-                setTenants(Array.isArray(res) ? res : []);
-            } catch (err) { console.error(err); }
+        // [UPDATE] Không gọi getTenantsByRoomId nữa
+    };
+
+    // [NEW] Handler tìm kiếm Tenant
+    const handleSearchTenant = async () => {
+        if (!searchQuery.trim()) return;
+
+        setSearchLoading(true);
+        setSearchError("");
+        setFoundTenant(null);
+        setForm(prev => ({...prev, tenant_user_id: ""}));
+
+        try {
+            const tenant = await lookupTenant(searchQuery);
+            if (tenant) {
+                setFoundTenant(tenant);
+                setForm(prev => ({...prev, tenant_user_id: tenant.user_id}));
+            } else {
+                setSearchError("Không tìm thấy khách thuê này.");
+            }
+        } catch (err) {
+            // Check 404
+            if (err.response && err.response.status === 404) {
+                setSearchError("Không tìm thấy dữ liệu (404).");
+            } else {
+                setSearchError("Lỗi hệ thống khi tìm kiếm.");
+            }
+        } finally {
+            setSearchLoading(false);
         }
+    };
+
+    const handleClearTenant = () => {
+        setFoundTenant(null);
+        setSearchQuery("");
+        setForm(prev => ({...prev, tenant_user_id: ""}));
     };
 
     const handleFileChange = (e) => {
         const selectedFiles = Array.from(e.target.files || []);
         if (selectedFiles.length === 0) return;
-
-        // Logic check loại file
         const hasPDF = selectedFiles.some(f => f.type === "application/pdf");
-
-        if (hasPDF) {
-            // Nếu có PDF, chỉ được phép chọn 1 file
-            if (selectedFiles.length > 1) {
-                alert("Nếu chọn PDF, bạn chỉ được phép tải lên 1 file duy nhất.");
-                // Reset input
-                e.target.value = "";
-                return;
-            }
+        if (hasPDF && selectedFiles.length > 1) {
+            alert("Nếu chọn PDF, bạn chỉ được phép tải lên 1 file duy nhất.");
+            e.target.value = "";
+            return;
         }
-        // Nếu toàn là ảnh thì cho phép nhiều (không cần check else vì input accept đã filter)
-
         setForm(prev => ({ ...prev, files: selectedFiles }));
     };
 
@@ -165,7 +192,7 @@ function CreateContractPage() {
         setForm(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- AI HANDLER (Import only support Single PDF usually) ---
+    // --- AI HANDLER ---
     const handleAiImportFile = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -194,7 +221,22 @@ function CreateContractPage() {
             const roomId = contract_data?.room_id;
 
             if (buildingId) await getEmptyRoomsByBuildingId(buildingId).then(r => setRooms(Array.isArray(r) ? r : r.data || [])).catch(()=>{});
-            if (roomId) await getTenantsByRoomId(roomId).then(t => setTenants(Array.isArray(t) ? t : [])).catch(()=>{});
+
+            // [UPDATE] Logic xử lý Tenant từ AI
+            if (tenant_info) {
+                // Nếu AI trả về thông tin tenant, ta set luôn vào state tìm thấy
+                // Để hiện thẻ thông tin luôn
+                setFoundTenant({
+                    user_id: tenant_info.user_id,
+                    full_name: tenant_info.full_name,
+                    phone: tenant_info.phone,
+                    id_number: tenant_info.id_number,
+                    email: tenant_info.email,
+                    avatar_url: tenant_info.avatar_url || null
+                });
+                // Điền SĐT vào ô search để đẹp UI
+                setSearchQuery(tenant_info.phone || tenant_info.id_number || "");
+            }
 
             setForm(prev => ({
                 ...prev,
@@ -205,10 +247,10 @@ function CreateContractPage() {
                 duration_months: contract_data?.duration_months || 12,
                 rent_amount: contract_data?.rent_amount || "",
                 deposit_amount: contract_data?.deposit_amount || "",
-                penalty_rate: contract_data?.penalty_rate || 0.1, // Default valid
+                penalty_rate: contract_data?.penalty_rate || 0.1,
                 payment_cycle_months: contract_data?.payment_cycle_months || 1,
                 note: contract_data?.note || "",
-                files: [file] // AI import overrides files with the imported PDF
+                files: [file]
             }));
 
             setAiMessage({ type: 'success', text: "Đã trích xuất dữ liệu thành công!" });
@@ -236,35 +278,25 @@ function CreateContractPage() {
         e.preventDefault();
         setSubmitting(true);
         try {
-            // Validation Manual
-            if (!form.room_id || !form.tenant_user_id) throw new Error("Vui lòng chọn phòng và khách thuê.");
+            if (!form.room_id || !form.tenant_user_id) throw new Error("Vui lòng chọn phòng và xác nhận khách thuê.");
 
             const rate = parseFloat(form.penalty_rate);
             if (isNaN(rate) || rate < 0.01 || rate > 1) {
                 throw new Error("Tỷ lệ phạt phải từ 0.01% đến 1%.");
             }
 
-            // Create Contract with FormData to handle multiple files
-            // Note: API wrapper function 'createContract' needs to handle FormData correctly
-            // If you use JSON normally, you need to change to FormData here.
-
-            // Assuming createContract in api/contracts handles FormData conversion
-            // OR we construct FormData here and pass it.
-            // Let's assume we pass the raw object and the API utility handles it,
-            // BUT usually for files we need manual FormData construction.
-
             const formData = new FormData();
             Object.keys(form).forEach(key => {
                 if (key === 'files') {
                     form.files.forEach(file => {
-                        formData.append('contract_file', file); // Use same key 'contract_file' multiple times
+                        formData.append('contract_file', file);
                     });
                 } else {
                     formData.append(key, form[key]);
                 }
             });
 
-            await createContract(formData); // Passing FormData
+            await createContract(formData);
             alert("Tạo hợp đồng thành công!");
             navigate("/contracts");
         } catch (error) {
@@ -280,6 +312,9 @@ function CreateContractPage() {
             {/* HEADER */}
             <div className="page-header">
                 <div>
+                    <Button variant="light" className="border shadow-sm" onClick={() => navigate(-1)}>
+                        <ArrowLeft />
+                    </Button>
                     <h2>Tạo hợp đồng mới</h2>
                     <p>Thiết lập thông tin hợp đồng thuê phòng cho khách hàng.</p>
                 </div>
@@ -322,12 +357,70 @@ function CreateContractPage() {
                                     {rooms.map(r => <option key={r.room_id} value={r.room_id}>Phòng {r.room_number}</option>)}
                                 </select>
                             </Col>
+
+                            {/* [UPDATE] CỘT CHỌN KHÁCH THUÊ MỚI */}
                             <Col md={4}>
                                 <label className="form-label">Khách thuê <span className="required">*</span></label>
-                                <select name="tenant_user_id" className="form-select" value={form.tenant_user_id} onChange={handleChange} required disabled={!form.room_id}>
-                                    <option value="">-- Chọn khách --</option>
-                                    {tenants.map(t => <option key={t.user_id} value={t.user_id}>{t.full_name} ({t.phone})</option>)}
-                                </select>
+
+                                {/* 1. Ô Input tìm kiếm */}
+                                <div className="input-group mb-2">
+                                    <input
+                                        type="text"
+                                        className={`form-control ${searchError ? 'is-invalid' : ''}`}
+                                        placeholder="Nhập SĐT hoặc CCCD..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearchTenant())}
+                                        disabled={!!foundTenant} // Disable khi đã tìm thấy
+                                    />
+                                    {foundTenant ? (
+                                        <Button variant="outline-danger" onClick={handleClearTenant}>
+                                            <XLg /> Bỏ chọn
+                                        </Button>
+                                    ) : (
+                                        <Button variant="outline-primary" onClick={handleSearchTenant} disabled={searchLoading}>
+                                            {searchLoading ? <Spinner size="sm"/> : <Search />} Tìm
+                                        </Button>
+                                    )}
+                                </div>
+                                {searchError && <div className="text-danger small mb-2">{searchError}</div>}
+
+                                {/* 2. THẺ THÔNG TIN (USER CARD) */}
+                                {foundTenant && (
+                                    <Card className="tenant-info-card border-success">
+                                        <Card.Body className="p-2">
+                                            <div className="d-flex align-items-center gap-3">
+                                                {/* Avatar */}
+                                                <div className="avatar-placeholder">
+                                                    {foundTenant.avatar_url ? (
+                                                        <Image src={foundTenant.avatar_url} roundedCircle style={{width:40, height:40, objectFit:'cover'}} />
+                                                    ) : (
+                                                        <span className="fw-bold">{foundTenant.full_name?.charAt(0).toUpperCase()}</span>
+                                                    )}
+                                                </div>
+
+                                                {/* Info Text */}
+                                                <div className="flex-grow-1 overflow-hidden">
+                                                    <div className="fw-bold text-success text-truncate">{foundTenant.full_name}</div>
+                                                    <div className="small text-muted d-flex align-items-center gap-1">
+                                                        <Telephone size={10}/> {foundTenant.phone}
+                                                    </div>
+                                                    <div className="small text-muted d-flex align-items-center gap-1">
+                                                        <PersonBadge size={10}/> {foundTenant.id_number || "Chưa có CCCD"}
+                                                    </div>
+                                                </div>
+
+                                                {/* Icon Check */}
+                                                <div className="text-success fs-4 me-1">
+                                                    <CheckCircleFill />
+                                                </div>
+                                            </div>
+                                        </Card.Body>
+                                    </Card>
+                                )}
+
+                                {/* Hidden Input để đảm bảo validate HTML hoạt động (nếu cần) */}
+                                <input type="hidden" name="tenant_user_id" value={form.tenant_user_id} required />
                             </Col>
                         </Row>
 
@@ -403,11 +496,9 @@ function CreateContractPage() {
                             <Col md={6}>
                                 <label className="form-label">File Hợp đồng (PDF / Nhiều ảnh)</label>
                                 <div className="file-upload-area" onClick={() => document.getElementById('manual-file').click()} style={{cursor:'pointer'}}>
-                                    {/* Enable multiple files */}
                                     <input id="manual-file" type="file" name="file" accept=".pdf,image/*" multiple hidden onChange={handleFileChange} />
                                     <div className="text-muted">Nhấn để tải file (1 PDF hoặc nhiều Ảnh)</div>
 
-                                    {/* Display selected files */}
                                     {form.files && form.files.length > 0 && (
                                         <div className="mt-2 text-start d-inline-block">
                                             {form.files.map((f, idx) => (
@@ -440,8 +531,9 @@ function CreateContractPage() {
                 </div>
             )}
 
-            {/* SCANNER MODAL */}
+            {/* SCANNER MODAL (Giữ nguyên) */}
             <Modal show={showScanner} centered size="lg" backdrop="static" className="scanner-modal">
+                {/* ... (Giữ nguyên nội dung modal) */}
                 <Modal.Body className="scanner-body">
                     <button className="scanner-close-btn" onClick={handleCancelScan}><XLg/></button>
                     <div className="scanner-container">

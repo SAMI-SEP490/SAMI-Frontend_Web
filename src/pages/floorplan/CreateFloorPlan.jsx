@@ -86,6 +86,53 @@ const scalePointsToBox = (pts, newW, newH) => {
   }));
 };
 
+/* ---------- validate geometry (room inside building + no overlap) ---------- */
+const pointInPolygon = (point, polygon) => {
+  const { x, y } = point;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x,
+      yi = polygon[i].y;
+    const xj = polygon[j].x,
+      yj = polygon[j].y;
+
+    const intersect =
+      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi + 0.0) + xi;
+
+    if (intersect) inside = !inside;
+  }
+  return inside;
+};
+
+const rectsOverlap = (a, b) =>
+  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+const getBuildingPolygonFromNodes = (nodes) => {
+  const building = (nodes || []).find(
+    (n) => n?.type === "building" && Array.isArray(n?.data?.points)
+  );
+  if (!building) return null;
+  const bx = Number(building?.position?.x || 0);
+  const by = Number(building?.position?.y || 0);
+  const poly = building.data.points.map((p) => ({
+    x: bx + Number(p.x || 0),
+    y: by + Number(p.y || 0),
+  }));
+  return poly.length >= 3 ? poly : null;
+};
+
+const getRoomRectsFromNodes = (nodes) =>
+  (nodes || [])
+    .filter((n) => n?.type === "block" && n?.data?.icon === "room")
+    .map((n) => ({
+      id: n.id,
+      roomNo: String(n?.data?.room_number || "").trim(),
+      x: Number(n?.position?.x || 0),
+      y: Number(n?.position?.y || 0),
+      w: Number(n?.data?.w || 0),
+      h: Number(n?.data?.h || 0),
+    }));
+
 /* ---------- drag util cho handle ---------- */
 function useDrag(callback) {
   return (e) => {
@@ -759,7 +806,6 @@ function FloorplanEditor() {
         setTimeout(injectCallbacks, 0);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pxPerMeter, rf, gridGap, injectCallbacks, setNodes]
   );
 
@@ -844,6 +890,45 @@ function FloorplanEditor() {
     return null;
   };
 
+  const validateRoomPlacementBeforeSave = (nodesList) => {
+    const rooms = getRoomRectsFromNodes(nodesList);
+    if (!rooms.length) return null;
+
+    const poly = getBuildingPolygonFromNodes(nodesList);
+    if (!poly) {
+      return "Vui lòng tạo Tòa nhà (Building) trước khi lưu, vì phòng phải nằm trong tòa nhà.";
+    }
+
+    // check inside building (4 corners)
+    for (const r of rooms) {
+      const corners = [
+        { x: r.x, y: r.y },
+        { x: r.x + r.w, y: r.y },
+        { x: r.x + r.w, y: r.y + r.h },
+        { x: r.x, y: r.y + r.h },
+      ];
+      const ok = corners.every((pt) => pointInPolygon(pt, poly));
+      if (!ok) {
+        return `Phòng ${r.roomNo || r.id} phải nằm hoàn toàn trong tòa nhà.`;
+      }
+    }
+
+    // check overlap
+    for (let i = 0; i < rooms.length; i++) {
+      for (let j = i + 1; j < rooms.length; j++) {
+        if (rectsOverlap(rooms[i], rooms[j])) {
+          return `Phòng ${
+            rooms[i].roomNo || rooms[i].id
+          } đang bị đè lên phòng ${
+            rooms[j].roomNo || rooms[j].id
+          }. Vui lòng sắp xếp lại.`;
+        }
+      }
+    }
+
+    return null;
+  };
+
   const handleSaveToAPI = async () => {
     try {
       if (!activeBuilding) {
@@ -877,6 +962,12 @@ function FloorplanEditor() {
         return;
       }
 
+       const placementErr = validateRoomPlacementBeforeSave(nodes);
+      if (placementErr) {
+        alert(placementErr);
+        return;
+      }
+      
       const buildingName = activeBuildingObj?.name || `#${String(buildingId)}`;
 
       const payload = {

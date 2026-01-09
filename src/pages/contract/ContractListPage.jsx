@@ -1,6 +1,6 @@
 // src/pages/contract/ContractListPage.jsx
 import React, { useState, useEffect, useMemo } from "react";
-import { Table, Button, Modal, Spinner, OverlayTrigger, Tooltip, Badge } from "react-bootstrap";
+import { Table, Button, Modal, Spinner, OverlayTrigger, Tooltip } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import {
   listContracts,
@@ -12,7 +12,8 @@ import { listBuildings } from "@/services/api/building.js";
 import { getAccessToken } from "../../services/http";
 import {
   PlusLg, Download, Eye, Trash,
-  ArrowClockwise, FileEarmarkPdf, Building, Person, Calendar3
+  ArrowClockwise, FileEarmarkPdf, Building, Person, Calendar3,
+  JournalText, PencilSquare // <--- Đã thêm PencilSquare
 } from "react-bootstrap-icons";
 import "./ContractListPage.css";
 
@@ -167,6 +168,7 @@ function ContractListPage() {
       pending: { label: "Chờ duyệt", css: "status-pending" },
       expired: { label: "Hết hạn", css: "status-expired" },
       terminated: { label: "Đã hủy", css: "status-terminated" },
+      rejected: { label: "Từ chối", css: "status-expired" } // Thêm style cho rejected nếu cần
     };
     const item = map[status] || { label: status, css: "status-expired" };
     return (
@@ -233,6 +235,7 @@ function ContractListPage() {
                 <option value="pending">Chờ duyệt</option>
                 <option value="expired">Hết hạn</option>
                 <option value="terminated">Đã hủy</option>
+                <option value="rejected">Bị từ chối</option>
               </select>
             </div>
 
@@ -314,28 +317,48 @@ function ContractListPage() {
 
                         <td>
                           <div className="action-cell">
+                            {/* 1. Xem chi tiết (Giữ nguyên) */}
                             <WithTooltip text="Xem chi tiết">
                               <button className="btn-icon view" onClick={() => { setSelectedContract(c); setShowDetailModal(true); }}>
                                 <Eye />
                               </button>
                             </WithTooltip>
 
-                            {c.has_file && (
-                                <>
-                                  <WithTooltip text="Xem file gốc">
-                                    <button className="btn-icon view" onClick={() => handlePreviewFile(c)} disabled={previewLoading}>
-                                      <FileEarmarkPdf />
-                                    </button>
-                                  </WithTooltip>
-                                  <WithTooltip text="Tải xuống">
-                                    <button className="btn-icon download" onClick={() => handleDownload(c)} disabled={isDownloading}>
-                                      {isDownloading ? <Spinner size="sm"/> : <Download />}
-                                    </button>
-                                  </WithTooltip>
-                                </>
+                            {/* 2. Phụ lục (Giữ nguyên) */}
+                            <WithTooltip text="Phụ lục hợp đồng">
+                              <button
+                                  className="btn-icon info"
+                                  onClick={() => navigate(`/contracts/${c.contract_id}/addendum`)}
+                              >
+                                <JournalText />
+                              </button>
+                            </WithTooltip>
+
+                            {/* 3. Chỉnh sửa (THAY THẾ nút xem file) */}
+                            {/* Chỉ cho phép sửa khi status là pending hoặc rejected */}
+                            {['pending', 'rejected'].includes(c.status) && (
+                                <WithTooltip text="Chỉnh sửa">
+                                  <button
+                                      className="btn-icon text-primary" // Sử dụng text-primary hoặc class edit tùy CSS của bạn
+                                      onClick={() => navigate(`/contracts/${c.contract_id}`)}
+                                  >
+                                    <PencilSquare />
+                                  </button>
+                                </WithTooltip>
                             )}
 
-                            {userRole === "OWNER" && (
+                            {/* 4. Download file (Giữ nguyên) */}
+                            {c.has_file && (
+                                <WithTooltip text="Tải xuống">
+                                  <button className="btn-icon download" onClick={() => handleDownload(c)} disabled={isDownloading}>
+                                    {isDownloading ? <Spinner size="sm"/> : <Download />}
+                                  </button>
+                                </WithTooltip>
+                            )}
+
+                            {/* 5. Xóa (Cập nhật điều kiện) */}
+                            {/* Chỉ xóa khi: Owner AND (Terminated OR Expired OR Rejected) */}
+                            {userRole === "OWNER" && ['terminated', 'expired', 'rejected'].includes(c.status) && (
                                 <WithTooltip text="Xóa hợp đồng">
                                   <button className="btn-icon delete" onClick={() => { setDeleteId(c.contract_id); setShowDeleteModal(true); }}>
                                     <Trash />
@@ -374,7 +397,7 @@ function ContractListPage() {
             </div>
         )}
 
-        {/* --- MODAL DETAIL --- */}
+        {/* --- MODAL DETAIL (Giữ nguyên, nhưng trong modal vẫn có nút xem file nên không lo mất tính năng này) --- */}
         <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} size="lg" centered>
           <Modal.Header closeButton className="border-bottom-0 pb-0">
             <Modal.Title className="h5 fw-bold">Thông tin Hợp đồng</Modal.Title>
@@ -458,13 +481,12 @@ function ContractListPage() {
                   <FileEarmarkPdf className="me-2"/> Xem file
                 </Button>
             )}
-            <Button variant="primary" onClick={() => navigate(`/contracts/${selectedContract?.contract_id}`)}>
-              Chỉnh sửa
-            </Button>
+
+
           </Modal.Footer>
         </Modal>
 
-        {/* --- PREVIEW & DELETE MODALS (Giữ nguyên logic, chỉnh nhẹ UI) --- */}
+        {/* --- PREVIEW & DELETE MODALS --- */}
         <Modal show={showFilePreviewModal} onHide={() => {setShowFilePreviewModal(false); setFilePreviewUrl(null);}} size="xl" centered>
           <Modal.Body className="p-0 bg-dark d-flex justify-content-center align-items-center" style={{height:'85vh', position:'relative'}}>
             <Button variant="light" size="sm" className="position-absolute top-0 end-0 m-3" onClick={()=>setShowFilePreviewModal(false)}>✕</Button>

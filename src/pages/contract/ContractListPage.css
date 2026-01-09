@@ -234,3 +234,17 @@
     color: #111827;
     font-weight: 500;
 }
+.btn-icon:hover {
+    transform: translateY(-1px);
+}
+/* Màu riêng cho nút Phụ lục khi hover */
+.btn-icon.info:hover {
+    background-color: #e0f2fe;
+    color: #0284c7;
+    border-color: #0284c7;
+}
+
+/* Đảm bảo ô Action không bị quá rộng nhưng các nút vẫn nằm ngang đẹp */
+.custom-table tbody td:last-child {
+    white-space: nowrap;
+}

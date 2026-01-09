@@ -1,0 +1,159 @@
+/* src/pages/addendum/CreateAddendumPage.css */
+
+.create-addendum-container {
+    padding: 24px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    padding-bottom: 80px; /* Space for footer */
+}
+
+/* Chips Selection Style */
+.selection-chip {
+    padding: 8px 16px;
+    border-radius: 50px;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.selection-chip:hover {
+    background-color: #e9ecef;
+    border-color: #ced4da;
+}
+
+.selection-chip.active {
+    background-color: #e7f1ff; /* Light Primary */
+    border-color: #0d6efd;
+    color: #0d6efd;
+}
+
+/* Changes Row Comparison Style */
+.changes-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px dashed #dee2e6;
+}
+
+.change-row {
+    display: grid;
+    grid-template-columns: 1.5fr 40px 2fr; /* Label - Arrow - Input */
+    align-items: center;
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.current-val-badge {
+    font-size: 0.75rem;
+    color: #6c757d;
+    background: #f1f3f5;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 4px;
+}
+
+.change-arrow {
+    text-align: center;
+    color: #adb5bd;
+    font-size: 1.2rem;
+}
+
+/* File Upload Styles */
+.file-upload-wrapper {
+    position: relative;
+}
+
+.hidden-input {
+    display: none;
+}
+
+.upload-box {
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background-color: #fff;
+    width: 100%;
+}
+
+.upload-box:hover {
+    border-color: #0d6efd;
+    background-color: #f8fbff;
+}
+
+/* Footer Actions */
+.form-actions-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0; /* Adjust if you have a sidebar */
+    right: 0;
+    background: white;
+    padding: 16px 32px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+    z-index: 1000;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .change-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .change-arrow {
+        transform: rotate(90deg); /* Xoay mũi tên xuống */
+        margin: 4px 0;
+    }
+
+    .form-actions-footer {
+        padding: 12px;
+        justify-content: space-between;
+    }
+}
+
+/* Animation */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.cursor-pointer {
+    cursor: pointer;
+}
+.border-dashed {
+    border-style: dashed !important;
+}
+.transition-all {
+    transition: all 0.2s ease-in-out;
+}
+.hover-bg-light:hover {
+    background-color: #f8f9fa;
+    border-color: #dee2e6 !important;
+}
+.file-upload-wrapper:hover {
+    background-color: #e9ecef !important;
+}

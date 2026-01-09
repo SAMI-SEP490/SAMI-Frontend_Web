@@ -5,10 +5,13 @@ import {
   updateRoom,
   deactivateRoom,
   activateRoom,
-  hardDeleteRoom,
 } from "../../services/api/rooms";
 import { getAccessToken } from "../../services/http";
 import "./RoomListPage.css";
+import {
+  listBuildings,
+  listAssignedBuildings,
+} from "../../services/api/building";
 
 function RoomListPage() {
   const [rooms, setRooms] = useState([]);
@@ -18,7 +21,7 @@ function RoomListPage() {
   const [floorFilter, setFloorFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [loadingIds, setLoadingIds] = useState([]);
-
+  const [buildings, setBuildings] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
 
@@ -56,6 +59,69 @@ function RoomListPage() {
     fetchData();
   }, []);
 
+  // ===== LOAD BUILDINGS BY ROLE =====
+  useEffect(() => {
+    if (!userRole) return;
+
+    async function fetchBuildingsByRole() {
+      try {
+        let data = [];
+
+        if (userRole === "OWNER") {
+          data = await listBuildings();
+        } else if (userRole === "MANAGER") {
+          data = await listAssignedBuildings();
+        }
+
+        const raw = Array.isArray(data) ? data : data?.items ?? [];
+
+        const normalized = raw
+          .map((b) => {
+            // CASE 1: listBuildings (OWNER)
+            if (b.building_id) {
+              return {
+                building_id: b.building_id,
+                name: b.name,
+              };
+            }
+
+            // CASE 2: listAssignedBuildings trả { id, name }
+            if (b.id && b.name) {
+              return {
+                building_id: b.id,
+                name: b.name,
+              };
+            }
+
+            // CASE 3: listAssignedBuildings trả { building: {...} }
+            if (b.building?.building_id) {
+              return {
+                building_id: b.building.building_id,
+                name: b.building.name,
+              };
+            }
+
+            return null;
+          })
+          .filter(Boolean);
+
+        setBuildings(normalized);
+
+        if (userRole === "MANAGER") {
+          if (normalized.length === 1) {
+            setBuildingFilter(String(normalized[0].building_id));
+          } else {
+            setBuildingFilter("");
+          }
+        }
+      } catch (error) {
+        console.error("Lỗi load building theo role:", error);
+      }
+    }
+
+    fetchBuildingsByRole();
+  }, [userRole]);
+
   // ===== UTILS =====
   const getStatusLabel = (status) => {
     const statusMap = {
@@ -73,6 +139,13 @@ function RoomListPage() {
     ];
     return buildings.sort();
   };
+  const buildingMap = React.useMemo(() => {
+    const map = {};
+    buildings.forEach((b) => {
+      map[b.building_id] = b.name;
+    });
+    return map;
+  }, [buildings]);
 
   const getUniqueFloors = () => {
     const floors = [
@@ -116,11 +189,6 @@ function RoomListPage() {
   const handleViewDetails = async (room) => {
     setSelectedRoom(room);
     setShowDetailModal(true);
-  };
-
-  const handleEditRoom = (room) => {
-    setEditRoom({ ...room });
-    setShowEditModal(true);
   };
 
   const handleSaveEdit = async () => {
@@ -176,20 +244,6 @@ function RoomListPage() {
     }
   };
 
-  const handleDeleteRoom = async () => {
-    try {
-      setLoadingIds((p) => [...p, deleteId]);
-      await hardDeleteRoom(deleteId);
-      setRooms((prev) => prev.filter((r) => r.room_id !== deleteId));
-      setShowDeleteModal(false);
-    } catch (error) {
-      alert("❌ Lỗi khi xóa phòng!");
-      console.error(error);
-    } finally {
-      setLoadingIds((p) => p.filter((i) => i !== deleteId));
-    }
-  };
-
   const handleResetFilters = () => {
     setStatusFilter("");
     setBuildingFilter("");
@@ -207,6 +261,7 @@ function RoomListPage() {
 
     const matchesBuilding = buildingFilter
       ? room.building_name === buildingFilter
+      ? String(room.building_id) === String(buildingFilter)
       : true;
     const matchesFloor = floorFilter
       ? room.floor === parseInt(floorFilter)
@@ -234,6 +289,23 @@ function RoomListPage() {
     <div className="container">
       <h2 className="title">Quản lý Phòng</h2>
 
+      {userRole === "MANAGER" && buildings.length > 0 && (
+        <div
+          style={{
+            marginBottom: "12px",
+            padding: "8px 12px",
+            background: "#f0f6ff",
+            border: "1px solid #c7dcff",
+            borderRadius: "6px",
+            fontWeight: 600,
+            color: "#1e3a8a",
+            width: "fit-content",
+          }}
+        >
+          🏢 Tòa nhà đang quản lý:{" "}
+          <span>{buildings.map((b) => b.name).join(", ")}</span>
+        </div>
+      )}
       {/* FILTER */}
       <div className="filter-bar">
         <input
@@ -278,6 +350,23 @@ function RoomListPage() {
             {getUniqueBuildings().map((building) => (
               <option key={building} value={building}>
                 {building}
+            {buildings.map((b) => (
+              <option key={b.building_id} value={String(b.building_id)}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {userRole === "MANAGER" && buildings.length > 1 && (
+          <select
+            className="status-select"
+            value={buildingFilter}
+            onChange={(e) => setBuildingFilter(e.target.value)}
+          >
+            {buildings.map((b) => (
+              <option key={b.building_id} value={String(b.building_id)}>
+                {b.name}
               </option>
             ))}
           </select>
@@ -325,6 +414,7 @@ function RoomListPage() {
                   <td>{index + 1}</td>
                   {userRole === "OWNER" && (
                     <td>{room.building_name || "N/A"}</td>
+                    <td>{buildingMap[room.building_id] || "N/A"}</td>
                   )}
                   <td>
                     <strong>{room.room_number || "N/A"}</strong>
@@ -379,6 +469,7 @@ function RoomListPage() {
         size="xl"
         container={document.querySelector(".main-content")}
         backdrop={false}
+        size="lg"
       >
         <Modal.Header closeButton>
           <Modal.Title>
@@ -480,6 +571,7 @@ function RoomListPage() {
         size="xl"
         container={document.querySelector(".main-content")}
         backdrop={false}
+        size="lg"
       >
         <Modal.Header closeButton>
           <Modal.Title>✏️ Chỉnh sửa phòng</Modal.Title>

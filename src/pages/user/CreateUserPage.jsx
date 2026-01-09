@@ -7,9 +7,8 @@ import {
 } from "../../services/api/users";
 import { listBuildings } from "../../services/api/building";
 import { colors } from "../../constants/colors";
+import { getAccessToken } from "../../services/http";
 
-/** convert yyyy-mm-dd → ISO */
-const toISO = (d) => (d ? new Date(d).toISOString() : undefined);
 
 export default function UserCreatePage() {
   const navigate = useNavigate();
@@ -20,7 +19,35 @@ export default function UserCreatePage() {
   const [err, setErr] = useState("");
   const [userId, setUserId] = useState(null);
   const [buildings, setBuildings] = useState([]);
+  const getCurrentUserId = () => {
+    const token = getAccessToken();
+    if (!token) return null;
 
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return payload?.userId ?? null; // 👈 FIX CHÍNH XÁC
+    } catch {
+      return null;
+    }
+  };
+  const getCurrentUserRole = () => {
+    const token = getAccessToken();
+    if (!token) return "";
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return String(payload?.role || "").toLowerCase();
+    } catch {
+      return "";
+    }
+  };
+  const currentUserId = getCurrentUserId();
+  const currentUserRole = getCurrentUserRole();
+  useEffect(() => {
+    if (currentUserRole === "manager") {
+      setRole("tenant");
+    }
+  }, []);
   /** USER */
   const [userForm, setUserForm] = useState({
     full_name: "",
@@ -30,7 +57,6 @@ export default function UserCreatePage() {
     email: "",
     password: "",
   });
-
   /** TENANT */
   const [tenantForm, setTenantForm] = useState({
     buildingId: "",
@@ -48,13 +74,36 @@ export default function UserCreatePage() {
   useEffect(() => {
     if (step !== 3) return;
 
-    if (role === "tenant") {
-      listBuildings().then(setBuildings).catch(() => setBuildings([]));
-    }
+    listBuildings()
+      .then((data) => {
+        setBuildings(data);
 
-    if (role === "manager") {
-      listBuildings().then(setBuildings).catch(() => setBuildings([]));
-    }
+        // MANAGER tạo TENANT → auto select building
+        if (currentUserRole === "manager" && role === "tenant") {
+          const myBuilding = data.find((b) =>
+            b.managers?.some(
+              (m) => Number(m.user_id) === Number(currentUserId)
+            )
+          );
+          if (!myBuilding) {
+            console.warn("Manager chưa được gán building");
+            console.log("Current user:", currentUserId);
+            console.table(
+              data.map(b => ({
+                building: b.name,
+                managers: b.managers?.map(m => m.user_id)
+              }))
+            );
+          }
+          if (myBuilding) {
+            setTenantForm((prev) => ({
+              ...prev,
+              buildingId: String(myBuilding.building_id),
+            }));
+          }
+        }
+      })
+      .catch(() => setBuildings([]));
   }, [step, role]);
 
   /** STEP 2 */
@@ -100,7 +149,9 @@ export default function UserCreatePage() {
           note: tenantForm.note || null,
         });
       }
-
+      if (currentUserRole === "manager" && role !== "tenant") {
+        throw new Error("Quản lý chỉ được tạo người thuê");
+      }
       // MANAGER
       if (role === "manager") {
         if (!managerForm.buildingId) {
@@ -228,12 +279,14 @@ export default function UserCreatePage() {
               >
                 Người thuê
               </div>
-              <div
-                className={`role ${role === "manager" ? "active" : ""}`}
-                onClick={() => setRole("manager")}
-              >
-                Quản lý
-              </div>
+              {currentUserRole !== "manager" && (
+                <div
+                  className={`role ${role === "manager" ? "active" : ""}`}
+                  onClick={() => setRole("manager")}
+                >
+                  Quản lý
+                </div>
+              )}
             </div>
 
             <div className="actions">
@@ -350,21 +403,24 @@ export default function UserCreatePage() {
                   <label>Tòa nhà</label>
                   <select
                     value={tenantForm.buildingId}
+                    disabled={currentUserRole === "manager"}
                     onChange={(e) =>
-                      setTenantForm({
-                        ...tenantForm,
-                        buildingId: e.target.value,
-                      })
+                      setTenantForm({ ...tenantForm, buildingId: e.target.value })
                     }
                     required
                   >
                     <option value="">-- Chọn tòa nhà --</option>
                     {buildings.map((b) => (
-                      <option key={b.building_id} value={b.building_id}>
+                      <option key={b.building_id} value={String(b.building_id)}>
                         {b.name}
                       </option>
                     ))}
                   </select>
+
+                  {currentUserRole === "manager" && (
+                    <small className="hint">Tòa nhà được gán theo quản lý</small>
+                  )}
+
                 </div>
 
                 <div className="field">

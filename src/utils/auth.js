@@ -1,14 +1,14 @@
-import { jwtDecode } from "jwt-decode";
 
 export function getUserRole() {
   try {
-    const token = localStorage.getItem("access_token");
-    if (!token) return null;
+    const userRaw = localStorage.getItem("sami:user");
+    if (!userRaw) return null;
 
-    const decoded = jwtDecode(token);
-    return decoded?.role || null;
+    const user = JSON.parse(userRaw);
+    return user?.role || null;
   } catch (err) {
-    console.error("Decode token failed", err);
+    console.error("Get role from localStorage failed", err);
     return null;
   }
 }
+

@@ -490,11 +490,11 @@ function FloorplanEditor() {
   }, [floorOptions, activeFloor]);
 
   useEffect(() => {
-  const role = getUserRole();
-  if (role === "MANAGER") {
-    navigate("/floorplan/view");
-  }
-}, [navigate]);
+    const role = getUserRole();
+    if (role === "MANAGER") {
+      navigate("/floorplan/view");
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (!activeBuilding) return;
@@ -518,7 +518,7 @@ function FloorplanEditor() {
     };
   }, [activeBuilding]);
 
-  // load list building
+  // load list building (CHỈ LOAD 1 LẦN)
   useEffect(() => {
     let canceled = false;
 
@@ -534,16 +534,15 @@ function FloorplanEditor() {
         setBuildings(arr);
 
         if (arr.length > 0) {
-          // Kiểm tra xem activeBuilding hiện tại có khớp ID tòa nào không
-          const exists = arr.some(
-            (b) => String(b.building_id) === String(activeBuilding)
-          );
-          const isNumeric = /^\d+$/.test(String(activeBuilding));
+          setActiveBuilding((prev) => {
+            const prevStr = String(prev || "");
+            const isNumeric = /^\d+$/.test(prevStr);
+            const exists = arr.some((b) => String(b.building_id) === prevStr);
 
-          // Nếu đang là "A" / "" / hoặc ID không tồn tại -> set về tòa đầu tiên
-          if (!exists || !isNumeric) {
-            setActiveBuilding(String(arr[0].building_id));
-          }
+            // giữ building hiện tại nếu hợp lệ, không thì lấy tòa đầu tiên
+            if (prevStr && isNumeric && exists) return prevStr;
+            return String(arr[0].building_id);
+          });
         }
       } catch (err) {
         if (canceled) return;
@@ -557,7 +556,7 @@ function FloorplanEditor() {
     return () => {
       canceled = true;
     };
-  }, [activeBuilding]);
+  }, []);
 
   // eslint-disable-next-line no-unused-vars
   const comboKey = `${activeBuilding || "NO_BUILDING"}-${
@@ -970,12 +969,12 @@ function FloorplanEditor() {
         return;
       }
 
-       const placementErr = validateRoomPlacementBeforeSave(nodes);
+      const placementErr = validateRoomPlacementBeforeSave(nodes);
       if (placementErr) {
         alert(placementErr);
         return;
       }
-      
+
       const buildingName = activeBuildingObj?.name || `#${String(buildingId)}`;
 
       const payload = {

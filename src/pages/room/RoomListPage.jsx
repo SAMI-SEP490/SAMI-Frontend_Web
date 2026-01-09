@@ -51,6 +51,7 @@ function RoomListPage() {
       try {
         const data = await listRooms();
         setRooms(Array.isArray(data) ? data : data?.items ?? []);
+        console.log("Loaded rooms:", data);
       } catch (error) {
         alert("❌ Lỗi khi tải dữ liệu phòng!");
         console.error(error);
@@ -108,13 +109,11 @@ function RoomListPage() {
         setBuildings(normalized);
 
         if (userRole === "MANAGER") {
-          if (normalized.length === 1) {
-            setBuildingFilter(String(normalized[0].building_id));
-          } else {
-            setBuildingFilter("");
-          }
+          // Không set default filter, để user chọn
+          setBuildingFilter("");
         }
       } catch (error) {
+        alert("❌ Lỗi khi tải dữ liệu tòa nhà!");
         console.error("Lỗi load building theo role:", error);
       }
     }

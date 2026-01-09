@@ -55,6 +55,8 @@ function MaintenanceListPage() {
       case "in_progress":
         return <span className="status published">Đang xử lý</span>;
       case "resolved":
+        return <span className="status archived">Đã giải quyết</span>;
+      case "completed":
         return <span className="status archived">Đã hoàn thành</span>;
       case "rejected":
         return <span className="status archived">Đã từ chối</span>;
@@ -147,7 +149,8 @@ function MaintenanceListPage() {
           <option value="">Tất cả trạng thái</option>
           <option value="pending">Chờ xử lý</option>
           <option value="in_progress">Đang xử lý</option>
-          <option value="resolved">Đã hoàn thành</option>
+          <option value="resolved">Đã giải quyết</option>
+          <option value="completed">Đã hoàn thành</option>
           <option value="rejected">Từ chối</option>
         </select>
       </div>

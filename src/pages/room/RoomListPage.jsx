@@ -454,15 +454,17 @@ function RoomListPage() {
                     >
                       👁 Xem
                     </Button>
-                    {room.status === "occupied" && room.is_active && (
-                      <Button
-                        size="sm"
-                        className="btn publish"
-                        onClick={() => handleAddTenant(room.room_id)}
-                      >
-                        ➕ Thêm người thuê
-                      </Button>
-                    )}
+                    {room.status === "occupied" &&
+                      room.is_active &&
+                      room.status !== "maintenance" && (
+                        <Button
+                          size="sm"
+                          className="btn publish"
+                          onClick={() => handleAddTenant(room.room_id)}
+                        >
+                          ➕ Thêm người thuê
+                        </Button>
+                      )}
                     {canToggleStatus(room) && (
                       <Button
                         size="sm"

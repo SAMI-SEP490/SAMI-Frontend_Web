@@ -24,7 +24,7 @@ export default function PrivateLayout() {
           style={{
             position: "sticky",
             top: 0,
-            zIndex: 1000,
+            zIndex: 1100,
             flexShrink: 0,
           }}
         >
@@ -44,6 +44,7 @@ export default function PrivateLayout() {
                 height: "100%",
                 flexShrink: 0,
                 transition: "width 0.3s",
+                zIndex: 1100,
               }}
             >
               <Sidebar toggleSidebar={toggleSidebar} /> {/* <<< truyền xuống */}
@@ -52,6 +53,7 @@ export default function PrivateLayout() {
 
         {/* Main */}
         <div
+          className="main-content"
           style={{
             flex: 1,
             padding: "30px",

@@ -56,10 +56,8 @@ const getCreatedAt = (b) =>
   b.created_at || b.createdAt || b.created_date || b.created || b.createdOn;
 
 const getRoomId = (b) => b.room_id ?? b.roomId ?? b.room?.id ?? b.room?.room_id;
-const getRoomLabel = (bill, roomsMap) => {
-  const roomId = getRoomId(bill);
-  if (!roomId) return "—";
-  return roomsMap.get(Number(roomId)) || "Phòng ?";
+const getRoomLabel = (bill) => {
+  return bill.rooms?.room_number || bill.room?.room_number || "—";
 };
 
 const getBillId = (b) => b.id ?? b.bill_id ?? b.billId;
@@ -171,21 +169,35 @@ export default function BillListPage() {
     const bill = bills.find((b) => getBillId(b) === id);
     if (!bill) return;
 
-    await updateDraftBill(id, {
-      status: "issued",
-      room_id: bill.room_id,
-      tenant_user_id: bill.tenant_user_id,
-      billing_period_start: bill.billing_period_start,
-      billing_period_end: bill.billing_period_end,
-      due_date: bill.due_date,
-      total_amount: bill.total_amount,
-      description: bill.description,
-      penalty_amount: bill.penalty_amount,
-    });
-
-    setBills((prev) =>
-      prev.map((b) => (getBillId(b) === id ? { ...b, status: "issued" } : b))
+    const ok = window.confirm(
+      "Bạn có chắc muốn xuất bản hóa đơn này?\nSau khi xuất bản sẽ KHÔNG thể chỉnh sửa hoặc hoàn tác."
     );
+    if (!ok) return;
+
+    try {
+      // Include ALL required fields for the 'issued' validation schema
+      await updateDraftBill(id, {
+        status: "issued",
+        contract_id: bill.contract_id,
+        tenant_user_id: bill.tenant_user_id,
+        bill_type: bill.bill_type,
+
+        billing_period_start: bill.billing_period_start,
+        billing_period_end: bill.billing_period_end,
+        due_date: bill.due_date,
+        total_amount: bill.total_amount,
+        description: bill.description,
+        penalty_amount: bill.penalty_amount,
+      });
+
+      alert("Xuất bản hóa đơn thành công!");
+
+      setBills((prev) =>
+        prev.map((b) => (getBillId(b) === id ? { ...b, status: "issued" } : b))
+      );
+    } catch (e) {
+      alert(e.message || "Lỗi khi xuất bản hóa đơn");
+    }
   }
 
   async function onCashPay(id) {

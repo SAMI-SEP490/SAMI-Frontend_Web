@@ -87,7 +87,7 @@ import SlotListPage from "../pages/parkingslot/SlotListPage";
 import CreateParkingSlotPage from "../pages/parkingslot/CreateParkingSlotPage";
 // rooms
 import RoomListPage from "@/pages/room/RoomListPage.jsx";
-
+import AddTenantToRoom from "@/pages/room/AddTenantToRoom.jsx";
 // ===== Utility Services =====
 import UtilityServicePage from "@/pages/services/UtilityServicePage.jsx";
 
@@ -159,30 +159,30 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-          <Route
+        <Route
           path={ROUTES.contractAddendum}
           element={
             <ProtectedRoute>
-              <ContractAddendumPage/>
+              <ContractAddendumPage />
             </ProtectedRoute>
           }
         />
-          <Route
-              path={ROUTES.createAddendum}
-              element={
-                  <ProtectedRoute>
-                      <CreateAddendumPage />
-                  </ProtectedRoute>
-              }
-          />
-          <Route
-              path={ROUTES.editAddendum}
-              element={
-                  <ProtectedRoute>
-                      <EditAddendumPage />
-                  </ProtectedRoute>
-              }
-          />
+        <Route
+          path={ROUTES.createAddendum}
+          element={
+            <ProtectedRoute>
+              <CreateAddendumPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.editAddendum}
+          element={
+            <ProtectedRoute>
+              <EditAddendumPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path={ROUTES.editContract}
           element={
@@ -220,7 +220,7 @@ export default function AppRoutes() {
           path={ROUTES.tenantCreate}
           element={
             <ProtectedRoute>
-              <CreateTenantPage/>
+              <CreateTenantPage />
             </ProtectedRoute>
           }
         />
@@ -486,6 +486,15 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <RoomListPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.roomTenants}
+          element={
+            <ProtectedRoute>
+              <AddTenantToRoom />
             </ProtectedRoute>
           }
         />

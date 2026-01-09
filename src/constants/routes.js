@@ -75,6 +75,7 @@ export const ROUTES = {
   roomDetail: "/rooms/:id",
   roomEdit: "/rooms/:id/edit",
   roomCreate: "/rooms/create",
+  roomTenants: "/rooms/:id/tenants",
 
   // Utility Services
   utilityServices: "/utility-services",

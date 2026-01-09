@@ -465,7 +465,7 @@ function FloorplanEdit() {
     }
   }, [floorOptions, activeFloor]);
 
-  /* Load list building (giống Create) */
+  /* Load list building (CHỈ LOAD 1 LẦN) */
   useEffect(() => {
     let canceled = false;
 
@@ -481,14 +481,14 @@ function FloorplanEdit() {
         setBuildings(arr);
 
         if (arr.length > 0) {
-          const exists = arr.some(
-            (b) => String(b.building_id) === String(activeBuilding)
-          );
-          const isNumeric = /^\d+$/.test(String(activeBuilding));
+          setActiveBuilding((prev) => {
+            const prevStr = String(prev || "");
+            const isNumeric = /^\d+$/.test(prevStr);
+            const exists = arr.some((b) => String(b.building_id) === prevStr);
 
-          if (!exists || !isNumeric) {
-            setActiveBuilding(String(arr[0].building_id));
-          }
+            if (prevStr && isNumeric && exists) return prevStr;
+            return String(arr[0].building_id);
+          });
         }
       } catch (err) {
         if (canceled) return;
@@ -502,7 +502,7 @@ function FloorplanEdit() {
     return () => {
       canceled = true;
     };
-  }, [activeBuilding]);
+  }, []);
 
   /* Inject callback cho building + block/small */
   const injectCallbacks = useCallback(() => {

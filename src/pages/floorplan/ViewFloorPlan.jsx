@@ -32,6 +32,7 @@ const bboxOf = (pts = []) => {
 };
 const role = getUserRole();
 const isOwner = role === "OWNER";
+console.log("isOwner", isOwner , role);
 
 function BuildingNodeView({ data }) {
   const {

@@ -35,34 +35,38 @@ export default function UserCreatePage() {
   });
 
   /** TENANT */
-  const [tenantForm, setTenantForm] = useState({
-    roomId: "",
-    idNumber: "",
-    emergencyContactPhone: "",
-    note: "",
-  });
+ const [tenantForm, setTenantForm] = useState({
+  buildingId: "",
+  roomId: "",
+  idNumber: "",
+  note: "",
+});
 
   /** MANAGER */
-  const [managerForm, setManagerForm] = useState({
-    buildingId: "",
-    assignedFrom: "",
-    assignedTo: "",
-    note: "",
-  });
+const [managerForm, setManagerForm] = useState({
+  buildingId: "",
+  note: "",
+});
 
   /** load data step 3 */
   useEffect(() => {
     if (step !== 3) return;
 
     if (role === "tenant") {
-      listRoomsLite().then(setRooms).catch(() => setRooms([]));
+      listBuildings().then(setBuildings).catch(() => setBuildings([]));
     }
 
     if (role === "manager") {
       listBuildings().then(setBuildings).catch(() => setBuildings([]));
     }
   }, [step, role]);
+useEffect(() => {
+  if (!tenantForm.buildingId) return;
 
+  listRoomsLite({ buildingId: tenantForm.buildingId })
+    .then(setRooms)
+    .catch(() => setRooms([]));
+}, [tenantForm.buildingId]);
   /** STEP 2 */
   const submitUser = async (e) => {
     e.preventDefault();
@@ -81,49 +85,50 @@ export default function UserCreatePage() {
   };
 
   /** STEP 3 */
-  const submitRole = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setErr("");
+const submitRole = async (e) => {
+  e.preventDefault();
+  setSaving(true);
+  setErr("");
 
-    try {
-      if (role === "tenant") {
-        await changeToTenant({
-          userId,
-          ...tenantForm,
-        });
+  try {
+    if (!userId) throw new Error("User chưa được tạo");
+
+    // TENANT
+    if (role === "tenant") {
+      if (!tenantForm.roomId) {
+        throw new Error("Chưa chọn phòng");
       }
 
-      if (role === "manager") {console.log("MANAGER PAYLOAD", {
-  userId: Number(userId),
-  buildingId: Number(managerForm.buildingId),
-  assignedFrom: new Date(managerForm.assignedFrom).toISOString(),
-  assignedTo: managerForm.assignedTo
-    ? new Date(managerForm.assignedTo).toISOString()
-    : undefined,
-  note: managerForm.note,
-});
-        await changeToManager({
-          userId: Number(userId),
-    buildingId: Number(managerForm.buildingId),
-    assignedFrom: managerForm.assignedFrom
-      ? new Date(managerForm.assignedFrom).toISOString()
-      : undefined,
-    assignedTo: managerForm.assignedTo
-      ? new Date(managerForm.assignedTo).toISOString()
-      : undefined,
-    note: managerForm.note || undefined,
-        });
-      }
-
-      alert("Tạo người dùng thành công");
-      navigate("/users");
-    } catch (e) {
-      setErr(e?.response?.data?.message || "Gán vai trò thất bại");
-    } finally {
-      setSaving(false);
+      await changeToTenant({
+        userId: Number(userId),
+        roomId: Number(tenantForm.roomId),
+        idNumber: tenantForm.idNumber,
+        note: tenantForm.note || null,
+      });
     }
-  };
+
+    // MANAGER
+    if (role === "manager") {
+      if (!managerForm.buildingId) {
+        throw new Error("Chưa chọn tòa nhà");
+      }
+
+      await changeToManager({
+        userId: Number(userId),
+        buildingId: Number(managerForm.buildingId),
+        note: managerForm.note || null,
+      });
+    }
+
+    alert("Tạo người dùng thành công");
+    navigate("/users");
+  } catch (e) {
+    console.error(e);
+    setErr(e?.response?.data?.message || e.message || "Gán vai trò thất bại");
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <div className="page">
@@ -339,67 +344,75 @@ export default function UserCreatePage() {
         {step === 3 && (
           <form onSubmit={submitRole}>
             {role === "tenant" && (
-              <>
-                <div className="field">
-                  <label>Phòng đang thuê</label>
-                  <select
-                    value={tenantForm.roomId}
-                    onChange={(e) =>
-                      setTenantForm({
-                        ...tenantForm,
-                        roomId: e.target.value,
-                      })
-                    }
-                    required
-                  >
-                    <option value="">-- Chọn phòng --</option>
-                    {rooms.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        Phòng {r.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+  <>
+    <div className="field">
+      <label>Tòa nhà</label>
+      <select
+        value={tenantForm.buildingId}
+        onChange={(e) =>
+          setTenantForm({
+            ...tenantForm,
+            buildingId: e.target.value,
+            roomId: "", // reset phòng khi đổi building
+          })
+        }
+        required
+      >
+        <option value="">-- Chọn tòa nhà --</option>
+        {buildings.map((b) => (
+          <option key={b.building_id} value={b.building_id}>
+            {b.name}
+          </option>
+        ))}
+      </select>
+    </div>
 
-                <div className="field">
-                  <label>CCCD / CMND</label>
-                  <input
-                    value={tenantForm.idNumber}
-                    onChange={(e) =>
-                      setTenantForm({
-                        ...tenantForm,
-                        idNumber: e.target.value,
-                      })
-                    }
-                    required
-                  />
-                </div>
+    <div className="field">
+      <label>Phòng</label>
+      <select
+        value={tenantForm.roomId}
+        onChange={(e) =>
+          setTenantForm({ ...tenantForm, roomId: e.target.value })
+        }
+        disabled={!tenantForm.buildingId}
+        required
+      >
+        <option value="">-- Chọn phòng --</option>
+        {rooms.map((r) => {
+  const id = r.room_id ?? r.id ?? r.roomId;
+  const number = r.room_number ?? r.number ?? r.roomNo;
 
-                <div className="field">
-                  <label>SĐT khẩn cấp</label>
-                  <input
-                    value={tenantForm.emergencyContactPhone}
-                    onChange={(e) =>
-                      setTenantForm({
-                        ...tenantForm,
-                        emergencyContactPhone: e.target.value,
-                      })
-                    }
-                    required
-                  />
-                </div>
+  return (
+    <option key={id} value={id}>
+      {number || `Phòng #${id}`}
+    </option>
+  );
+})}
+      </select>
+    </div>
 
-                <div className="field">
-                  <label>Ghi chú</label>
-                  <input
-                    value={tenantForm.note}
-                    onChange={(e) =>
-                      setTenantForm({ ...tenantForm, note: e.target.value })
-                    }
-                  />
-                </div>
-              </>
-            )}
+    <div className="field">
+      <label>CCCD / CMND</label>
+      <input
+        value={tenantForm.idNumber}
+        onChange={(e) =>
+          setTenantForm({ ...tenantForm, idNumber: e.target.value })
+        }
+        required
+      />
+    </div>
+
+    <div className="field">
+      <label>Ghi chú</label>
+      <input
+        value={tenantForm.note}
+        onChange={(e) =>
+          setTenantForm({ ...tenantForm, note: e.target.value })
+        }
+      />
+    </div>
+  </>
+)}
 
             {role === "manager" && (
               <>
@@ -425,36 +438,6 @@ export default function UserCreatePage() {
   })}
 </select>
                 </div>
-
-                <div className="field">
-                  <label>Ngày bắt đầu</label>
-                  <input
-                    type="date"
-                    value={managerForm.assignedFrom}
-                    onChange={(e) =>
-                      setManagerForm({
-                        ...managerForm,
-                        assignedFrom: e.target.value,
-                      })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="field">
-                  <label>Ngày kết thúc</label>
-                  <input
-                    type="date"
-                    value={managerForm.assignedTo}
-                    onChange={(e) =>
-                      setManagerForm({
-                        ...managerForm,
-                        assignedTo: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
                 <div className="field">
                   <label>Ghi chú</label>
                   <input

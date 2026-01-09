@@ -9,16 +9,14 @@ const pick = (...vals) => {
   return undefined;
 };
 const normalizeTenant = (u) => ({
-  room: u?.room_name || "—",
+  room: u?.room_name || "—", // service đã map sẵn
   idNumber: u?.id_number || "—",
-  emergencyContactPhone: u?.emergency_contact_phone || "—",
+  tenantSince: u?.tenant_since || null,
   note: u?.note || "—",
 });
 
 const normalizeManager = (u) => ({
   building: u?.building_name || `Tòa nhà #${u?.building_id ?? "—"}`,
-  assignedFrom: u?.assigned_from || null,
-  assignedTo: u?.assigned_to || null,
   note: u?.note || "—",
 });
 
@@ -225,18 +223,13 @@ display: flex;
     <h3 style={{ marginTop: 24 }}>Thông tin người thuê</h3>
 
     <div className="row">
-      <div className="label">Phòng</div>
-      <div className="value">{user.tenant.room}</div>
+      <div className="label">Tòa nhà</div>
+      <div className="value">{user.tenant.building}</div>
     </div>
 
     <div className="row">
       <div className="label">CCCD / CMND</div>
       <div className="value">{user.tenant.idNumber}</div>
-    </div>
-
-    <div className="row">
-      <div className="label">SĐT khẩn cấp</div>
-      <div className="value">{user.tenant.emergencyContactPhone}</div>
     </div>
 
     <div className="row">
@@ -252,20 +245,6 @@ display: flex;
     <div className="row">
       <div className="label">Tòa nhà</div>
       <div className="value">{user.manager.building}</div>
-    </div>
-
-    <div className="row">
-      <div className="label">Bắt đầu</div>
-      <div className="value">
-        {formatDateVN(user.manager.assignedFrom)}
-      </div>
-    </div>
-
-    <div className="row">
-      <div className="label">Kết thúc</div>
-      <div className="value">
-        {formatDateVN(user.manager.assignedTo)}
-      </div>
     </div>
 
     <div className="row">

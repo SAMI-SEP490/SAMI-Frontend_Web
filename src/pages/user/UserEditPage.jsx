@@ -35,8 +35,6 @@ export default function UserEditPage() {
 
   const [form, setForm] = useState({
     building_id: "",
-    assigned_from: "",
-    assigned_to: "",
     note: "",
   });
 
@@ -168,26 +166,6 @@ export default function UserEditPage() {
               </option>
             ))}
           </select>
-        </div>
-
-        <div className="field">
-          <div className="label">Ngày bắt đầu (dd/mm/yyyy)</div>
-          <input placeholder="dd/mm/yyyy"
-            value={form.assigned_from}
-            onChange={(e) =>
-              setForm({ ...form, assigned_from: e.target.value })
-            }
-          />
-        </div>
-
-        <div className="field">
-          <div className="label">Ngày kết thúc</div>
-          <input placeholder="dd/mm/yyyy"
-            value={form.assigned_to}
-            onChange={(e) =>
-              setForm({ ...form, assigned_to: e.target.value })
-            }
-          />
         </div>
 
         <div className="field">

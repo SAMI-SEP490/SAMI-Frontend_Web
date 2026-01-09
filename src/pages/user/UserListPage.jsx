@@ -10,13 +10,24 @@ import {
   ArrowCounterclockwise,
 } from "react-bootstrap-icons";
 import "./UserListPage.css";
+import { getAccessToken } from "../../services/http";
 
 /* ================= Helpers ================= */
 const pick = (...vals) => {
   for (const v of vals) if (v !== undefined && v !== null && v !== "") return v;
   return undefined;
 };
+const getRoleFromToken = () => {
+  const token = getAccessToken();
+  if (!token) return "";
 
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return String(payload?.role || "").toLowerCase();
+  } catch {
+    return "";
+  }
+};
 const normalizeUser = (u) => {
   const id = pick(u?.user_id, u?.id, u?._id);
   return {
@@ -25,32 +36,35 @@ const normalizeUser = (u) => {
     email: pick(u?.email, ""),
     role: pick(u?.role, ""),
     status: pick(u?.status, "active"),
+    building_id: u?.building_id ?? null,
+    building_name: u?.building_name ?? null,
   };
 };
 
 export default function UserListPage() {
   const navigate = useNavigate();
-const [buildings, setBuildings] = useState([]);
-const [buildingFilter, setBuildingFilter] = useState("");
+  const [buildings, setBuildings] = useState([]);
+  const [buildingFilter, setBuildingFilter] = useState("");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
-
+const [currentUserRole, setCurrentUserRole] = useState("");
   /* ================= Fetch ================= */
+useEffect(() => {
+  setCurrentUserRole(getRoleFromToken());
+}, []);
   useEffect(() => {
   (async () => {
     try {
       setLoading(true);
-      const data = await listUsers({
-        building_id: buildingFilter || undefined,
-      });
+      const data = await listUsers();
       setUsers((Array.isArray(data) ? data : []).map(normalizeUser));
     } finally {
       setLoading(false);
     }
   })();
-}, [buildingFilter]);
+}, []);
 useEffect(() => {
   (async () => {
     const data = await listBuildings();
@@ -82,22 +96,38 @@ useEffect(() => {
   };
 
   /* ================= Filter ================= */
-  const filteredUsers = useMemo(() => {
-    return users
-      .filter((u) => String(u?.role).toLowerCase() !== "owner")
+const filteredUsers = useMemo(() => {
+  return users
+    // Không hiển thị OWNER
+    .filter((u) => String(u?.role).toLowerCase() !== "owner")
+
+    // Search
+    .filter((u) => {
+      if (!search) return true;
+      const s = search.toLowerCase();
+      return (
+        u.full_name.toLowerCase().includes(s) ||
+        u.email.toLowerCase().includes(s)
+      );
+    })
+
+    // Role
+    .filter((u) => {
+      if (!roleFilter) return true;
+      return String(u.role).toLowerCase() === roleFilter;
+    })
+
+    // Building (NEW)
       .filter((u) => {
-        if (!search) return true;
-        const s = search.toLowerCase();
-        return (
-          u.full_name.toLowerCase().includes(s) ||
-          u.email.toLowerCase().includes(s)
-        );
-      })
-      .filter((u) => {
-        if (!roleFilter) return true;
-        return String(u.role).toLowerCase() === roleFilter;
-      });
-  }, [users, search, roleFilter]);
+  // MANAGER không filter theo building
+  if (currentUserRole === "manager") return true;
+
+  if (!buildingFilter) return true;
+  if (!u.building_id) return true;
+
+  return String(u.building_id) === String(buildingFilter);
+});
+}, [users, search, roleFilter, buildingFilter]);
 
   /* ================= Actions ================= */
   const handleDelete = async (id) => {
@@ -130,18 +160,20 @@ useEffect(() => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-<select
-  className="status-select"
-  value={buildingFilter}
-  onChange={(e) => setBuildingFilter(e.target.value)}
->
-  <option value="">Tất cả tòa nhà</option>
-  {buildings.map((b) => (
-    <option key={b.building_id} value={b.building_id}>
-      {b.name}
-    </option>
-  ))}
-</select>
+{currentUserRole !== "manager" && (
+  <select
+    className="status-select"
+    value={buildingFilter}
+    onChange={(e) => setBuildingFilter(e.target.value)}
+  >
+    <option value="">Tất cả tòa nhà</option>
+    {buildings.map((b) => (
+      <option key={b.building_id} value={b.building_id}>
+        {b.name}
+      </option>
+    ))}
+  </select>
+)}
 
         <select
           className="status-select"
@@ -149,7 +181,9 @@ useEffect(() => {
           onChange={(e) => setRoleFilter(e.target.value)}
         >
           <option value="">Tất cả vai trò</option>
+          {currentUserRole !== "manager" && (
           <option value="manager">Quản lý</option>
+          )}
           <option value="tenant">Người thuê</option>
           <option value="user">Người dùng</option>
         </select>

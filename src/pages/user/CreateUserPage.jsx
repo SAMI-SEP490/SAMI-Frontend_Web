@@ -6,11 +6,9 @@ import {
   changeToManager,
 } from "../../services/api/users";
 import { listBuildings } from "../../services/api/building";
-import { listRoomsLite } from "../../services/api/rooms";
 import { colors } from "../../constants/colors";
+import { getAccessToken } from "../../services/http";
 
-/** convert yyyy-mm-dd → ISO */
-const toISO = (d) => (d ? new Date(d).toISOString() : undefined);
 
 export default function UserCreatePage() {
   const navigate = useNavigate();
@@ -20,10 +18,36 @@ export default function UserCreatePage() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [userId, setUserId] = useState(null);
-
-  const [rooms, setRooms] = useState([]);
   const [buildings, setBuildings] = useState([]);
+  const getCurrentUserId = () => {
+    const token = getAccessToken();
+    if (!token) return null;
 
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return payload?.userId ?? null; // 👈 FIX CHÍNH XÁC
+    } catch {
+      return null;
+    }
+  };
+  const getCurrentUserRole = () => {
+    const token = getAccessToken();
+    if (!token) return "";
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return String(payload?.role || "").toLowerCase();
+    } catch {
+      return "";
+    }
+  };
+  const currentUserId = getCurrentUserId();
+  const currentUserRole = getCurrentUserRole();
+  useEffect(() => {
+    if (currentUserRole === "manager") {
+      setRole("tenant");
+    }
+  }, []);
   /** USER */
   const [userForm, setUserForm] = useState({
     full_name: "",
@@ -33,40 +57,55 @@ export default function UserCreatePage() {
     email: "",
     password: "",
   });
-
   /** TENANT */
- const [tenantForm, setTenantForm] = useState({
-  buildingId: "",
-  roomId: "",
-  idNumber: "",
-  note: "",
-});
+  const [tenantForm, setTenantForm] = useState({
+    buildingId: "",
+    idNumber: "",
+    note: "",
+  });
 
   /** MANAGER */
-const [managerForm, setManagerForm] = useState({
-  buildingId: "",
-  note: "",
-});
+  const [managerForm, setManagerForm] = useState({
+    buildingId: "",
+    note: "",
+  });
 
   /** load data step 3 */
   useEffect(() => {
     if (step !== 3) return;
 
-    if (role === "tenant") {
-      listBuildings().then(setBuildings).catch(() => setBuildings([]));
-    }
+    listBuildings()
+      .then((data) => {
+        setBuildings(data);
 
-    if (role === "manager") {
-      listBuildings().then(setBuildings).catch(() => setBuildings([]));
-    }
+        // MANAGER tạo TENANT → auto select building
+        if (currentUserRole === "manager" && role === "tenant") {
+          const myBuilding = data.find((b) =>
+            b.managers?.some(
+              (m) => Number(m.user_id) === Number(currentUserId)
+            )
+          );
+          if (!myBuilding) {
+            console.warn("Manager chưa được gán building");
+            console.log("Current user:", currentUserId);
+            console.table(
+              data.map(b => ({
+                building: b.name,
+                managers: b.managers?.map(m => m.user_id)
+              }))
+            );
+          }
+          if (myBuilding) {
+            setTenantForm((prev) => ({
+              ...prev,
+              buildingId: String(myBuilding.building_id),
+            }));
+          }
+        }
+      })
+      .catch(() => setBuildings([]));
   }, [step, role]);
-useEffect(() => {
-  if (!tenantForm.buildingId) return;
 
-  listRoomsLite({ buildingId: tenantForm.buildingId })
-    .then(setRooms)
-    .catch(() => setRooms([]));
-}, [tenantForm.buildingId]);
   /** STEP 2 */
   const submitUser = async (e) => {
     e.preventDefault();
@@ -85,51 +124,60 @@ useEffect(() => {
   };
 
   /** STEP 3 */
-const submitRole = async (e) => {
-  e.preventDefault();
-  setSaving(true);
-  setErr("");
+  const submitRole = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setErr("");
 
-  try {
-    if (!userId) throw new Error("User chưa được tạo");
+    try {
+      if (!userId) throw new Error("User chưa được tạo");
 
-    // TENANT
-    if (role === "tenant") {
-      if (!tenantForm.roomId) {
-        throw new Error("Chưa chọn phòng");
+      // TENANT
+      if (role === "tenant") {
+        if (!tenantForm.buildingId) {
+          throw new Error("Chưa chọn tòa nhà");
+        }
+        console.log("Tenant payload", {
+          userId,
+          buildingId: tenantForm.buildingId,
+          idNumber: tenantForm.idNumber,
+        });
+        await changeToTenant({
+          userId: Number(userId),
+          buildingId: Number(tenantForm.buildingId),
+          idNumber: tenantForm.idNumber,
+          note: tenantForm.note || null,
+        });
+      }
+      if (currentUserRole === "manager" && role !== "tenant") {
+        throw new Error("Quản lý chỉ được tạo người thuê");
+      }
+      // MANAGER
+      if (role === "manager") {
+        if (!managerForm.buildingId) {
+          throw new Error("Chưa chọn tòa nhà");
+        }
+
+        await changeToManager({
+          userId: Number(userId),
+          buildingId: Number(managerForm.buildingId),
+          note: managerForm.note || null,
+        });
       }
 
-      await changeToTenant({
-        userId: Number(userId),
-        roomId: Number(tenantForm.roomId),
-        idNumber: tenantForm.idNumber,
-        note: tenantForm.note || null,
-      });
+      alert("Tạo người dùng thành công");
+      navigate("/users");
+    } catch (e) {
+      console.error(e);
+      setErr(e?.response?.data?.message || e.message || "Gán vai trò thất bại");
+    } finally {
+      setSaving(false);
     }
-
-    // MANAGER
-    if (role === "manager") {
-      if (!managerForm.buildingId) {
-        throw new Error("Chưa chọn tòa nhà");
-      }
-
-      await changeToManager({
-        userId: Number(userId),
-        buildingId: Number(managerForm.buildingId),
-        note: managerForm.note || null,
-      });
-    }
-
-    alert("Tạo người dùng thành công");
-    navigate("/users");
-  } catch (e) {
-    console.error(e);
-    setErr(e?.response?.data?.message || e.message || "Gán vai trò thất bại");
-  } finally {
-    setSaving(false);
-  }
-};
-
+  };
+  const titleByRole = {
+    tenant: "người thuê",
+    manager: "quản lý",
+  };
   return (
     <div className="page">
       <style>{`
@@ -209,12 +257,16 @@ const submitRole = async (e) => {
           color:#fff;
         }
         .btn-secondary{
-          background:#e5e7eb;
+          background:#e5e7eb  ;
         }
       `}</style>
 
       <div className="card">
-        <h1>Tạo người dùng</h1>
+        <h1>
+          {step === 1 && "Chọn loại người dùng"}
+          {step === 2 && `Nhập thông tin ${titleByRole[role]}`}
+          {step === 3 && `Hoàn tất ${titleByRole[role]}`}
+        </h1>
         {err && <div className="error">{err}</div>}
 
         {/* STEP 1 */}
@@ -227,12 +279,14 @@ const submitRole = async (e) => {
               >
                 Người thuê
               </div>
-              <div
-                className={`role ${role === "manager" ? "active" : ""}`}
-                onClick={() => setRole("manager")}
-              >
-                Quản lý
-              </div>
+              {currentUserRole !== "manager" && (
+                <div
+                  className={`role ${role === "manager" ? "active" : ""}`}
+                  onClick={() => setRole("manager")}
+                >
+                  Quản lý
+                </div>
+              )}
             </div>
 
             <div className="actions">
@@ -344,99 +398,77 @@ const submitRole = async (e) => {
         {step === 3 && (
           <form onSubmit={submitRole}>
             {role === "tenant" && (
-  <>
-    <div className="field">
-      <label>Tòa nhà</label>
-      <select
-        value={tenantForm.buildingId}
-        onChange={(e) =>
-          setTenantForm({
-            ...tenantForm,
-            buildingId: e.target.value,
-            roomId: "", // reset phòng khi đổi building
-          })
-        }
-        required
-      >
-        <option value="">-- Chọn tòa nhà --</option>
-        {buildings.map((b) => (
-          <option key={b.building_id} value={b.building_id}>
-            {b.name}
-          </option>
-        ))}
-      </select>
-    </div>
+              <>
+                <div className="field">
+                  <label>Tòa nhà</label>
+                  <select
+                    value={tenantForm.buildingId}
+                    disabled={currentUserRole === "manager"}
+                    onChange={(e) =>
+                      setTenantForm({ ...tenantForm, buildingId: e.target.value })
+                    }
+                    required
+                  >
+                    <option value="">-- Chọn tòa nhà --</option>
+                    {buildings.map((b) => (
+                      <option key={b.building_id} value={String(b.building_id)}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
 
-    <div className="field">
-      <label>Phòng</label>
-      <select
-        value={tenantForm.roomId}
-        onChange={(e) =>
-          setTenantForm({ ...tenantForm, roomId: e.target.value })
-        }
-        disabled={!tenantForm.buildingId}
-        required
-      >
-        <option value="">-- Chọn phòng --</option>
-        {rooms.map((r) => {
-  const id = r.room_id ?? r.id ?? r.roomId;
-  const number = r.room_number ?? r.number ?? r.roomNo;
+                  {currentUserRole === "manager" && (
+                    <small className="hint">Tòa nhà được gán theo quản lý</small>
+                  )}
 
-  return (
-    <option key={id} value={id}>
-      {number || `Phòng #${id}`}
-    </option>
-  );
-})}
-      </select>
-    </div>
+                </div>
 
-    <div className="field">
-      <label>CCCD / CMND</label>
-      <input
-        value={tenantForm.idNumber}
-        onChange={(e) =>
-          setTenantForm({ ...tenantForm, idNumber: e.target.value })
-        }
-        required
-      />
-    </div>
+                <div className="field">
+                  <label>CCCD / CMND</label>
+                  <input
+                    value={tenantForm.idNumber}
+                    onChange={(e) =>
+                      setTenantForm({ ...tenantForm, idNumber: e.target.value })
+                    }
+                    required
+                  />
+                </div>
 
-    <div className="field">
-      <label>Ghi chú</label>
-      <input
-        value={tenantForm.note}
-        onChange={(e) =>
-          setTenantForm({ ...tenantForm, note: e.target.value })
-        }
-      />
-    </div>
-  </>
-)}
+                <div className="field">
+                  <label>Ghi chú</label>
+                  <input
+                    value={tenantForm.note}
+                    onChange={(e) =>
+                      setTenantForm({ ...tenantForm, note: e.target.value })
+                    }
+                  />
+                </div>
+              </>
+            )}
 
             {role === "manager" && (
               <>
                 <div className="field">
                   <label>Tòa nhà</label>
                   <select
-  value={managerForm.buildingId}
-  onChange={(e) =>
-    setManagerForm({ ...managerForm, buildingId: e.target.value })
-  }
-  required
->
-  <option value="">-- Chọn tòa nhà --</option>
+                    value={managerForm.buildingId}
+                    onChange={(e) =>
+                      setManagerForm({ ...managerForm, buildingId: e.target.value })
+                    }
+                    required
+                  >
+                    <option value="">-- Chọn tòa nhà --</option>
 
-  {buildings.map((b) => {
-    const id = b.id ?? b.building_id;
+                    {buildings.map((b) => {
+                      const id = b.id ?? b.building_id;
 
-    return (
-      <option key={id} value={id}>
-        {b.name || `Tòa nhà #${id}`}
-      </option>
-    );
-  })}
-</select>
+                      return (
+                        <option key={id} value={id}>
+                          {b.name || `Tòa nhà #${id}`}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
                 <div className="field">
                   <label>Ghi chú</label>

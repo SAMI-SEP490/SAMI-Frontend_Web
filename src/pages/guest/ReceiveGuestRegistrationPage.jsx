@@ -85,7 +85,7 @@ export default function ReceiveGuestRegistrationPage() {
 
   const filtered = guestRegistrations.filter((item) => {
     const nameMatch =
-      item.tenants?.users?.full_name
+      item.host?.user?.full_name
         ?.toLowerCase()
         .includes(searchName.toLowerCase()) ?? false;
 
@@ -150,8 +150,8 @@ export default function ReceiveGuestRegistrationPage() {
               filtered.map((item, index) => (
                 <tr key={item.registration_id}>
                   <td className="center">{index + 1}</td>
-                  <td>{item.tenants?.users?.full_name || "—"}</td>
-                  <td className="center">{item.rooms?.room_number || "—"}</td>
+                  <td>{item.host?.user?.full_name || "—"}</td>
+                  <td className="center">{item.room?.room_number || "—"}</td>
                   <td className="center">
                     {item.created_at
                       ? new Date(item.created_at).toLocaleDateString("vi-VN")

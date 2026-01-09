@@ -129,11 +129,10 @@ export async function reactivateVehicle(id, slot_id) {
 /**
  * Đổi slot cho xe
  */
-export async function changeVehicleSlot(id, new_slot_id) {
-  const res = await http.post(`/vehicle/${id}/change-slot`, {
-    new_slot_id,
+export async function changeVehicleSlot(vehicleId, slotId) {
+  return http.post(`/vehicle/${vehicleId}/change-slot`, {
+    slot_id: slotId
   });
-  return res?.data?.data ?? null;
 }
 
 /**

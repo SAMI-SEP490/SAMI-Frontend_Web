@@ -20,7 +20,7 @@ export default function SlotListPage() {
   const [slots, setSlots] = useState([]);
   const [buildings, setBuildings] = useState([]);
   const [loading, setLoading] = useState(true);
-
+const [currentBuilding, setCurrentBuilding] = useState(null);
   /* ================= FILTER ================= */
   const [search, setSearch] = useState("");
   const [ownerBuildingId, setOwnerBuildingId] = useState(""); // OWNER ONLY
@@ -39,33 +39,65 @@ export default function SlotListPage() {
 
   /* ================= FETCH DATA ================= */
   async function fetchData() {
+  try {
+    setLoading(true);
+
+    let params = {};
+    if (role === "MANAGER" && userBuildingId) {
+      params.building_id = userBuildingId;
+    }
+
+    if (role === "OWNER" && ownerBuildingId) {
+      params.building_id = ownerBuildingId;
+    }
+
+    const sRes = await listParkingSlots(params);
+    setSlots(sRes?.slots || sRes || []);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false); // 🔥 QUAN TRỌNG
+  }
+}
+useEffect(() => {
+  if (!role) return;
+  fetchData();
+}, [role, ownerBuildingId, userBuildingId]);
+  useEffect(() => {
+  async function loadBuildings() {
     try {
-      setLoading(true);
+      const bRes = await listBuildingsForParking();
+      console.log("BUILDINGS API:", bRes);
 
-      if (role === "OWNER") {
-        const bRes = await listBuildingsForParking();
-        setBuildings(bRes || []);
+      setBuildings(bRes || []);
+
+      if (role === "OWNER" && bRes?.length) {
+        setOwnerBuildingId(bRes[0].building_id);
       }
 
-      let params = {};
-      if (role === "MANAGER" && userBuildingId) {
-        params.building_id = userBuildingId;
+      // 🔥 FIX QUAN TRỌNG
+      if (role === "MANAGER" && bRes?.length) {
+        console.log("MANAGER building:", bRes[0]);
+        setCurrentBuilding(bRes[0]);
       }
-
-      const sRes = await listParkingSlots(params);
-      setSlots(sRes?.slots || sRes || []);
     } catch (err) {
       console.error(err);
-      alert("❌ Lấy dữ liệu thất bại.");
-    } finally {
-      setLoading(false);
     }
   }
 
-  useEffect(() => {
-    if (role) fetchData();
-  }, [role, userBuildingId]);
+  if (role) loadBuildings();
+}, [role]);
 
+useEffect(() => {
+  if (!role || !buildings.length) return;
+
+  if (role === "OWNER" && ownerBuildingId) {
+    const found = buildings.find(
+      b => b.building_id === Number(ownerBuildingId)
+    );
+    setCurrentBuilding(found || null);
+  }
+}, [role, ownerBuildingId, buildings]);
   /* ================= DELETE ================= */
   async function handleDelete(slot) {
     if (!slot.is_available) return;
@@ -109,17 +141,25 @@ export default function SlotListPage() {
 
   /* ================= STATISTICS ================= */
   const statistics = useMemo(() => {
-    const baseSlots =
-      role === "OWNER" && ownerBuildingId
-        ? slots.filter((s) => s.building_id === Number(ownerBuildingId))
-        : slots;
+  const baseSlots =
+    role === "OWNER" && ownerBuildingId
+      ? slots.filter((s) => s.building_id === Number(ownerBuildingId))
+      : slots;
 
-    const total = baseSlots.length;
-    const available = baseSlots.filter((s) => s.is_available).length;
-    const used = total - available;
+  const total = baseSlots.length;
+  const available = baseSlots.filter((s) => s.is_available).length;
+  const used = total - available;
 
-    return { total, available, used };
-  }, [slots, ownerBuildingId, role]);
+  const twoWheeler = baseSlots.filter(
+    (s) => s.slot_type === "two_wheeler"
+  ).length;
+
+  const fourWheeler = baseSlots.filter(
+    (s) => s.slot_type === "four_wheeler"
+  ).length;
+
+  return { total, available, used, twoWheeler, fourWheeler };
+}, [slots, ownerBuildingId, role]);
 
   if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
 
@@ -129,10 +169,17 @@ export default function SlotListPage() {
 
       {/* ================= STAT ================= */}
       <div className="stat-box">
-        <span>📊 Tổng: {statistics.total}</span>
-        <span className="available">🟢 Trống: {statistics.available}</span>
-        <span className="unavailable">🔴 Đã dùng: {statistics.used}</span>
-      </div>
+  <span>📊 Tổng: {statistics.total}</span>
+  <span className="available">🟢 Trống: {statistics.available}</span>
+  <span className="unavailable">🔴 Đã dùng: {statistics.used}</span>
+
+  {currentBuilding && (
+  <>
+    <span>🏍️ Xe 2 bánh tối đa: {currentBuilding.max_2_wheel_slot ?? "—"}</span>
+    <span>🚗 Xe 4 bánh tối đa: {currentBuilding.max_4_wheel_slot ?? "—"}</span>
+  </>
+)}
+</div>
 
       {/* ================= FILTER BAR ================= */}
       <div className="filter-bar">
@@ -145,19 +192,18 @@ export default function SlotListPage() {
         />
 
         {role === "OWNER" && (
-          <select
-            value={ownerBuildingId}
-            onChange={(e) => setOwnerBuildingId(e.target.value)}
-            className="status-select"
-          >
-            <option value="">Tất cả tòa nhà</option>
-            {buildings.map((b) => (
-              <option key={b.building_id} value={b.building_id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        )}
+  <select
+    value={ownerBuildingId}
+    onChange={(e) => setOwnerBuildingId(e.target.value)}
+    className="status-select"
+  >
+    {buildings.map((b) => (
+      <option key={b.building_id} value={b.building_id}>
+        {b.name}
+      </option>
+    ))}
+  </select>
+)}
 
         <select
           value={typeFilter}
@@ -165,8 +211,8 @@ export default function SlotListPage() {
           className="status-select"
         >
           <option value="">Tất cả loại xe</option>
-          <option value="two_wheeler">Xe máy</option>
-          <option value="four_wheeler">Ô tô</option>
+          <option value="two_wheeler">Xe 2 bánh</option>
+          <option value="four_wheeler">Xe 4 bánh</option>
         </select>
 
         <select
@@ -199,7 +245,7 @@ export default function SlotListPage() {
                 <td>{index + 1}</td>
                 <td>{slot.slot_number}</td>
                 <td>
-                  {slot.slot_type === "two_wheeler" ? "Xe máy" : "Ô tô"}
+                  {slot.slot_type === "two_wheeler" ? "Xe 2 bánh" : "Xe 4 bánh"}
                 </td>
                 <td>
                   <span
@@ -211,15 +257,6 @@ export default function SlotListPage() {
                   </span>
                 </td>
                 <td className="action-buttons">
-                  <button
-                    className="btn edit"
-                    onClick={() =>
-                      navigate(`/parking-slots/${slot.slot_id}/edit`)
-                    }
-                  >
-                    <Pencil size={14} /> Sửa
-                  </button>
-
                   <button
                     className={`btn delete ${
                       !slot.is_available ? "disabled" : ""

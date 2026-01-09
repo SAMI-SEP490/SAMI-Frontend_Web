@@ -1,6 +1,7 @@
 // src/pages/user/UserListPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { listBuildings } from "../../services/api/building";
 import { listUsers, deleteUser, restoreUser } from "../../services/api/users";
 import {
   Eye,
@@ -29,7 +30,8 @@ const normalizeUser = (u) => {
 
 export default function UserListPage() {
   const navigate = useNavigate();
-
+const [buildings, setBuildings] = useState([]);
+const [buildingFilter, setBuildingFilter] = useState("");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -37,18 +39,24 @@ export default function UserListPage() {
 
   /* ================= Fetch ================= */
   useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const data = await listUsers();
-        const raw = Array.isArray(data) ? data : [];
-        setUsers(raw.map(normalizeUser));
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
+  (async () => {
+    try {
+      setLoading(true);
+      const data = await listUsers({
+        building_id: buildingFilter || undefined,
+      });
+      setUsers((Array.isArray(data) ? data : []).map(normalizeUser));
+    } finally {
+      setLoading(false);
+    }
+  })();
+}, [buildingFilter]);
+useEffect(() => {
+  (async () => {
+    const data = await listBuildings();
+    setBuildings(Array.isArray(data) ? data : []);
+  })();
+}, []);
   /* ================= Labels ================= */
   const roleLabel = (role) => {
     switch (String(role).toLowerCase()) {
@@ -115,13 +123,25 @@ export default function UserListPage() {
       <h2 className="title">Quản lý người dùng</h2>
 
       {/* FILTER + ACTION */}
-      <div className="filter-bar grid">
+      <div className="filter-bar filter-grid">
         <input
           className="search-input"
           placeholder="🔎 Tìm theo tên hoặc email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+<select
+  className="status-select"
+  value={buildingFilter}
+  onChange={(e) => setBuildingFilter(e.target.value)}
+>
+  <option value="">Tất cả tòa nhà</option>
+  {buildings.map((b) => (
+    <option key={b.building_id} value={b.building_id}>
+      {b.name}
+    </option>
+  ))}
+</select>
 
         <select
           className="status-select"

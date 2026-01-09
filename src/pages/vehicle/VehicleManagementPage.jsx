@@ -7,10 +7,11 @@ import {
 } from "../../services/api/vehicle";
 import { listAvailableSlotsForVehicle } from "../../services/api/parking-slots";
 import "./VehicleManagementPage.css";
-
+import { listBuildingsForParking } from "../../services/api/parking-slots";
+import { getAccessToken } from "../../services/http";
 const VEHICLE_TYPE_VN = {
-  two_wheeler: "Xe máy",
-  four_wheeler: "Ô tô",
+  two_wheeler: "Xe 2 bánh",
+  four_wheeler: "Xe 4 bánh",
 };
 
 const STATUS_VN = {
@@ -18,11 +19,19 @@ const STATUS_VN = {
   inactive: "Ngừng",
   deactivated: "Đã hủy",
 };
+function notifySuccess(message) {
+  alert("✅ " + message);
+}
 
+function notifyError(message) {
+  alert("❌ " + message);
+}
 export default function VehicleManagementPage() {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(false);
-
+const [userRole, setUserRole] = useState(null);
+const [buildings, setBuildings] = useState([]);
+const [filterBuilding, setFilterBuilding] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
@@ -35,24 +44,43 @@ export default function VehicleManagementPage() {
   // LOAD VEHICLES (FIX pagination)
   // ===============================
   async function loadVehicles() {
-    setLoading(true);
-    try {
-      const res = await listVehicles({
-        type: filterType || undefined,
-        status: filterStatus || undefined,
-      });
+  setLoading(true);
+  try {
+    const params = {
+      type: filterType || undefined,
+      status: filterStatus || undefined,
+    };
 
-      // API returns { items, page, total, limit }
-      const list = Array.isArray(res) ? res : res.items;
-setVehicles(list || []);
-    } finally {
-      setLoading(false);
+    if (userRole === "OWNER" && filterBuilding) {
+      params.building_id = filterBuilding;
     }
-  }
 
+    const res = await listVehicles(params);
+console.log("🚘 VEHICLE API RAW:", res);
+    // 🔥 res ĐÃ LÀ ARRAY
+setVehicles(Array.isArray(res) ? res : []);
+  } finally {
+    setLoading(false);
+  }
+}
+useEffect(() => {
+  const token = getAccessToken();
+  if (!token) return;
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    setUserRole(payload.role);
+
+    if (payload.role === "OWNER") {
+      listBuildingsForParking().then(setBuildings);
+    }
+  } catch (err) {
+    console.error("❌ Invalid token", err);
+  }
+}, []);
   useEffect(() => {
-    loadVehicles();
-  }, [filterType, filterStatus]);
+  if (userRole) loadVehicles();
+}, [filterType, filterStatus, filterBuilding, userRole]);
 
   // ===============================
   // OPEN SLOT MODAL
@@ -61,7 +89,7 @@ setVehicles(list || []);
   setSelectedVehicle({ ...vehicle, mode });
   setSelectedSlotId("");
   setShowSlotModal(true);
-
+  console.log('SELECTED VEHICLE:', vehicle);
   const slots = await listAvailableSlotsForVehicle(vehicle.vehicle_id);
   setAvailableSlots(slots);
 }
@@ -77,6 +105,7 @@ setVehicles(list || []);
         selectedVehicle.vehicle_id,
         Number(selectedSlotId)
       );
+      notifySuccess("Kích hoạt xe thành công!");
     }
 
     if (selectedVehicle.mode === "change") {
@@ -84,6 +113,7 @@ setVehicles(list || []);
         selectedVehicle.vehicle_id,
         Number(selectedSlotId)
       );
+      notifySuccess("Đổi slot xe thành công!");
     }
 
     setShowSlotModal(false);
@@ -99,32 +129,274 @@ setVehicles(list || []);
     await deactivateVehicle(vehicle.vehicle_id);
     await loadVehicles();
   }
+const pageStyle = `
+/* ===============================
+   CONTAINER
+   =============================== */
+.container {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 24px 30px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.container h2 {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1e3a8a;
+  border-bottom: 2px solid #3b82f6;
+  padding-bottom: 10px;
+  margin-bottom: 24px;
+}
+
+/* ===============================
+   FILTER BAR
+   =============================== */
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.filter-bar select {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* ===============================
+   TABLE
+   =============================== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead {
+  background: #f3f4f6;
+}
+
+th,
+td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+  text-align: left;
+}
+
+th {
+  font-weight: 600;
+  color: #374151;
+}
+
+tbody tr:hover {
+  background: #f9fafb;
+}
+
+td button {
+  margin-right: 6px;
+}
+
+/* ===============================
+   STATUS BADGE
+   =============================== */
+.status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.status.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.inactive {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.status.deactivated {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ===============================
+   BUTTONS
+   =============================== */
+button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  background: #e5e7eb;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: #3b82f6;
+  color: #fff;
+}
+
+button.success {
+  background: #22c55e;
+  color: #fff;
+}
+
+button.warning {
+  background: #f59e0b;
+  color: #fff;
+}
+
+button.danger {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* ===============================
+   LOADING / EMPTY
+   =============================== */
+.loading-text,
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+}
+
+/* ===============================
+   MODAL OVERLAY (FIXED)
+   =============================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* ===============================
+   MODAL OVERLAY
+   =============================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* ===============================
+   MODAL BOX (FIX KHÔNG HIỆN)
+   =============================== */
+.modal {
+  position: relative;              /* 🔴 QUAN TRỌNG */
+  z-index: 10000;                  /* 🔴 CAO HƠN OVERLAY */
+  background: #ffffff;
+  padding: 22px;
+  border-radius: 10px;
+  width: 360px;
+  max-width: 90%;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+
+  /* 🔴 ÉP HIỆN */
+  display: block;
+  opacity: 1;
+  transform: none;
+}
+
+/* ===============================
+   MODAL TITLE
+   =============================== */
+.modal h3 {
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* ===============================
+   MODAL FORM
+   =============================== */
+.modal select {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 18px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+}
+
+/* ===============================
+   MODAL ACTIONS
+   =============================== */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+`;
 
   // ===============================
   // UI
   // ===============================
   return (
+    <>
+    <style>{pageStyle}</style>
     <div className="container">
       <h2>🚘 Quản lý phương tiện</h2>
 
       {/* FILTER */}
       <div className="filter-bar">
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-          <option value="">Tất cả loại xe</option>
-          <option value="two_wheeler">Xe máy</option>
-          <option value="four_wheeler">Ô tô</option>
-        </select>
+  {userRole === "OWNER" && (
+    <select
+      value={filterBuilding}
+      onChange={(e) => setFilterBuilding(e.target.value)}
+    >
+      <option value="">Tất cả tòa nhà</option>
+      {buildings.map((b) => (
+        <option key={b.building_id} value={b.building_id}>
+          {b.name}
+        </option>
+      ))}
+    </select>
+  )}
 
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="active">Hoạt động</option>
-          <option value="inactive">Ngừng</option>
-          <option value="deactivated">Đã hủy</option>
-        </select>
-      </div>
+  <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+    <option value="">Tất cả loại xe</option>
+    <option value="two_wheeler">Xe 2 bánh</option>
+    <option value="four_wheeler">Xe 4 bánh</option>
+  </select>
+
+  <select
+    value={filterStatus}
+    onChange={(e) => setFilterStatus(e.target.value)}
+  >
+    <option value="">Tất cả trạng thái</option>
+    <option value="active">Hoạt động</option>
+    <option value="inactive">Ngừng</option>
+    <option value="deactivated">Đã hủy</option>
+  </select>
+</div>
 
       {/* TABLE */}
       {loading ? (
@@ -213,6 +485,6 @@ setVehicles(list || []);
           </div>
         </div>
       )}
-    </div>
+    </div></>
   );
 }

@@ -5,28 +5,72 @@ import {
   rejectVehicleRegistration,
   deleteVehicleRegistration
 } from "../../services/api/vehicle";
-import { listAvailableParkingSlots } from "../../services/api/parking-slots";
+import { listAvailableParkingSlots,
+  listBuildingsForParking
+ } from "../../services/api/parking-slots";
+ import { getAccessToken } from "../../services/http";
 import { createPortal } from "react-dom";
-import "./VehicleRegistrationListPage.css?x=1"
+
 export default function VehicleRegistrationListPage() {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+const VEHICLE_TYPE_LABEL = {
+  two_wheeler: "Xe 2 bánh",
+  four_wheeler: "Xe 4 bánh",
+};
 
+const STATUS_LABEL = {
+  requested: "Chờ duyệt",
+  pending: "Chờ duyệt",
+  approved: "Đã duyệt",
+  rejected: "Từ chối"
+};
+const [role, setRole] = useState(null);
+const [buildings, setBuildings] = useState([]);
+const [selectedBuilding, setSelectedBuilding] = useState("");
   // approve modal
   const [approveTarget, setApproveTarget] = useState(null);
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState("");
+useEffect(() => {
+  const token = getAccessToken();
+  if (!token) return;
 
+  const decoded = JSON.parse(atob(token.split(".")[1]));
+  setRole(decoded.role?.toUpperCase());
+}, []);
+useEffect(() => {
+  if (role !== "OWNER") return;
+
+  const loadBuildings = async () => {
+    const res = await listBuildingsForParking();
+    setBuildings(res || []);
+  };
+
+  loadBuildings();
+}, [role]);
   async function fetchData() {
-    setLoading(true);
-    const res = await listVehicleRegistrations();
-    setRegistrations(res?.registrations ?? res ?? []);
-    setLoading(false);
+  setLoading(true);
+
+  const filters = {};
+
+  // ✅ OWNER ONLY
+  if (role === "OWNER" && selectedBuilding) {
+    filters.building_id = selectedBuilding;
   }
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const res = await listVehicleRegistrations(filters);
+  setRegistrations(res?.registrations ?? []);
+  setLoading(false);
+}
+
+useEffect(() => {
+  if (!role) return; // ⛔ CHỐT CHẶN QUAN TRỌNG
+
+  fetchData();
+  console.log("🔥 FRONT ROLE:", role);
+}, [role, selectedBuilding]);
 
   /* ================= APPROVE ================= */
 
@@ -343,7 +387,21 @@ tr:hover {
       {/* ===== MAIN TABLE ===== */}
       <div className="container">
         <h2 className="title">Danh sách đăng ký xe</h2>
-
+{role === "OWNER" && (
+  <div style={{ marginBottom: 16 }}>
+    <select
+      value={selectedBuilding}
+      onChange={(e) => setSelectedBuilding(e.target.value)}
+    >
+      <option value="">-- Tất cả tòa nhà --</option>
+      {buildings.map((b) => (
+        <option key={b.building_id} value={b.building_id}>
+          {b.name}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
         {registrations.length === 0 ? (
           <p className="no-data">Không có dữ liệu</p>
         ) : (
@@ -365,11 +423,11 @@ tr:hover {
                     <td>{i + 1}</td>
                     <td>{r.requester?.user?.full_name}</td>
                     <td>{r.license_plate}</td>
-                    <td>{r.vehicle_type}</td>
+                    <td>{VEHICLE_TYPE_LABEL[r.vehicle_type] || "—"}</td>
 
                     <td className="center">
                       <span className={`status ${r.status}`}>
-                        {r.status.toUpperCase()}
+                         {STATUS_LABEL[r.status] || r.status}
                       </span>
                     </td>
 
@@ -381,7 +439,7 @@ tr:hover {
                               className="btn approve"
                               onClick={() => openApprove(r)}
                             >
-                              Approve
+                              Duyệt
                             </button>
 
                             <button
@@ -390,7 +448,7 @@ tr:hover {
                                 handleReject(r.registration_id)
                               }
                             >
-                              Reject
+                              Từ chối
                             </button>
                           </>
                         )}
@@ -435,7 +493,7 @@ tr:hover {
             onClick={() => setApproveTarget(null)}
             style={{ marginLeft: 8 }}
           >
-            Hủy
+            Hủy 
           </button>
         </div>
       </div>

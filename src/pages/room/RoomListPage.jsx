@@ -244,11 +244,21 @@ function RoomListPage() {
     }
   };
 
-  const handleResetFilters = () => {
-    setStatusFilter("");
-    setBuildingFilter("");
-    setFloorFilter("");
-    setSearchTerm("");
+  const handleDeleteRoom = async () => {
+    if (!selectedRoom?.room_id) {
+      alert("ID phòng không hợp lệ!");
+      return;
+    }
+
+    try {
+      // Assuming there's a deleteRoom API
+      // await deleteRoom(selectedRoom.room_id);
+      alert("Tính năng xóa phòng chưa được implement!");
+      setShowDeleteModal(false);
+    } catch (error) {
+      alert("❌ Lỗi khi xóa phòng!");
+      console.error(error);
+    }
   };
 
   // ===== FILTER =====
@@ -260,8 +270,8 @@ function RoomListPage() {
       : true;
 
     const matchesBuilding = buildingFilter
-      ? room.building_name === buildingFilter
-      ? String(room.building_id) === String(buildingFilter)
+      ? room.building_name === buildingFilter ||
+        String(room.building_id) === String(buildingFilter)
       : true;
     const matchesFloor = floorFilter
       ? room.floor === parseInt(floorFilter)
@@ -347,9 +357,6 @@ function RoomListPage() {
             onChange={(e) => setBuildingFilter(e.target.value)}
           >
             <option value="">Tất cả tòa nhà</option>
-            {getUniqueBuildings().map((building) => (
-              <option key={building} value={building}>
-                {building}
             {buildings.map((b) => (
               <option key={b.building_id} value={String(b.building_id)}>
                 {b.name}
@@ -413,7 +420,6 @@ function RoomListPage() {
                 <tr key={roomId} className={rowClassName}>
                   <td>{index + 1}</td>
                   {userRole === "OWNER" && (
-                    <td>{room.building_name || "N/A"}</td>
                     <td>{buildingMap[room.building_id] || "N/A"}</td>
                   )}
                   <td>
@@ -469,7 +475,6 @@ function RoomListPage() {
         size="xl"
         container={document.querySelector(".main-content")}
         backdrop={false}
-        size="lg"
       >
         <Modal.Header closeButton>
           <Modal.Title>
@@ -571,7 +576,6 @@ function RoomListPage() {
         size="xl"
         container={document.querySelector(".main-content")}
         backdrop={false}
-        size="lg"
       >
         <Modal.Header closeButton>
           <Modal.Title>✏️ Chỉnh sửa phòng</Modal.Title>

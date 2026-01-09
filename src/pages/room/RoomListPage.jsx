@@ -466,15 +466,14 @@ function RoomListPage() {
         </Table>
       </div>
 
-      {showDetailModal && <div className="custom-modal-backdrop"></div>}
-
       {/* MODAL VIEW DETAILS */}
       <Modal
         show={showDetailModal}
         onHide={() => setShowDetailModal(false)}
-        size="xl"
-        container={document.querySelector(".main-content")}
-        backdrop={false}
+        size="lg"
+        fullscreen="sm-down"
+        backdrop={true}
+        container={document.body}
       >
         <Modal.Header closeButton>
           <Modal.Title>
@@ -567,14 +566,12 @@ function RoomListPage() {
         </Modal.Footer>
       </Modal>
 
-      {showEditModal && <div className="custom-modal-backdrop"></div>}
-
       {/* MODAL EDIT */}
       <Modal
         show={showEditModal}
         onHide={() => setShowEditModal(false)}
-        size="xl"
-        container={document.querySelector(".main-content")}
+        size="lg"
+        container={document.body}
         backdrop={false}
       >
         <Modal.Header closeButton>
@@ -644,14 +641,12 @@ function RoomListPage() {
         </Modal.Footer>
       </Modal>
 
-      {showDeleteModal && <div className="custom-modal-backdrop"></div>}
-
       {/* MODAL DELETE CONFIRM */}
       <Modal
         show={showDeleteModal}
         onHide={() => setShowDeleteModal(false)}
-        size="xl"
-        container={document.querySelector(".main-content")}
+        size="lg"
+        container={document.body}
         backdrop={false}
       >
         <Modal.Header closeButton>

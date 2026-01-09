@@ -137,12 +137,6 @@ function RoomListPage() {
     return statusMap[status] || status;
   };
 
-  const getUniqueBuildings = () => {
-    const buildings = [
-      ...new Set(rooms.map((r) => r.building_name).filter(Boolean)),
-    ];
-    return buildings.sort();
-  };
   const buildingMap = React.useMemo(() => {
     const map = {};
     buildings.forEach((b) => {

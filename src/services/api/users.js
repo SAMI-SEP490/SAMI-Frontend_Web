@@ -24,48 +24,16 @@ const TENANTS_FALLBACK_PATHS = [
 ];
 
 export async function listTenants(params = {}) {
-  // 1) Gọi đúng route: /api/user/list-users
-  try {
-    const res = await http.get(LIST_USERS_PATH, { params });
-    const raw = unwrap(res);
+  const res = await http.get("/user/list-users", { params });
+  const data = unwrap(res);
 
-    // raw có thể là mảng hoặc object { data: [...] } hoặc { users: [...] }
-    const arr = Array.isArray(raw)
-      ? raw
-      : Array.isArray(raw?.data)
-      ? raw.data
-      : Array.isArray(raw?.users)
-      ? raw.users
-      : [];
+  const arr = Array.isArray(data?.data)
+    ? data.data
+    : Array.isArray(data)
+    ? data
+    : [];
 
-    // Chỉ lấy role = tenant (nhiều backend đặt khác key/lowercase)
-    return arr.filter(
-      (u) => String(u?.role ?? u?.role_name ?? "").toLowerCase() === "tenant"
-    );
-  } catch (e) {
-    // 2) Fallback cho các codebase cũ
-    let lastErr = e;
-    for (const p of TENANTS_FALLBACK_PATHS) {
-      try {
-        const res = await http.get(p, { params });
-        const data = unwrap(res);
-        const list = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.data)
-          ? data.data
-          : [];
-        if (list.length) {
-          return list.filter(
-            (u) =>
-              String(u?.role ?? u?.role_name ?? "").toLowerCase() === "tenant"
-          );
-        }
-      } catch (er) {
-        lastErr = er;
-      }
-    }
-    throw lastErr;
-  }
+  return arr.filter((u) => u.role === "TENANT");
 }
 
 /** =========================
@@ -123,73 +91,66 @@ export async function registerUser({
  *  CHANGE TO TENANT (POST /user/change-to-tenant)
  *  Cho phép truyền cả roomId, idNumber, emergencyContactPhone, note...
  * ========================= */
-export async function changeToTenant(payload = {}) {
-  const res = await http.post("/user/change-to-tenant", payload);
+export async function changeToTenant({ userId, idNumber, note }) {
+  const res = await http.post("/user/change-to-tenant", {
+    userId: Number(userId),
+    idNumber,
+    note: note || undefined,
+  });
   return unwrap(res);
 }
+export async function assignTenantToRoom({
+  tenantUserId,
+  roomId,
+  movedInAt,
+  tenantType = "PRIMARY",
+  note,
+}) {
+  const res = await http.post("/room-tenants/assign", {
+    tenantUserId: Number(tenantUserId),
+    roomId: Number(roomId),
+    movedInAt: movedInAt
+      ? new Date(movedInAt).toISOString()
+      : new Date().toISOString(),
+    tenantType,
+    note,
+  });
 
+  return unwrap(res);
+}
 /** =========================
  *  REGISTER TENANT QUICK
  *  (gộp register user -> change-to-tenant)
  * ========================= */
 export async function registerTenantQuick(form) {
-  const email = String(form.email || "").trim();
-  const password = form.password;
-  const full_name = form.full_name || form.name || "";
-  const phoneDigits = digits(form.phone);
-  const gender = GENDER_MAP[form.gender] || undefined;
-  const birthday = normalizeDate(form.birthday || form.dob);
-
-  if (phoneDigits.length < 10) {
-    throw new Error("Số điện thoại phải có ít nhất 10 chữ số.");
-  }
-
-  const userRes = await registerUser({
-    email,
-    password,
-    phone: phoneDigits,
-    full_name,
-    gender,
-    birthday,
+  const user = await registerUser({
+    email: form.email,
+    password: form.password,
+    phone: form.phone,
+    full_name: form.full_name,
+    gender: form.gender,
+    birthday: form.birthday,
   });
 
-  const userId =
-    userRes?.id ||
-    userRes?.user_id ||
-    userRes?.uid ||
-    userRes?._id ||
-    userRes?.data?.id;
-  if (!userId) {
-    console.error("Register response (unexpected shape):", userRes);
-    throw new Error("Không lấy được userId sau khi đăng ký.");
-  }
+  const userId = user.user_id || user.id;
 
-  const idNumber =
-    digits(form.idNumber) || digits(Date.now()).slice(-12) || "000000000000";
-  const emergencyContactPhone = digits(form.emergencyPhone || form.phone).slice(
-    0,
-    11
-  );
-
-  const tenantRes = await changeToTenant({
+  // Tạo TENANT
+  await changeToTenant({
     userId,
-    idNumber,
-    emergencyContactPhone,
-    note:
-      [
-        form.address && `Địa chỉ: ${form.address}`,
-        form.floor && `Tầng: ${form.floor}`,
-        form.room && `Phòng: ${form.room}`,
-        form.startDate && `Từ: ${form.startDate}`,
-        form.endDate && `Đến: ${form.endDate}`,
-        form.contract && `Hợp đồng: ${form.contract}`,
-        form.note && `${form.note}`,
-      ]
-        .filter(Boolean)
-        .join(" | ") || "",
+    idNumber: form.idNumber,
+    note: form.note || undefined,
   });
 
-  return { userId, user: userRes, tenant: tenantRes };
+  // Gán phòng
+  if (form.roomId) {
+    await assignTenantToRoom({
+      tenantUserId: userId,
+      roomId: form.roomId,
+      movedInAt: form.startDate,
+    });
+  }
+
+  return userId;
 }
 
 /** =========================
@@ -258,14 +219,24 @@ export const changeManagerToTenant = async (payload) => {
   return unwrap(http.post("/user/change-to-tenant", payload));
 };
 
-export const changeToManager = async (payload) => {
-  return unwrap(http.post("/user/change-to-manager", payload));
+export const changeToManager = async ({
+  userId,
+  buildingId,
+  note,
+}) => {
+  return unwrap(
+    http.post("/user/change-to-manager", {
+      userId: Number(userId),
+      buildingId: Number(buildingId),
+      note: note || undefined,
+    })
+  );
 };
-
 // 🧭 Lấy danh sách tất cả users (chỉ owner và manager được phép)
-export const listUsers = async () => {
-  const res = await http.get("/user/list-users");
-  console.log("🌐 BASE URL:", http.defaults.baseURL);
+export const listUsers = async (params = {}) => {
+  const res = await http.get("/user/list-users", {
+    params, // ✅ CHÌA KHÓA
+  });
   return unwrap(res);
 };
 export async function deleteUser(userId) {

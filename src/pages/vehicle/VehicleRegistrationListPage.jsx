@@ -46,6 +46,11 @@ useEffect(() => {
   const loadBuildings = async () => {
     const res = await listBuildingsForParking();
     setBuildings(res || []);
+
+    // ⭐ AUTO CHỌN TÒA ĐẦU TIÊN
+    if (res?.length) {
+      setSelectedBuilding(res[0].building_id.toString());
+    }
   };
 
   loadBuildings();
@@ -66,12 +71,12 @@ useEffect(() => {
 }
 
 useEffect(() => {
-  if (!role) return; // ⛔ CHỐT CHẶN QUAN TRỌNG
+  if (!role) return;
+
+  if (role === "OWNER" && !selectedBuilding) return;
 
   fetchData();
-  console.log("🔥 FRONT ROLE:", role);
 }, [role, selectedBuilding]);
-
   /* ================= APPROVE ================= */
 
   const openApprove = (registration) => {

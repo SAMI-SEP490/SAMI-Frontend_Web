@@ -14,14 +14,14 @@ async function _callRoomsList() {
       const arr = Array.isArray(payload) ? payload : payload?.items ?? [];
 
       return (Array.isArray(arr) ? arr : [])
-          .map((r) => {
-            const id = r?.id ?? r?.room_id ?? r?.roomId;
-            const number = r?.room_number ?? r?.number ?? r?.name ?? `${id}`;
-            return id == null || !number
-                ? null
-                : { id: String(id), label: String(number) };
-          })
-          .filter(Boolean);
+        .map((r) => {
+          const id = r?.id ?? r?.room_id ?? r?.roomId;
+          const number = r?.room_number ?? r?.number ?? r?.name ?? `${id}`;
+          return id == null || !number
+            ? null
+            : { id: String(id), label: String(number) };
+        })
+        .filter(Boolean);
     }
 
     return [];
@@ -69,16 +69,25 @@ export async function getRoomsByBuildingId(buildingId, params = {}) {
     const response = await http.get(`/room/building/${buildingId}`, { params });
     return unwrap(response);
   } catch (error) {
-    console.error(`Lỗi khi lấy danh sách phòng của tòa nhà ${buildingId}:`, error);
+    console.error(
+      `Lỗi khi lấy danh sách phòng của tòa nhà ${buildingId}:`,
+      error
+    );
     throw error;
   }
 }
 export async function getEmptyRoomsByBuildingId(buildingId, params = {}) {
   try {
-    const response = await http.get(`/room/building/${buildingId}?onlyEmpty=true`, { params });
+    const response = await http.get(
+      `/room/building/${buildingId}?onlyEmpty=true`,
+      { params }
+    );
     return unwrap(response);
   } catch (error) {
-    console.error(`Lỗi khi lấy danh sách phòng của tòa nhà ${buildingId}:`, error);
+    console.error(
+      `Lỗi khi lấy danh sách phòng của tòa nhà ${buildingId}:`,
+      error
+    );
     throw error;
   }
 }
@@ -99,7 +108,10 @@ export async function getRoomStatisticsByBuilding(buildingId) {
     const response = await http.get(`/room/statistics/building/${buildingId}`);
     return unwrap(response);
   } catch (error) {
-    console.error(`Lỗi khi lấy thống kê phòng của building ${buildingId}:`, error);
+    console.error(
+      `Lỗi khi lấy thống kê phòng của building ${buildingId}:`,
+      error
+    );
     throw error;
   }
 }
@@ -155,6 +167,27 @@ export async function hardDeleteRoom(id) {
     return unwrap(response);
   } catch (error) {
     console.error(`Lỗi khi xóa phòng ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Thêm tenant vào phòng
+ * @param {string|number} roomId - ID phòng
+ * @param {Object} tenantData - Dữ liệu tenant
+ * Ví dụ tenantData:
+ * {
+ *   user_id: 6,
+ *   moved_in_at: "2025-01-01",
+ *   note: "Người ở ghép"
+ * }
+ */
+export async function addTenantToRoom(roomId, tenantData) {
+  try {
+    const response = await http.post(`/room/${roomId}/tenants`, tenantData);
+    return unwrap(response);
+  } catch (error) {
+    console.error(`Lỗi khi thêm tenant vào phòng ${roomId}:`, error);
     throw error;
   }
 }

@@ -12,6 +12,7 @@ import {
   listBuildings,
   listAssignedBuildings,
 } from "../../services/api/building";
+import { useNavigate } from "react-router-dom";
 
 function RoomListPage() {
   const [rooms, setRooms] = useState([]);
@@ -29,7 +30,11 @@ function RoomListPage() {
   const [editRoom, setEditRoom] = useState(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const navigate = useNavigate();
 
+  const handleAddTenant = (roomId) => {
+    navigate(`/rooms/${roomId}/tenants`);
+  };
   // ===== EXTRACT ROLE FROM JWT =====
   useEffect(() => {
     try {
@@ -419,7 +424,9 @@ function RoomListPage() {
                 <tr key={roomId} className={rowClassName}>
                   <td>{index + 1}</td>
                   {userRole === "OWNER" && (
-                    <td>{buildingMap[room.building_id] || "N/A"}</td>
+                    <td style={{ textAlign: "center" }}>
+                      {buildingMap[room.building_id] || "N/A"}
+                    </td>
                   )}
                   <td>
                     <strong>{room.room_number || "N/A"}</strong>
@@ -427,7 +434,9 @@ function RoomListPage() {
                   <td>{room.floor || "N/A"}</td>
                   <td>{room.size || "N/A"}</td>
                   <td>{renderStatus(room.status, room.is_active)}</td>
-                  <td>{room.tenant_count || 0}</td>
+                  <td style={{ textAlign: "center" }}>
+                    {room.tenant_count || 0}
+                  </td>
 
                   <td className="action-buttons">
                     <Button
@@ -438,7 +447,15 @@ function RoomListPage() {
                     >
                       👁 Xem
                     </Button>
-
+                    {room.status === "occupied" && room.is_active && (
+                      <Button
+                        size="sm"
+                        className="btn publish"
+                        onClick={() => handleAddTenant(room.room_id)}
+                      >
+                        ➕ Thêm người thuê
+                      </Button>
+                    )}
                     {canToggleStatus(room) && (
                       <Button
                         size="sm"

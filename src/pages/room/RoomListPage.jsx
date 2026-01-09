@@ -28,6 +28,8 @@ function RoomListPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editRoom, setEditRoom] = useState(null);
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
   // ===== EXTRACT ROLE FROM JWT =====
   useEffect(() => {
     try {
@@ -131,6 +133,12 @@ function RoomListPage() {
     return statusMap[status] || status;
   };
 
+  const getUniqueBuildings = () => {
+    const buildings = [
+      ...new Set(rooms.map((r) => r.building_name).filter(Boolean)),
+    ];
+    return buildings.sort();
+  };
   const buildingMap = React.useMemo(() => {
     const map = {};
     buildings.forEach((b) => {
@@ -252,6 +260,7 @@ function RoomListPage() {
       : true;
 
     const matchesBuilding = buildingFilter
+      ? room.building_name === buildingFilter
       ? String(room.building_id) === String(buildingFilter)
       : true;
     const matchesFloor = floorFilter
@@ -279,6 +288,7 @@ function RoomListPage() {
   return (
     <div className="container">
       <h2 className="title">Quản lý Phòng</h2>
+
       {userRole === "MANAGER" && buildings.length > 0 && (
         <div
           style={{
@@ -337,6 +347,9 @@ function RoomListPage() {
             onChange={(e) => setBuildingFilter(e.target.value)}
           >
             <option value="">Tất cả tòa nhà</option>
+            {getUniqueBuildings().map((building) => (
+              <option key={building} value={building}>
+                {building}
             {buildings.map((b) => (
               <option key={b.building_id} value={String(b.building_id)}>
                 {b.name}
@@ -400,6 +413,7 @@ function RoomListPage() {
                 <tr key={roomId} className={rowClassName}>
                   <td>{index + 1}</td>
                   {userRole === "OWNER" && (
+                    <td>{room.building_name || "N/A"}</td>
                     <td>{buildingMap[room.building_id] || "N/A"}</td>
                   )}
                   <td>
@@ -446,10 +460,15 @@ function RoomListPage() {
         </Table>
       </div>
 
+      {showDetailModal && <div className="custom-modal-backdrop"></div>}
+
       {/* MODAL VIEW DETAILS */}
       <Modal
         show={showDetailModal}
         onHide={() => setShowDetailModal(false)}
+        size="xl"
+        container={document.querySelector(".main-content")}
+        backdrop={false}
         size="lg"
       >
         <Modal.Header closeButton>
@@ -543,10 +562,15 @@ function RoomListPage() {
         </Modal.Footer>
       </Modal>
 
+      {showEditModal && <div className="custom-modal-backdrop"></div>}
+
       {/* MODAL EDIT */}
       <Modal
         show={showEditModal}
         onHide={() => setShowEditModal(false)}
+        size="xl"
+        container={document.querySelector(".main-content")}
+        backdrop={false}
         size="lg"
       >
         <Modal.Header closeButton>
@@ -612,6 +636,33 @@ function RoomListPage() {
           </Button>
           <Button variant="primary" onClick={handleSaveEdit}>
             Lưu thay đổi
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {showDeleteModal && <div className="custom-modal-backdrop"></div>}
+
+      {/* MODAL DELETE CONFIRM */}
+      <Modal
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+        size="xl"
+        container={document.querySelector(".main-content")}
+        backdrop={false}
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>⚠️ Xác nhận xóa</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Bạn có chắc chắn muốn xóa vĩnh viễn phòng này không? <br />
+          <strong>Hành động này không thể hoàn tác!</strong>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            Hủy
+          </Button>
+          <Button variant="danger" onClick={handleDeleteRoom}>
+            Xóa
           </Button>
         </Modal.Footer>
       </Modal>

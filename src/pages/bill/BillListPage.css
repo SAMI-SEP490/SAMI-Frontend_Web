@@ -1,44 +1,106 @@
-@import "../tenant/TenantListPage.css";
-.status {
-  padding: 4px 10px;
+@import "../tenant/TenantListPage.css"; /* Kế thừa style bảng cơ bản */
+
+/* --- FILTER BAR --- */
+.filter-bar {
+  display: flex; /* Dùng Flex thay vì Grid để dễ kiểm soát width */
+  align-items: center;
+  gap: 12px; /* Khoảng cách đều giữa các phần tử */
+  margin-bottom: 24px;
+  background: #fff;
+  padding: 16px;
   border-radius: 12px;
-  font-size: 13px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  flex-wrap: wrap; /* Xuống dòng nếu màn hình nhỏ */
+}
+
+/* Các input lọc */
+.filter-control {
+  height: 42px; /* Chiều cao cố định cho tất cả */
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: #fff;
+  min-width: 150px;
+  box-sizing: border-box; /* Đảm bảo padding không làm phình to */
+}
+
+.filter-control:focus {
+  outline: none;
+  border-color: #0f3d8a;
+  box-shadow: 0 0 0 2px rgba(15, 61, 138, 0.1);
+}
+
+/* Nút Tạo hóa đơn */
+.btn-create {
+  height: 42px; /* Bằng chiều cao input */
+  padding: 0 20px;
+  background-color: #0f3d8a;
+  color: white;
+  border: none;
+  border-radius: 8px;
   font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto; /* Đẩy nút sang tận cùng bên phải */
+  white-space: nowrap;
+  transition: background 0.2s;
 }
 
-.status.draft {
-  background: #fef3c7;
-  color: #92400e;
+.btn-create:hover {
+  background-color: #0b2e66;
 }
 
-.status.published {
-  background: #dbeafe;
-  color: #1e40af;
+/* --- DATE PICKER GROUP --- */
+/* Gom 2 cái ngày lại cho gọn nếu muốn, hoặc để rời như hiện tại */
+.date-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.status.unpaid {
-  background: #fee2e2;
-  color: #991b1b;
+.date-label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
 }
 
-.status.paid {
-  background: #dcfce7;
-  color: #166534;
+/* --- STATUS BADGES --- */
+.status {
+  padding: 6px 12px;
+  border-radius: 20px; /* Bo tròn kiểu pill */
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+  min-width: 100px;
+  text-align: center;
 }
 
-.status.partial {
-  background: #ffedd5;
-  color: #9a3412;
-}
+.status.draft { background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
+.status.issued { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.status.unpaid { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.status.paid { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.status.partial { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+.status.overdue { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
-.status.overdue {
-  background: #fee2e2;
-  color: #991b1b;
-}
+/* --- ACTION BUTTONS --- */
 .btn.cash {
-  background: #16a34a;
+  background: #10b981;
   color: #fff;
+  border: none;
 }
 .btn.cash:hover {
-  background: #15803d;
+  background: #059669;
+}
+
+.btn.publish {
+  background: #3b82f6;
+  color: white;
+  border: none;
+}
+.btn.publish:hover {
+  background: #2563eb;
 }

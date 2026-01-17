@@ -220,13 +220,16 @@ export default function BillListPage() {
 
   if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
 
-  return (
+return (
     <div className="container">
       <h2 className="title">Danh sách hóa đơn</h2>
 
-      <div className="filter-bar grid">
+      {/* --- PHẦN SỬA --- */}
+      <div className="filter-bar">
+        {/* Select Phòng */}
         <select
-          className="status-select"
+          className="filter-control"
+          style={{ minWidth: '180px' }} // Rộng hơn xíu cho tên phòng dài
           value={roomFilter}
           onChange={(e) => setRoomFilter(e.target.value)}
         >
@@ -238,26 +241,34 @@ export default function BillListPage() {
           ))}
         </select>
 
-        <input
-          type="date"
-          className="search-input"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-        />
+        {/* Date Filters: Gom vào 1 nhóm hoặc để rời đều đẹp */}
+        <div className="date-group">
+          <span className="date-label">Từ:</span>
+          <input
+            type="date"
+            className="filter-control"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+          />
+        </div>
 
-        <input
-          type="date"
-          className="search-input"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-        />
+        <div className="date-group">
+          <span className="date-label">Đến:</span>
+          <input
+            type="date"
+            className="filter-control"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+          />
+        </div>
 
+        {/* Nút Tạo - Đẩy sang phải */}
         <button
           type="button"
-          className="btn add"
+          className="btn-create"
           onClick={() => navigate("/bills/create")}
         >
-          + Tạo hóa đơn
+          <span style={{ fontSize: '18px', fontWeight: 'bold' }}>+</span> Tạo hóa đơn
         </button>
       </div>
 

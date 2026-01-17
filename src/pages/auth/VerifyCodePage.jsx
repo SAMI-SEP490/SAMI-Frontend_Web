@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { colors } from "../../constants/colors";
 import { useNavigate, useLocation } from "react-router-dom";
 import { verifyOTP } from "../../services/api/auth";
+import "./AuthCommon.css";
 
 export default function VerifyCodePage() {
   const [code, setCode] = useState("");
@@ -9,30 +9,16 @@ export default function VerifyCodePage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // userId được truyền từ LoginPage khi backend yêu cầu OTP:
-  // navigate("/verify-code", { state: { userId, email, from } })
   const userId = location.state?.userId;
+  const userEmail = location.state?.email;
 
-  const handleVerify = async () => {
-    // ======= VALIDATE: GIỮ NGUYÊN Y NHƯ TRƯỚC ======= //
-    if (!code.trim()) {
-      alert("Vui lòng nhập mã xác thực");
-      return;
-    }
-
-    if (code.length !== 6) {
-      alert("Mã xác thực phải gồm 6 chữ số");
-      return;
-    }
-
-    if (!/^\d{6}$/.test(code)) {
-      alert("Mã xác thực chỉ được chứa chữ số");
-      return;
-    }
-    // ======= HẾT PHẦN VALIDATE ======= //
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    if (!code.trim()) return alert("Vui lòng nhập mã xác thực");
+    if (code.length !== 6) return alert("Mã xác thực phải gồm 6 chữ số");
+    if (!/^\d{6}$/.test(code)) return alert("Mã xác thực chỉ được chứa chữ số");
 
     if (!userId) {
-      // Phòng trường hợp mở thẳng /verify-code mà không đi từ /login
       alert("Thiếu thông tin phiên đăng nhập. Vui lòng đăng nhập lại.");
       navigate("/login", { replace: true });
       return;
@@ -40,11 +26,8 @@ export default function VerifyCodePage() {
 
     setLoading(true);
     try {
-      // Gọi API verify OTP: hàm này sẽ tự lưu access/refresh token vào localStorage
       await verifyOTP({ userId, otp: code.trim() });
-
-      // Nếu LoginPage có truyền 'from', quay lại đó; mặc định về /profile
-      const back = location.state?.from?.pathname || "/profile";
+      const back = location.state?.from?.pathname || "/profile"; // Mặc định hoặc trang trước đó
       navigate(back, { replace: true });
     } catch (e) {
       const msg = e?.response?.data?.message || "OTP không hợp lệ";
@@ -55,91 +38,49 @@ export default function VerifyCodePage() {
   };
 
   const handleResend = () => {
-    // Bạn có thể gắn API resend OTP ở đây nếu backend có endpoint tương ứng.
     alert("Mã xác thực đã được gửi lại!");
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: colors.brand,
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: "20px",
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: "#fff",
-          width: "400px",
-          padding: "30px",
-          borderRadius: "12px",
-          boxShadow: "0 3px 6px rgba(0,0,0,0.15)",
-        }}
-      >
-        <h2 style={{ fontSize: "22px", fontWeight: 700, marginBottom: "10px" }}>
-          Xác minh mã
-        </h2>
-        <p style={{ color: "#555", fontSize: "14px", marginBottom: "20px" }}>
-          Nhập mã xác thực được gửi tới email của bạn
-        </p>
+    <div className="login-wrapper">
+      <div className="login-left" />
+      <div className="login-right">
+        <div className="login-center">
+          <img src="/logo1.png" alt="Logo" className="login-logo" />
+          
+          <div className="login-box">
+            <h2>Xác thực OTP</h2>
+            <p style={{ marginBottom: 20, color: "#666", fontSize: 14 }}>
+              Nhập mã 6 số đã gửi tới <b>{userEmail}</b>
+            </p>
 
-        <input
-          type="text"
-          placeholder="Nhập mã 6 ký tự"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          maxLength={6}
-          style={{
-            width: "100%",
-            padding: "12px",
-            fontSize: "16px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-            textAlign: "center",
-            letterSpacing: "8px",
-            marginBottom: "20px",
-          }}
-        />
+            <form onSubmit={handleVerify}>
+              <div className="form-group">
+                <input
+                  type="text"
+                  placeholder="------"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  maxLength={6}
+                  style={{ textAlign: "center", letterSpacing: 8, fontSize: 18 }}
+                />
+              </div>
 
-        <button
-          onClick={handleVerify}
-          disabled={loading}
-          style={{
-            width: "100%",
-            backgroundColor: colors.brand,
-            color: "#fff",
-            padding: "12px",
-            borderRadius: "6px",
-            fontSize: "16px",
-            fontWeight: 600,
-            border: "none",
-            cursor: "pointer",
-            marginBottom: "10px",
-            opacity: loading ? 0.8 : 1,
-          }}
-        >
-          {loading ? "Đang xác minh..." : "Xác nhận"}
-        </button>
+              <button type="submit" className="login-btn" disabled={loading}>
+                {loading ? "Đang xác minh..." : "Xác nhận"}
+              </button>
+            </form>
 
-        <button
-          onClick={handleResend}
-          style={{
-            width: "100%",
-            backgroundColor: "#f0f0f0",
-            color: colors.brand,
-            padding: "12px",
-            borderRadius: "6px",
-            fontSize: "14px",
-            fontWeight: 600,
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          Gửi lại mã
-        </button>
+            <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between' }}>
+               <span className="forgot-password" onClick={() => navigate("/login")}>
+                Quay lại
+              </span>
+              <span className="forgot-password" onClick={handleResend} style={{ fontWeight: '600' }}>
+                Gửi lại mã?
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

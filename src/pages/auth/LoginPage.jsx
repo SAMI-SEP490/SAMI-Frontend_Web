@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ROUTES } from "../../constants/routes";
-import "./LoginPage.css";
+import "./AuthCommon.css";
 import {
   login as apiLogin,
   logout as apiLogout,
@@ -168,7 +168,12 @@ function LoginPage() {
               </button>
             </form>
 
-            <span className="forgot-password">Bạn quên mật khẩu?</span>
+            <span
+              className="forgot-password"
+              onClick={() => navigate("/forgot-password")}
+            >
+              Bạn quên mật khẩu?
+            </span>
           </div>
         </div>
       </div>

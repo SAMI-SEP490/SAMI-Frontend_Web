@@ -1,110 +1,96 @@
-import React, { useMemo, useState } from "react";
-import { colors } from "../../constants/colors";
+import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { resetPassword } from "../../services/api/auth";
+import { resetPassword } from "../../services/api/auth"; // Hàm gọi API reset
+import "./AuthCommon.css";
 
 export default function NewPasswordPage() {
-  const { state } = useLocation();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const ctx = useMemo(() => {
-    return state?.userId && state?.resetToken
-      ? { userId: state.userId, resetToken: state.resetToken }
-      : JSON.parse(sessionStorage.getItem("sami:resetCtx") || "{}");
-  }, [state]);
+  const location = useLocation();
 
-  const [pw1, setPw1] = useState("");
-  const [pw2, setPw2] = useState("");
-
-  const handleSubmit = async () => {
-    if (pw1.length < 8) return alert("Mật khẩu tối thiểu 8 ký tự");
-    if (pw1 !== pw2) return alert("Mật khẩu nhập lại không khớp");
-    if (!ctx?.userId || !ctx?.resetToken)
-      return alert("Thiếu thông tin xác thực đặt lại mật khẩu");
-
+  // Lấy info từ state hoặc sessionStorage
+  const getContext = () => {
+    if (location.state?.userId && location.state?.resetToken) {
+      return location.state;
+    }
     try {
-      const res = await resetPassword({
-        userId: ctx.userId,
-        resetToken: ctx.resetToken,
-        newPassword: pw1,
-      });
-      alert(res?.message || "Đặt lại mật khẩu thành công. Vui lòng đăng nhập.");
+      return JSON.parse(sessionStorage.getItem("sami:resetCtx") || "{}");
+    } catch { return {}; }
+  };
+
+  const { userId, resetToken } = getContext();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!password || !confirmPassword) return alert("Vui lòng nhập đủ thông tin");
+    if (password !== confirmPassword) return alert("Mật khẩu xác nhận không khớp");
+    if (!userId || !resetToken) {
+      alert("Phiên làm việc hết hạn. Vui lòng thử lại.");
+      navigate("/forgot-password");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Gọi API resetPassword (cần đảm bảo api/auth có hàm này)
+      await resetPassword({ userId, token: resetToken, newPassword: password });
+      alert("Đổi mật khẩu thành công! Vui lòng đăng nhập lại.");
+      
+      // Clear session
       sessionStorage.removeItem("sami:resetCtx");
       navigate("/login");
     } catch (e) {
-      alert(
-        e?.response?.data?.message || e?.message || "Đặt lại mật khẩu thất bại"
-      );
+      alert(e?.response?.data?.message || "Đổi mật khẩu thất bại");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: colors.brand,
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          width: 400,
-          padding: 30,
-          borderRadius: 12,
-          boxShadow: "0 3px 6px rgba(0,0,0,.15)",
-        }}
-      >
-        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>
-          Đặt mật khẩu mới
-        </h2>
-        <input
-          type="password"
-          placeholder="Mật khẩu mới (≥ 8 ký tự)"
-          value={pw1}
-          onChange={(e) => setPw1(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            marginBottom: 12,
-            fontSize: 16,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-          }}
-        />
-        <input
-          type="password"
-          placeholder="Nhập lại mật khẩu"
-          value={pw2}
-          onChange={(e) => setPw2(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            marginBottom: 16,
-            fontSize: 16,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-          }}
-        />
+    <div className="login-wrapper">
+      <div className="login-left" />
+      <div className="login-right">
+        <div className="login-center">
+          <img src="/logo1.png" alt="Logo" className="login-logo" />
+          
+          <div className="login-box">
+            <h2>Mật khẩu mới</h2>
+            
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Mật khẩu mới</label>
+                <div className="pw-wrapper">
+                  <input
+                    type={showPw ? "text" : "password"}
+                    placeholder="Nhập mật khẩu mới"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button type="button" className="show-pw-btn" onClick={() => setShowPw(!showPw)}>
+                    {showPw ? "Ẩn" : "Hiện"}
+                  </button>
+                </div>
+              </div>
 
-        <button
-          onClick={handleSubmit}
-          style={{
-            width: "100%",
-            backgroundColor: colors.brand,
-            color: "#fff",
-            padding: 12,
-            borderRadius: 6,
-            fontSize: 16,
-            fontWeight: 600,
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          Xác nhận
-        </button>
+              <div className="form-group">
+                <label>Xác nhận mật khẩu</label>
+                <input
+                  type={showPw ? "text" : "password"}
+                  placeholder="Nhập lại mật khẩu"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+
+              <button type="submit" className="login-btn" disabled={loading}>
+                {loading ? "Đang xử lý..." : "Đổi mật khẩu"}
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   );

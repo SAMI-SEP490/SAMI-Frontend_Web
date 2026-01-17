@@ -1,155 +1,114 @@
 import React, { useState } from "react";
-import { colors } from "../../constants/colors";
 import { useNavigate } from "react-router-dom";
 import { forgotPassword } from "../../services/api/auth";
-import { listTenants } from "../../services/api/users"; // lấy data tenant từ BE
+import { listTenants } from "../../services/api/users";
+import "./AuthCommon.css"; // Đảm bảo bạn đã đổi tên hoặc import đúng file CSS
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleNext = async () => {
+  const handleNext = async (e) => {
+    e.preventDefault(); // Prevent reload form
     const trimmed = email.trim();
 
-    // 1️⃣ Bắt buộc nhập
     if (!trimmed) {
       alert("Vui lòng nhập email khôi phục");
       return;
     }
 
-    // 2️⃣ Validate format email
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!re.test(trimmed)) {
       alert("Vui lòng nhập email đúng định dạng.");
       return;
     }
 
-    // 3️⃣ Check xem có phải tenant không
-    let isTenant = false;
+    setLoading(true);
+
     try {
-      const tenants = await listTenants(); // trả về mảng tenant từ BE
-      const lower = trimmed.toLowerCase();
-
-      const foundTenant = tenants.find((t) => {
-        const tEmail = String(
-          t.email || t.user_email || t.userEmail || ""
-        ).toLowerCase();
-        return tEmail === lower;
-      });
-
-      if (foundTenant) {
-        isTenant = true;
+      // 1. Check Tenant
+      let isTenant = false;
+      try {
+        const tenants = await listTenants();
+        const lower = trimmed.toLowerCase();
+        const foundTenant = tenants.find((t) => {
+          const tEmail = String(t.email || t.user_email || t.userEmail || "").toLowerCase();
+          return tEmail === lower;
+        });
+        if (foundTenant) isTenant = true;
+      } catch (checkErr) {
+        console.warn("Lỗi check tenant:", checkErr);
       }
-    } catch (checkErr) {
-      console.warn(
-        "Không kiểm tra được role tenant, sẽ cho qua flow quên mật khẩu mặc định:",
-        checkErr
-      );
-    }
 
-    // 4️⃣ Nếu là tenant → chặn hẳn chức năng
-    if (isTenant) {
-      alert("Người thuê không có quyền sử dụng chức năng này!");
-      return;
-    }
-
-    // 5️⃣ Gọi API quên mật khẩu cho các role khác (owner/manager/...)
-    try {
-      const res = await forgotPassword(trimmed);
-
-      // Backend ALWAYS trả success:true, nên phải đọc message
-      const rawMsg = String(res?.message || "").toLowerCase();
-
-      // ❌ Email không tồn tại trong hệ thống
-      if (rawMsg.includes("does not exist")) {
-        alert("Email không tồn tại trong hệ thống");
-        // Không điều hướng, cho user nhập lại email
+      if (isTenant) {
+        alert("Người thuê không có quyền sử dụng chức năng này!");
+        setLoading(false);
         return;
       }
 
-      // Lưu userId để verify OTP và reset mật khẩu
-      const userId = res?.userId;
-      try {
-        sessionStorage.setItem(
-          "sami:resetCtx",
-          JSON.stringify({ userId, email: trimmed })
-        );
-      } catch (e) {
-        console.warn("Không lưu được resetCtx:", e);
+      // 2. Call API Forgot Password
+      const res = await forgotPassword(trimmed);
+      const rawMsg = String(res?.message || "").toLowerCase();
+
+      if (rawMsg.includes("does not exist")) {
+        alert("Email không tồn tại trong hệ thống");
+        setLoading(false);
+        return;
       }
 
-      // ✅ Case bình thường: gửi OTP thành công
+      const userId = res?.userId;
+      try {
+        sessionStorage.setItem("sami:resetCtx", JSON.stringify({ userId, email: trimmed }));
+      } catch (e) {}
+
       alert(res?.message || "Đã gửi mã xác thực tới email của bạn.");
       navigate(`/verify-reset-otp?email=${encodeURIComponent(trimmed)}`, {
         state: { email: trimmed, userId },
       });
+
     } catch (e) {
-      const msg =
-        e?.response?.data?.message ||
-        e?.message ||
-        "Không gửi được mã. Thử lại sau.";
+      const msg = e?.response?.data?.message || e?.message || "Không gửi được mã. Thử lại sau.";
       alert(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: colors.brand,
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          width: 400,
-          padding: 30,
-          borderRadius: 12,
-          boxShadow: "0 3px 6px rgba(0,0,0,.15)",
-        }}
-      >
-        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>
-          Tìm email của bạn
-        </h2>
-        <p style={{ color: "#555", fontSize: 14, marginBottom: 20 }}>
-          Nhập email khôi phục
-        </p>
+    <div className="login-wrapper">
+      <div className="login-left" />
+      <div className="login-right">
+        <div className="login-center">
+          <img src="/logo1.png" alt="Logo" className="login-logo" />
+          
+          <div className="login-box">
+            <h2>Quên Mật Khẩu</h2>
+            <p style={{ marginBottom: 20, color: "#666", fontSize: 14 }}>
+              Nhập email để nhận mã xác thực
+            </p>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            marginBottom: 20,
-            fontSize: 16,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-          }}
-        />
+            <form onSubmit={handleNext}>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  placeholder="Nhập email của bạn"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
 
-        <button
-          onClick={handleNext}
-          style={{
-            width: "100%",
-            backgroundColor: colors.brand,
-            color: "#fff",
-            padding: 12,
-            borderRadius: 6,
-            fontSize: 16,
-            fontWeight: 600,
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          Tiếp theo
-        </button>
+              <button type="submit" className="login-btn" disabled={loading}>
+                {loading ? "Đang xử lý..." : "Tiếp theo"}
+              </button>
+            </form>
+
+            <span className="forgot-password" onClick={() => navigate("/login")}>
+              Quay lại đăng nhập
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

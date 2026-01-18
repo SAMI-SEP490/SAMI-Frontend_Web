@@ -6,9 +6,9 @@ import {
   changeVehicleSlot,
 } from "../../services/api/vehicle";
 import { listAvailableSlotsForVehicle } from "../../services/api/parking-slots";
-import "./VehicleManagementPage.css";
 import { listBuildingsForParking } from "../../services/api/parking-slots";
 import { getAccessToken } from "../../services/http";
+import { createPortal } from "react-dom";
 const VEHICLE_TYPE_VN = {
   two_wheeler: "Xe 2 bánh",
   four_wheeler: "Xe 4 bánh",
@@ -29,77 +29,25 @@ function notifyError(message) {
 export default function VehicleManagementPage() {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(false);
-const [userRole, setUserRole] = useState(null);
-const [buildings, setBuildings] = useState([]);
-const [filterBuilding, setFilterBuilding] = useState("");
+  const [userRole, setUserRole] = useState(null);
+  const [buildings, setBuildings] = useState([]);
+  const [filterBuilding, setFilterBuilding] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-
+const [modalError, setModalError] = useState("");
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlotId, setSelectedSlotId] = useState("");
-
-  // ===============================
-  // LOAD VEHICLES (FIX pagination)
-  // ===============================
-  async function loadVehicles() {
-  setLoading(true);
-  try {
-    const params = {
-      type: filterType || undefined,
-      status: filterStatus || undefined,
-    };
-
-    if (userRole === "OWNER" && filterBuilding) {
-      params.building_id = filterBuilding;
-    }
-
-    const res = await listVehicles(params);
-console.log("🚘 VEHICLE API RAW:", res);
-    // 🔥 res ĐÃ LÀ ARRAY
-setVehicles(Array.isArray(res) ? res : []);
-  } finally {
-    setLoading(false);
+  function ModalPortal({ children }) {
+    return createPortal(children, document.body);
   }
-}
-useEffect(() => {
-  const token = getAccessToken();
-  if (!token) return;
+async function confirmSlot() {
+  if (!selectedSlotId || !selectedVehicle) return;
+
+  setModalError("");
 
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    setUserRole(payload.role);
-
-    if (payload.role === "OWNER") {
-      listBuildingsForParking().then(setBuildings);
-    }
-  } catch (err) {
-    console.error("❌ Invalid token", err);
-  }
-}, []);
-  useEffect(() => {
-  if (userRole) loadVehicles();
-}, [filterType, filterStatus, filterBuilding, userRole]);
-
-  // ===============================
-  // OPEN SLOT MODAL
-  // ===============================
-  async function openSlotModal(vehicle, mode) {
-  setSelectedVehicle({ ...vehicle, mode });
-  setSelectedSlotId("");
-  setShowSlotModal(true);
-  console.log('SELECTED VEHICLE:', vehicle);
-  const slots = await listAvailableSlotsForVehicle(vehicle.vehicle_id);
-  setAvailableSlots(slots);
-}
-
-  // ===============================
-  // CONFIRM SLOT
-  // ===============================
-  async function confirmSlot() {
-    if (!selectedSlotId || !selectedVehicle) return;
-
     if (selectedVehicle.mode === "reactivate") {
       await reactivateVehicle(
         selectedVehicle.vehicle_id,
@@ -119,6 +67,66 @@ useEffect(() => {
     setShowSlotModal(false);
     setSelectedVehicle(null);
     await loadVehicles();
+  } catch (err) {
+    console.log("❌ SLOT ERROR:", err);
+
+    const message =
+      err?.response?.data?.message ||
+      err?.message ||
+      "Có lỗi xảy ra, vui lòng thử lại";
+
+    setModalError(message);
+  }
+}
+  async function loadVehicles() {
+    setLoading(true);
+    try {
+      const params = {
+        type: filterType || undefined,
+        status: filterStatus || undefined,
+      };
+
+      if (userRole === "OWNER" && filterBuilding) {
+        params.building_id = filterBuilding;
+      }
+
+      const res = await listVehicles(params);
+      console.log("🚘 VEHICLE API RAW:", res);
+      // 🔥 res ĐÃ LÀ ARRAY
+      setVehicles(Array.isArray(res) ? res : []);
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      setUserRole(payload.role);
+
+      if (payload.role === "OWNER") {
+        listBuildingsForParking().then(setBuildings);
+      }
+    } catch (err) {
+      console.error("❌ Invalid token", err);
+    }
+  }, []);
+  useEffect(() => {
+    if (userRole) loadVehicles();
+  }, [filterType, filterStatus, filterBuilding, userRole]);
+
+  // ===============================
+  // OPEN SLOT MODAL
+  // ===============================
+  async function openSlotModal(vehicle, mode) {
+    setSelectedVehicle({ ...vehicle, mode });
+    setSelectedSlotId("");
+    setShowSlotModal(true);
+    console.log('SELECTED VEHICLE:', vehicle);
+    const slots = await listAvailableSlotsForVehicle(vehicle.vehicle_id);
+    setAvailableSlots(slots);
   }
 
   // ===============================
@@ -129,7 +137,7 @@ useEffect(() => {
     await deactivateVehicle(vehicle.vehicle_id);
     await loadVehicles();
   }
-const pageStyle = `
+  const pageStyle = `
 /* ===============================
    CONTAINER
    =============================== */
@@ -283,76 +291,94 @@ button.danger {
 /* ===============================
    MODAL OVERLAY (FIXED)
    =============================== */
-.modal-overlay {
+.vehicle-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 10000;
 }
 
-/* ===============================
-   MODAL OVERLAY
-   =============================== */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
+.vehicle-modal {
+  position: relative;
+  z-index: 10001;
 
-/* ===============================
-   MODAL BOX (FIX KHÔNG HIỆN)
-   =============================== */
-.modal {
-  position: relative;              /* 🔴 QUAN TRỌNG */
-  z-index: 10000;                  /* 🔴 CAO HƠN OVERLAY */
   background: #ffffff;
-  padding: 22px;
-  border-radius: 10px;
   width: 360px;
   max-width: 90%;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
 
-  /* 🔴 ÉP HIỆN */
-  display: block;
-  opacity: 1;
-  transform: none;
+  animation: popup 0.25s ease-out;
 }
 
 /* ===============================
    MODAL TITLE
    =============================== */
-.modal h3 {
+.vehicle-modal h3 {
   margin-bottom: 16px;
   font-size: 18px;
   font-weight: 600;
   color: #111827;
 }
-
 /* ===============================
    MODAL FORM
    =============================== */
-.modal select {
+.vehicle-modal select {
   width: 100%;
   padding: 8px 10px;
   margin-bottom: 18px;
   border-radius: 6px;
   border: 1px solid #d1d5db;
 }
-
 /* ===============================
    MODAL ACTIONS
    =============================== */
-.modal-actions {
+.vehicle-modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
+  margin-top: 20px;
+}
+.vehicle-modal-actions button {
+  min-width: 90px;
+  padding: 8px 14px;
+}
+.vehicle-modal-actions .btn-cancel {
+  background: #e5e7eb;
+  color: #374151;
+}
+.vehicle-modal-actions .btn-confirm {
+  background: #3b82f6;
+  color: white;
+}
+.vehicle-modal-actions .btn-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.vehicle-modal {
+  animation: popup 0.25s ease-out;
+}
+.vehicle-modal-error {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+@keyframes popup {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 `;
 
@@ -361,130 +387,144 @@ button.danger {
   // ===============================
   return (
     <>
-    <style>{pageStyle}</style>
-    <div className="container">
-      <h2>🚘 Quản lý phương tiện</h2>
+      <style>{pageStyle}</style>
+      <div className="container">
+        <h2>🚘 Quản lý phương tiện</h2>
 
-      {/* FILTER */}
-      <div className="filter-bar">
-  {userRole === "OWNER" && (
-    <select
-      value={filterBuilding}
-      onChange={(e) => setFilterBuilding(e.target.value)}
-    >
-      <option value="">Tất cả tòa nhà</option>
-      {buildings.map((b) => (
-        <option key={b.building_id} value={b.building_id}>
-          {b.name}
-        </option>
-      ))}
-    </select>
-  )}
-
-  <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-    <option value="">Tất cả loại xe</option>
-    <option value="two_wheeler">Xe 2 bánh</option>
-    <option value="four_wheeler">Xe 4 bánh</option>
-  </select>
-
-  <select
-    value={filterStatus}
-    onChange={(e) => setFilterStatus(e.target.value)}
-  >
-    <option value="">Tất cả trạng thái</option>
-    <option value="active">Hoạt động</option>
-    <option value="inactive">Ngừng</option>
-    <option value="deactivated">Đã hủy</option>
-  </select>
-</div>
-
-      {/* TABLE */}
-      {loading ? (
-        <p>Đang tải...</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Biển số</th>
-              <th>Loại</th>
-              <th>Trạng thái</th>
-              <th>Slot</th>
-              <th>Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-  {vehicles.map((v) => (
-    <tr key={v.vehicle_id}>
-      <td>
-        <b>{v.registration?.license_plate || "—"}</b>
-      </td>
-
-      <td>
-        {VEHICLE_TYPE_VN[v.registration?.vehicle_type] || "—"}
-      </td>
-
-      <td>{STATUS_VN[v.status]}</td>
-
-      <td>
-        {v.slot?.slot_number || "—"}
-      </td>
-
-      <td>
-        {v.status === "active" && (
-          <>
-            <button onClick={() => openSlotModal(v, "change")}>
-              🔁 Đổi slot
-            </button>
-            <button onClick={() => handleDeactivate(v)}>
-              ⛔ Ngừng
-            </button>
-          </>
-        )}
-
-        {(v.status === "inactive" || v.status === "deactivated") && (
-          <button onClick={() => openSlotModal(v, "reactivate")}>
-            ▶️ Kích hoạt
-          </button>
-        )}
-      </td>
-    </tr>
-  ))}
-</tbody>
-
-        </table>
-      )}
-
-      {/* SLOT MODAL */}
-      {showSlotModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3>
-              {selectedVehicle?.mode === "reactivate"
-                ? "Kích hoạt xe & gán slot"
-                : "Đổi slot xe"}
-            </h3>
-
+        {/* FILTER */}
+        <div className="filter-bar">
+          {userRole === "OWNER" && (
             <select
-              value={selectedSlotId}
-              onChange={(e) => setSelectedSlotId(e.target.value)}
+              value={filterBuilding}
+              onChange={(e) => setFilterBuilding(e.target.value)}
             >
-              <option value="">-- Chọn slot --</option>
-              {availableSlots.map((s) => (
-                <option key={s.slot_id} value={s.slot_id}>
-                  {s.slot_number}
+              <option value="">Tất cả tòa nhà</option>
+              {buildings.map((b) => (
+                <option key={b.building_id} value={b.building_id}>
+                  {b.name}
                 </option>
               ))}
             </select>
+          )}
 
-            <div className="modal-actions">
-              <button onClick={() => setShowSlotModal(false)}>Hủy</button>
-              <button disabled={!selectedSlotId} onClick={confirmSlot}>
-                Xác nhận
-              </button>
+          <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+            <option value="">Tất cả loại xe</option>
+            <option value="two_wheeler">Xe 2 bánh</option>
+            <option value="four_wheeler">Xe 4 bánh</option>
+          </select>
+
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="active">Hoạt động</option>
+            <option value="inactive">Ngừng</option>
+            <option value="deactivated">Đã hủy</option>
+          </select>
+        </div>
+
+        {/* TABLE */}
+        {loading ? (
+          <p>Đang tải...</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Biển số</th>
+                <th>Loại</th>
+                <th>Trạng thái</th>
+                <th>Slot</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vehicles.map((v) => (
+                <tr key={v.vehicle_id}>
+                  <td>
+                    <b>{v.registration?.license_plate || "—"}</b>
+                  </td>
+
+                  <td>
+                    {VEHICLE_TYPE_VN[v.registration?.vehicle_type] || "—"}
+                  </td>
+
+                  <td>{STATUS_VN[v.status]}</td>
+
+                  <td>
+                    {v.slot?.slot_number || "—"}
+                  </td>
+
+                  <td>
+                    {v.status === "active" && (
+                      <>
+                        <button onClick={() => openSlotModal(v, "change")}>
+                          🔁 Đổi slot
+                        </button>
+                        <button onClick={() => handleDeactivate(v)}>
+                          ⛔ Ngừng
+                        </button>
+                      </>
+                    )}
+
+                    {(v.status === "inactive" || v.status === "deactivated") && (
+                      <button onClick={() => openSlotModal(v, "reactivate")}>
+                        ▶️ Kích hoạt
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+          </table>
+        )}
+      </div>
+      {/* SLOT MODAL */}
+      {showSlotModal && (
+        <ModalPortal>
+          <div className="vehicle-modal-overlay">
+            <div className="vehicle-modal">
+              <h3>
+                {selectedVehicle?.mode === "reactivate"
+                  ? "Kích hoạt xe & gán slot"
+                  : "Đổi slot xe"}
+              </h3>
+{modalError && (
+  <div className="vehicle-modal-error">
+    ❌ {modalError}
+  </div>
+)}
+              <select
+                value={selectedSlotId}
+                onChange={(e) => setSelectedSlotId(e.target.value)}
+              >
+                <option value="">-- Chọn slot --</option>
+                {availableSlots.map((s) => (
+                  <option key={s.slot_id} value={s.slot_id}>
+                    {s.slot_number}
+                  </option>
+                ))}
+              </select>
+              <div className="vehicle-modal-actions">
+                <button
+                  className="btn-cancel"
+                  onClick={() => setShowSlotModal(false)}
+                  >
+                  Hủy
+                </button>
+
+                <button
+                  className="btn-confirm"
+                  disabled={!selectedSlotId}
+                  onClick={confirmSlot}
+                >
+                  Xác nhận
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div></>
+        </ModalPortal>
+      )}</>
   );
 }

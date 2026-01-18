@@ -4,9 +4,9 @@ import { createDraftBill } from "@/services/api/bills";
 import { listAssignedBuildings, listBuildings, getBuildingById } from "@/services/api/building";
 import { getRoomsByBuildingId, getRoomById } from "@/services/api/rooms";
 import { getUserById } from "@/services/api/users";
-import { getUtilityReadingsForm } from "@/services/api/utility";
+import { getUtilityReadingsForm, submitUtilityReadings } from "@/services/api/utility"; 
 import { getAccessToken } from "@/services/http";
-import { Trash, Calculator, ExclamationCircle } from "react-bootstrap-icons"; // Thêm icon Exclamation
+import { Trash, Calculator, ExclamationCircle, CloudUpload } from "react-bootstrap-icons";
 
 // --- HELPERS ---
 const getRole = () => {
@@ -60,7 +60,7 @@ export default function CreateBillPage() {
   const [charges, setCharges] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // [NEW] Điều kiện để cho phép nhập số mới
+  // Điều kiện để cho phép nhập số mới
   const isInputReady = useMemo(() => {
     return selectedBuilding && selectedRoom && isValidDate(periodEnd);
   }, [selectedBuilding, selectedRoom, periodEnd]);
@@ -78,15 +78,10 @@ export default function CreateBillPage() {
 
   // --- 2. Fetch Room List + Config ---
   useEffect(() => {
-    if (!selectedBuilding) { 
-        setRooms([]); 
-        setBuildingConfig(null);
-        return; 
-    }
+    if (!selectedBuilding) { setRooms([]); setBuildingConfig(null); return; }
     (async () => {
       const resRooms = await getRoomsByBuildingId(selectedBuilding);
       setRooms(Array.isArray(resRooms) ? resRooms : []);
-
       try {
           const resBuilding = await getBuildingById(selectedBuilding);
           const b = resBuilding?.data || resBuilding;
@@ -101,12 +96,7 @@ export default function CreateBillPage() {
 
   // --- 3. Fetch Contract ---
   useEffect(() => {
-    if(!selectedRoom) { 
-        setActiveContract(null); 
-        setTenantUserId("");
-        setTenantName("");
-        return; 
-    }
+    if(!selectedRoom) { setActiveContract(null); setTenantUserId(""); setTenantName(""); return; }
     (async () => {
         try {
             const roomDetail = await getRoomById(selectedRoom);
@@ -159,7 +149,7 @@ export default function CreateBillPage() {
             }
         })();
     }
-  }, [billType, isInputReady, selectedBuilding, selectedRoom, periodEnd]); // Phụ thuộc vào isInputReady
+  }, [billType, isInputReady, selectedBuilding, selectedRoom, periodEnd]);
 
   // --- 5. Auto Calculate Charges ---
   useEffect(() => {
@@ -215,6 +205,7 @@ export default function CreateBillPage() {
     setCharges(newCharges);
   };
 
+  // --- [UPDATE 2] MAIN SUBMIT FUNCTION ---
   const onSubmit = async () => {
     if (!activeContract) return alert("Phòng này chưa có hợp đồng!");
     if (!isValidDate(periodStart) || !isValidDate(periodEnd) || !isValidDate(dueDate)) {
@@ -226,6 +217,32 @@ export default function CreateBillPage() {
 
     setLoading(true);
     try {
+      // BƯỚC 1: NẾU LÀ BILL ĐIỆN NƯỚC -> GỌI API LƯU CHỈ SỐ TRƯỚC
+      if (billType === 'utilities') {
+        const d = new Date(periodEnd);
+        const month = d.getMonth() + 1;
+        const year = d.getFullYear();
+
+        // Chuẩn bị payload đúng format của submitUtilityReadings
+        const utilityPayload = {
+            building_id: Number(selectedBuilding),
+            billing_month: month,
+            billing_year: year,
+            readings: [
+                {
+                    room_id: Number(selectedRoom),
+                    new_electric: Number(utilityData.new_electric),
+                    new_water: Number(utilityData.new_water),
+                    // Có thể gửi kèm old_electric_override nếu backend hỗ trợ sửa số cũ
+                }
+            ]
+        };
+
+        console.log("Submitting Utility Readings:", utilityPayload);
+        await submitUtilityReadings(utilityPayload);
+      }
+
+      // BƯỚC 2: TẠO BILL DRAFT
       const payload = {
         contract_id: activeContract.contract_id,
         tenant_user_id: tenantUserId,
@@ -240,10 +257,13 @@ export default function CreateBillPage() {
       };
 
       await createDraftBill(payload);
-      alert("Đã lưu nháp thành công!");
+      
+      alert(billType === 'utilities' ? "Đã cập nhật chỉ số & Lưu nháp thành công!" : "Đã lưu nháp thành công!");
       nav("/bills");
+
     } catch (e) {
-      alert(e.message || "Lỗi tạo hóa đơn");
+      console.error(e);
+      alert(e.message || "Lỗi khi xử lý dữ liệu");
     } finally {
       setLoading(false);
     }
@@ -354,7 +374,7 @@ export default function CreateBillPage() {
                                             className="form-control border-warning" 
                                             value={utilityData.new_electric} 
                                             onChange={e => setUtilityData({...utilityData, new_electric: Number(e.target.value)})}
-                                            disabled={!isInputReady} // [FIX] Disable
+                                            disabled={!isInputReady}
                                             placeholder={!isInputReady ? "Chọn ngày..." : ""}
                                         />
                                     </div>
@@ -381,7 +401,7 @@ export default function CreateBillPage() {
                                             className="form-control border-info" 
                                             value={utilityData.new_water} 
                                             onChange={e => setUtilityData({...utilityData, new_water: Number(e.target.value)})}
-                                            disabled={!isInputReady} // [FIX] Disable
+                                            disabled={!isInputReady}
                                             placeholder={!isInputReady ? "Chọn ngày..." : ""}
                                         />
                                     </div>
@@ -429,22 +449,12 @@ export default function CreateBillPage() {
                                     {c.description && <div className="small text-muted fst-italic mt-1">{c.description}</div>}
                                 </td>
                                 <td>
-                                    <input 
-                                        type="number" 
-                                        className="form-control form-control-sm text-center" 
-                                        value={c.quantity} 
-                                        readOnly={billType === 'utilities'}
-                                        onChange={e=>updateCharge(i, 'quantity', e.target.value)} 
-                                    />
+                                    <input type="number" className="form-control form-control-sm text-center" 
+                                        value={c.quantity} readOnly={billType === 'utilities'} onChange={e=>updateCharge(i, 'quantity', e.target.value)} />
                                 </td>
                                 <td>
-                                    <input 
-                                        type="number" 
-                                        className="form-control form-control-sm text-end" 
-                                        value={c.unit_price || 0} 
-                                        readOnly={billType === 'utilities'}
-                                        onChange={e=>updateCharge(i, 'unit_price', e.target.value)} 
-                                    />
+                                    <input type="number" className="form-control form-control-sm text-end" 
+                                        value={c.unit_price || 0} readOnly={billType === 'utilities'} onChange={e=>updateCharge(i, 'unit_price', e.target.value)} />
                                 </td>
                                 <td className="text-end fw-bold">{fmtMoney(c.amount)}</td>
                                 {billType === 'other' && (
@@ -467,11 +477,16 @@ export default function CreateBillPage() {
                 <div className="d-flex justify-content-end gap-2 mt-3">
                     <button className="btn btn-light" onClick={()=>nav('/bills')}>Hủy bỏ</button>
                     <button 
-                        className="btn btn-warning px-4 fw-bold" 
+                        className="btn btn-warning px-4 fw-bold d-flex align-items-center gap-2" 
                         onClick={onSubmit} 
                         disabled={loading || !activeContract}
                     >
-                        {loading ? "Đang lưu..." : "Lưu Nháp"}
+                        {loading ? "Đang xử lý..." : (
+                            <>
+                                {billType === 'utilities' ? <CloudUpload/> : null}
+                                {billType === 'utilities' ? " Lưu Nháp & Cập nhật chỉ số" : " Lưu Nháp"}
+                            </>
+                        )}
                     </button>
                 </div>
             </div>

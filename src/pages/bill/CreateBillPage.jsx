@@ -3,7 +3,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createDraftBill } from "@/services/api/bills";
 import { listAssignedBuildings, listBuildings } from "@/services/api/building";
-import { getRoomsByBuildingId, getRoomById } from "@/services/api/rooms"; // [1] Import getRoomById
+import { getRoomsByBuildingId, getRoomById } from "@/services/api/rooms";
+import { getUserById } from "@/services/api/users";
 import { getAccessToken } from "@/services/http";
 import { Trash } from "react-bootstrap-icons";
 
@@ -15,6 +16,16 @@ const getRole = () => {
   } catch { return ""; }
 };
 
+// Validate Date Logic (Chặn 30/02, 31/04...)
+const isValidDate = (dateString) => {
+  // dateString format: yyyy-mm-dd
+  if (!dateString) return false;
+  const d = new Date(dateString);
+  const dNum = d.getTime();
+  if (!dNum && dNum !== 0) return false; // Invalid Date
+  return d.toISOString().slice(0, 10) === dateString;
+};
+
 export default function CreateBillPage() {
   const nav = useNavigate();
   const role = getRole();
@@ -24,10 +35,11 @@ export default function CreateBillPage() {
   const [selectedBuilding, setSelectedBuilding] = useState("");
   const [rooms, setRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState("");
-  
+   
   // Contract & Tenant State
   const [activeContract, setActiveContract] = useState(null); 
-  const [tenantUserId, setTenantUserId] = useState(""); // [NEW] Track selected payer
+  const [tenantUserId, setTenantUserId] = useState(""); 
+  const [tenantName, setTenantName] = useState("Đang tải...");
 
   // Bill State
   const [billType, setBillType] = useState("monthly_rent");
@@ -54,7 +66,7 @@ export default function CreateBillPage() {
     })();
   }, [role]);
 
-  // 2. Fetch Rooms List (Lite version)
+  // 2. Fetch Rooms
   useEffect(() => {
     if (!selectedBuilding) { setRooms([]); return; }
     (async () => {
@@ -63,28 +75,39 @@ export default function CreateBillPage() {
     })();
   }, [selectedBuilding]);
 
-  // 3. [FIXED] Fetch Room Detail to get Contract
+  // 3. Fetch Room Detail -> Contract -> Tenant Info
   useEffect(() => {
     if(!selectedRoom) { 
         setActiveContract(null); 
         setTenantUserId("");
+        setTenantName("");
         return; 
     }
 
     (async () => {
         try {
-            // Call API to get full room details (including current_contract)
             const roomDetail = await getRoomById(selectedRoom);
             
             if (roomDetail?.current_contract) {
-                console.log(`found contract`);
-                setActiveContract(roomDetail.current_contract);
-                // Auto-select the primary tenant from contract
-                setTenantUserId(roomDetail.current_contract.tenant_user_id);
+                const contract = roomDetail.current_contract;
+                setActiveContract(contract);
+                setTenantUserId(contract.tenant_user_id);
+
+                // Fetch Tenant Name directly
+                try {
+                    const userRes = await getUserById(contract.tenant_user_id);
+                    // Support both structures: res.data or direct user object
+                    const user = userRes?.data || userRes; 
+                    setTenantName(user?.full_name || `User #${contract.tenant_user_id}`);
+                } catch (err) {
+                    console.error("Fetch tenant error:", err);
+                    setTenantName(`User #${contract.tenant_user_id}`);
+                }
+
             } else {
-                console.log(`not found contract`);
                 setActiveContract(null);
                 setTenantUserId("");
+                setTenantName("");
             }
         } catch (e) {
             console.error("Failed to load room details:", e);
@@ -117,11 +140,20 @@ export default function CreateBillPage() {
     if (!activeContract) return alert("Phòng này chưa có hợp đồng/người thuê!");
     if (!tenantUserId) return alert("Không xác định được người thanh toán!");
 
+    // Validate Dates
+    if (!periodStart || !isValidDate(periodStart)) return alert("Ngày bắt đầu không hợp lệ!");
+    if (!periodEnd || !isValidDate(periodEnd)) return alert("Ngày kết thúc không hợp lệ!");
+    if (!dueDate || !isValidDate(dueDate)) return alert("Hạn chót không hợp lệ!");
+
+    if (new Date(periodStart) > new Date(periodEnd)) {
+        return alert("Ngày bắt đầu không thể lớn hơn ngày kết thúc!");
+    }
+
     setLoading(true);
     try {
       const payload = {
         contract_id: activeContract.contract_id,
-        tenant_user_id: tenantUserId, // Send the selected payer
+        tenant_user_id: tenantUserId,
         bill_type: billType,
         billing_period_start: periodStart,
         billing_period_end: periodEnd,
@@ -132,8 +164,7 @@ export default function CreateBillPage() {
         service_charges: charges
       };
 
-      if (status === 'draft') await createDraftBill(payload);
-      else await createDraftBill(payload); 
+      await createDraftBill(payload); 
 
       alert("Thành công!");
       nav("/bills");
@@ -177,7 +208,8 @@ export default function CreateBillPage() {
         {activeContract && (
             <div className="alert alert-success mt-3 py-2">
                 <strong>Hợp đồng:</strong> {activeContract.contract_number} <br/>
-                <strong>Người thuê (Chính):</strong> User ID #{activeContract.tenant_user_id}
+                {/* Show Name instead of ID */}
+                <strong>Người thuê (Chính):</strong> {tenantName} 
             </div>
         )}
       </div>
@@ -193,9 +225,33 @@ export default function CreateBillPage() {
                 <option value="other">Khác</option>
             </select>
           </div>
-          <div className="col-md-3"><label>Từ ngày</label><input type="date" className="form-control" onChange={e=>setPeriodStart(e.target.value)}/></div>
-          <div className="col-md-3"><label>Đến ngày</label><input type="date" className="form-control" onChange={e=>setPeriodEnd(e.target.value)}/></div>
-          <div className="col-md-3"><label>Hạn chót</label><input type="date" className="form-control" onChange={e=>setDueDate(e.target.value)}/></div>
+          <div className="col-md-3">
+            <label>Từ ngày</label>
+            <input 
+                type="date" 
+                className="form-control" 
+                onChange={e => setPeriodStart(e.target.value)} 
+                max="9999-12-31" // Limit year
+            />
+          </div>
+          <div className="col-md-3">
+            <label>Đến ngày</label>
+            <input 
+                type="date" 
+                className="form-control" 
+                onChange={e => setPeriodEnd(e.target.value)} 
+                max="9999-12-31"
+            />
+          </div>
+          <div className="col-md-3">
+            <label>Hạn chót</label>
+            <input 
+                type="date" 
+                className="form-control" 
+                onChange={e => setDueDate(e.target.value)} 
+                max="9999-12-31"
+            />
+          </div>
           <div className="col-12"><label>Mô tả</label><input className="form-control" onChange={e=>setDescription(e.target.value)}/></div>
         </div>
       </div>

@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { Trash, Plus, ArrowLeft, Save, Pencil } from "react-bootstrap-icons";
+import { Trash, Plus, ArrowLeft, Save, Pencil, Lock } from "react-bootstrap-icons";
 import { getBillById, updateDraftBill } from "../../services/api/bills";
-import { listUsers } from "../../services/api/users";
-import { http } from "../../services/http";
 
 /* ================== Helpers ================== */
 function parseDate(d) {
@@ -26,11 +24,12 @@ function extractRoomLabel(bill) {
   return room?.room_number || "—";
 }
 
+const fmtMoney = (v) => new Intl.NumberFormat('vi-VN').format(v || 0);
+
 /* ================== EDIT PAGE ================== */
 export default function EditBillPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const location = useLocation();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -48,8 +47,7 @@ export default function EditBillPage() {
     billing_period_start: "",
     billing_period_end: "",
     due_date: "",
-    description: "",
-    penalty_amount: 0,
+    description: ""
   });
 
   // Dynamic Service Charges
@@ -57,9 +55,11 @@ export default function EditBillPage() {
 
   // Auto-Calc Total
   const totalAmount = useMemo(() => {
-    const servicesTotal = charges.reduce((sum, c) => sum + (Number(c.amount) * Number(c.quantity)), 0);
-    return servicesTotal + Number(form.penalty_amount || 0);
-  }, [charges, form.penalty_amount]);
+    return charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [charges]);
+
+  // Check if bill is utilities (Locked mode)
+  const isUtilityBill = form.bill_type === 'utilities';
 
   /* ========== LOAD DATA ========== */
   useEffect(() => {
@@ -98,7 +98,6 @@ export default function EditBillPage() {
           billing_period_end: parseDate(detail.billing_period_end),
           due_date: parseDate(detail.due_date),
           description: detail.description || "",
-          penalty_amount: detail.penalty_amount || 0,
         });
 
         // 4. Populate Charges
@@ -106,18 +105,11 @@ export default function EditBillPage() {
           setCharges(detail.service_charges.map(c => ({
             service_type: c.service_type,
             quantity: c.quantity,
-            amount: c.amount, // Note: Schema calls it 'amount' (total for line) or unit_price? 
-            // BE usually stores 'amount' as final line total. 
-            // Let's assume UI edits 'amount' as Unit Price or Final Amount depending on logic.
-            // For simplicity: We edit 'amount' as UNIT PRICE here, or assume quantity=1.
-            // Actually, standard is: Unit Price * Quantity = Amount.
-            // Let's check API payload builder. It sends: quantity, unit_price, amount.
-            // Let's load 'unit_price' if available, else amount.
-            unit_price: c.unit_price || c.amount,
+            unit_price: c.unit_price || c.amount, // Fallback logic
+            amount: c.amount, 
             description: c.description || ""
           })));
         } else {
-          // Default if empty
           setCharges([{ service_type: "Tiền thuê", quantity: 1, amount: detail.total_amount || 0, unit_price: detail.total_amount || 0 }]);
         }
 
@@ -142,7 +134,7 @@ export default function EditBillPage() {
     const newCharges = [...charges];
     newCharges[index][field] = value;
 
-    // Sync amount if unit_price changes
+    // Sync amount if unit_price or quantity changes
     if (field === 'unit_price' || field === 'quantity') {
       const q = Number(field === 'quantity' ? value : newCharges[index].quantity);
       const p = Number(field === 'unit_price' ? value : newCharges[index].unit_price);
@@ -170,7 +162,7 @@ export default function EditBillPage() {
           service_type: c.service_type,
           quantity: Number(c.quantity),
           unit_price: Number(c.unit_price),
-          amount: Number(c.quantity) * Number(c.unit_price), // Recalculate to be safe
+          amount: Number(c.quantity) * Number(c.unit_price),
           description: c.description
         }))
       };
@@ -218,7 +210,14 @@ export default function EditBillPage() {
         <div className="row g-3 mb-4">
           <div className="col-md-3">
             <label className="form-label fw-bold">Loại hóa đơn</label>
-            <select className="form-select" name="bill_type" value={form.bill_type} onChange={onFormChange}>
+            {/* Nếu là Utility thì disable loại hóa đơn luôn để tránh đổi lung tung */}
+            <select 
+                className="form-select" 
+                name="bill_type" 
+                value={form.bill_type} 
+                onChange={onFormChange}
+                disabled={isUtilityBill} 
+            >
               <option value="monthly_rent">Tiền phòng</option>
               <option value="utilities">Điện nước</option>
               <option value="other">Khác</option>
@@ -245,19 +244,28 @@ export default function EditBillPage() {
         {/* SERVICE CHARGES */}
         <div className="mb-3">
           <div className="d-flex justify-content-between align-items-center mb-2">
-            <label className="form-label fw-bold mb-0">Chi tiết phí</label>
-            <button className="btn btn-sm btn-outline-primary" onClick={addCharge}>
-              <Plus size={18} /> Thêm dòng
-            </button>
+            <div className="d-flex align-items-center gap-2">
+                <label className="form-label fw-bold mb-0">Chi tiết phí</label>
+                {/* Hiển thị Lock icon nếu là utility */}
+                {isUtilityBill && <span className="badge bg-warning text-dark"><Lock className="me-1"/> Đã khóa (Điện nước)</span>}
+            </div>
+            
+            {/* Chỉ hiện nút thêm nếu KHÔNG PHẢI utility */}
+            {!isUtilityBill && (
+                <button className="btn btn-sm btn-outline-primary" onClick={addCharge}>
+                <Plus size={18} /> Thêm dòng
+                </button>
+            )}
           </div>
+
           <table className="table table-bordered align-middle">
             <thead className="table-light">
-              <tr>
+              <tr className="small text-center">
                 <th style={{ width: '35%' }}>Tên phí</th>
                 <th style={{ width: '15%' }}>Số lượng</th>
                 <th style={{ width: '20%' }}>Đơn giá</th>
                 <th style={{ width: '20%' }}>Thành tiền</th>
-                <th style={{ width: '10%' }}></th>
+                {!isUtilityBill && <th style={{ width: '5%' }}></th>}
               </tr>
             </thead>
             <tbody>
@@ -268,59 +276,50 @@ export default function EditBillPage() {
                       value={c.service_type}
                       onChange={e => updateCharge(i, 'service_type', e.target.value)}
                       placeholder="VD: Điện"
+                      readOnly={isUtilityBill} // LOCK
                     />
                     <input className="form-control form-control-sm text-muted fst-italic"
                       value={c.description}
                       onChange={e => updateCharge(i, 'description', e.target.value)}
                       placeholder="Ghi chú (tùy chọn)"
+                      readOnly={isUtilityBill}
                     />
                   </td>
                   <td>
-                    <input type="number" className="form-control form-control-sm"
+                    <input type="number" className="form-control form-control-sm text-center"
                       value={c.quantity}
                       onChange={e => updateCharge(i, 'quantity', e.target.value)}
-                      min="0"
+                      readOnly={isUtilityBill} // LOCK
                     />
                   </td>
                   <td>
-                    <input type="number" className="form-control form-control-sm"
+                    <input type="number" className="form-control form-control-sm text-end"
                       value={c.unit_price}
                       onChange={e => updateCharge(i, 'unit_price', e.target.value)}
-                      min="0"
+                      readOnly={isUtilityBill} // LOCK
                     />
                   </td>
-                  <td className="text-end">
-                    {(Number(c.quantity) * Number(c.unit_price)).toLocaleString()}
+                  <td className="text-end fw-bold">
+                    {fmtMoney(Number(c.quantity) * Number(c.unit_price))}
                   </td>
-                  <td className="text-center">
-                    <button className="btn btn-sm text-danger" onClick={() => removeCharge(i)}>
-                      <Trash />
-                    </button>
-                  </td>
+                  {!isUtilityBill && (
+                      <td className="text-center">
+                        <button className="btn btn-sm text-danger" onClick={() => removeCharge(i)}>
+                          <Trash />
+                        </button>
+                      </td>
+                  )}
                 </tr>
               ))}
             </tbody>
+            <tfoot className="table-light">
+                <tr>
+                    <td colSpan={3} className="text-end fw-bold">TỔNG CỘNG:</td>
+                    <td className="text-end fw-bold text-danger fs-5">{fmtMoney(totalAmount)}</td>
+                    {!isUtilityBill && <td></td>}
+                </tr>
+            </tfoot>
           </table>
-        </div>
-
-        {/* TOTALS */}
-        <div className="row justify-content-end">
-          <div className="col-md-5">
-            <div className="d-flex justify-content-between mb-2 align-items-center">
-              <span>Phạt quá hạn:</span>
-              <div style={{ width: '120px' }}>
-                <input type="number" className="form-control form-control-sm text-end"
-                  name="penalty_amount"
-                  value={form.penalty_amount}
-                  onChange={onFormChange}
-                />
-              </div>
-            </div>
-            <div className="d-flex justify-content-between border-top pt-2">
-              <span className="fw-bold fs-5">TỔNG CỘNG:</span>
-              <span className="fw-bold fs-5 text-primary">{totalAmount.toLocaleString()} đ</span>
-            </div>
-          </div>
         </div>
       </div>
 

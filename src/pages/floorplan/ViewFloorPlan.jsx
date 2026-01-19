@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ReactFlow, {
   ReactFlowProvider,
   Background,
@@ -21,18 +21,18 @@ import { getUserRole } from "../../utils/auth";
 const pathFromPoints = (pts) =>
   pts?.length ? `M${pts.map((p) => `${p.x} ${p.y}`).join(" L ")} Z` : "";
 const bboxOf = (pts = []) => {
-  if (!pts.length) return { w: 0, h: 0 };
+  if (!pts.length) return { minX: 0, minY: 0, w: 0, h: 0 };
   const xs = pts.map((p) => p.x);
   const ys = pts.map((p) => p.y);
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
-  return { w: maxX - minX, h: maxY - minY };
+  return { minX, minY, w: maxX - minX, h: maxY - minY };
 };
 const role = getUserRole();
 const isOwner = role === "OWNER";
-console.log("isOwner", isOwner , role);
+console.log("isOwner", isOwner, role);
 
 function BuildingNodeView({ data }) {
   const {
@@ -40,10 +40,15 @@ function BuildingNodeView({ data }) {
     stroke = "#334155",
     fill = "rgba(59,130,246,.06)",
   } = data || {};
-  const { w, h } = bboxOf(points);
+  const { minX, minY, w, h } = bboxOf(points);
   return (
     <div style={{ width: w, height: h }}>
-      <svg width={w} height={h} style={{ display: "block" }}>
+      <svg
+        width={w}
+        height={h}
+        viewBox={`${minX} ${minY} ${w} ${h}`}
+        style={{ display: "block", overflow: "visible" }}
+      >
         <path
           d={pathFromPoints(points)}
           fill={fill}
@@ -59,7 +64,7 @@ function BuildingNodeView({ data }) {
 }
 
 function BlockNodeView({ data }) {
-  const { w = 120, h = 80, color = "#1e40af" } = data || {};
+  const { w = 120, h = 80, color = "#1e40af", fontSize = 13 } = data || {};
 
   const isRoom = data?.icon === "room" || data?.room_number !== undefined;
   const roomNo = data?.room_number ? String(data.room_number) : "";
@@ -77,6 +82,7 @@ function BlockNodeView({ data }) {
         alignItems: "center",
         justifyContent: "center",
         fontWeight: 700,
+        fontSize,
         color: "#0f172a",
       }}
     >
@@ -92,6 +98,7 @@ function SmallNodeView({ data }) {
     h = 40,
     color = "#64748b",
     bg = "#f1f5f9",
+    fontSize = 13,
   } = data || {};
   return (
     <div
@@ -106,6 +113,7 @@ function SmallNodeView({ data }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        fontSize,
       }}
     >
       {label}
@@ -115,6 +123,9 @@ function SmallNodeView({ data }) {
 
 function ViewerInner() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const qsBuilding = searchParams.get("building");
+  const qsFloor = searchParams.get("floor");
 
   // ======= State chọn tòa & tầng =======
   const [buildings, setBuildings] = useState([]);
@@ -141,11 +152,55 @@ function ViewerInner() {
       block: BlockNodeView,
       small: SmallNodeView,
     }),
-    []
+    [],
   );
 
   const hasPlan = nodes && nodes.length > 0;
+  const refreshPlansForBuilding = async (buildingIdStr, preferFloor = "") => {
+    if (!buildingIdStr) return;
 
+    try {
+      setLoadingPlan(true);
+
+      const buildingIdInt = parseInt(buildingIdStr, 10);
+      const { items } = await listFloorPlans({
+        building_id: buildingIdInt,
+        page: 1,
+        limit: 200,
+      });
+
+      const latestByFloor = {};
+      for (const plan of items || []) {
+        const floorKey = String(plan.floor_number ?? "");
+        if (!floorKey) continue;
+        if (!latestByFloor[floorKey]) latestByFloor[floorKey] = plan;
+      }
+
+      const floors = Object.keys(latestByFloor).sort(
+        (a, b) => Number(a) - Number(b),
+      );
+
+      setPlansByFloor(latestByFloor);
+      setFloorIds(floors);
+
+      // ưu tiên tầng muốn giữ, nếu không có thì chọn tầng cao nhất, nếu không có thì rỗng
+      let nextActive = "";
+      if (preferFloor && floors.includes(String(preferFloor)))
+        nextActive = String(preferFloor);
+      else nextActive = floors.length ? floors[floors.length - 1] : "";
+
+      setActiveFloor(nextActive);
+    } catch (err) {
+      console.error(err);
+      setPlansByFloor({});
+      setFloorIds([]);
+      setActiveFloor("");
+      setNodes([]);
+      setEdges([]);
+    } finally {
+      setLoadingPlan(false);
+    }
+  };
   // ===================== 1. Lấy danh sách tòa nhà =====================
   useEffect(() => {
     let canceled = false;
@@ -163,7 +218,14 @@ function ViewerInner() {
 
         if (arr.length > 0) {
           const firstId = String(arr[0].building_id);
-          setActiveBuilding((prev) => prev || firstId);
+
+          const desiredBuilding =
+            (qsBuilding &&
+            arr.some((b) => String(b.building_id) === String(qsBuilding))
+              ? String(qsBuilding)
+              : "") || firstId;
+
+          setActiveBuilding((prev) => prev || desiredBuilding);
         }
       } catch (err) {
         if (canceled) return;
@@ -186,8 +248,18 @@ function ViewerInner() {
     () =>
       buildings.find((b) => String(b.building_id) === String(activeBuilding)) ||
       null,
-    [buildings, activeBuilding]
+    [buildings, activeBuilding],
   );
+
+  useEffect(() => {
+    if (!activeBuilding) return;
+
+    // chỉ set floor nếu có (tránh URL floor= trống)
+    const next = { building: String(activeBuilding) };
+    if (activeFloor) next.floor = String(activeFloor);
+
+    setSearchParams(next, { replace: true });
+  }, [activeBuilding, activeFloor, setSearchParams]);
 
   // ===================== 2. Lấy danh sách floor plan theo tòa =====================
   useEffect(() => {
@@ -235,7 +307,7 @@ function ViewerInner() {
         }
 
         const floors = Object.keys(latestByFloor).sort(
-          (a, b) => Number(a) - Number(b)
+          (a, b) => Number(a) - Number(b),
         );
 
         if (canceled) return;
@@ -243,9 +315,15 @@ function ViewerInner() {
         setPlansByFloor(latestByFloor);
         setFloorIds(floors);
 
-        // Nếu tầng đang chọn không còn trong list thì auto chọn tầng đầu tiên có layout
+        // Nếu tầng đang chọn không còn trong list thì auto chọn tầng theo query -> activeFloor -> tầng đầu tiên
         if (!floors.includes(activeFloor)) {
-          setActiveFloor(floors[0] || "");
+          const desiredFloor =
+            (qsFloor && floors.includes(String(qsFloor))
+              ? String(qsFloor)
+              : "") ||
+            floors[0] ||
+            "";
+          setActiveFloor(desiredFloor);
         }
       } catch (err) {
         if (canceled) return;
@@ -295,6 +373,7 @@ function ViewerInner() {
         const layout = detail?.layout || {};
         const rawNodes = Array.isArray(layout.nodes) ? layout.nodes : [];
         const rawEdges = Array.isArray(layout.edges) ? layout.edges : [];
+        const metaFont = Number(layout?.meta?.labelFontSize || 13);
 
         const nn = rawNodes.map((n) => {
           const isRoom =
@@ -307,7 +386,8 @@ function ViewerInner() {
             selectable: false,
             data: {
               ...(n.data || {}),
-              // nếu là room và có số phòng thì label cũng set về số (hỗ trợ dữ liệu cũ)
+              // ✅ nếu node chưa có fontSize riêng thì lấy theo meta
+              fontSize: n?.data?.fontSize ?? metaFont,
               ...(isRoom && roomNo ? { label: roomNo } : {}),
             },
             style: {
@@ -382,14 +462,23 @@ function ViewerInner() {
     if (!canDeleteFloor) return;
 
     const ok = window.confirm(
-      `Chỉ được xóa tầng cao nhất.\nBạn có chắc muốn xóa tầng ${activeFloor}?`
+      `Chỉ được xóa tầng cao nhất.\nBạn có chắc muốn xóa tầng ${activeFloor}?`,
     );
     if (!ok) return;
 
-    await deleteFloorPlan(activePlan.plan_id);
+    try {
+      const deletingFloor = String(activeFloor);
+      await deleteFloorPlan(activePlan.plan_id);
 
-    // reload đơn giản, tránh lệch state
-    window.location.reload();
+      // ✅ sau khi xóa tầng cao nhất, tầng tiếp theo cần chọn thường là (deletingFloor - 1)
+      const nextFloor = String(Math.max(1, Number(deletingFloor) - 1));
+
+      // ✅ refetch lại đúng building đang chọn, rồi focus đúng tầng tiếp theo
+      await refreshPlansForBuilding(activeBuilding, nextFloor);
+    } catch (e) {
+      alert(e?.message || "Không thể xóa tầng.");
+      console.error(e);
+    }
   };
 
   // ===================== RENDER UI =====================
@@ -581,9 +670,14 @@ function ViewerInner() {
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable={false}
-            panOnScroll
-            zoomOnScroll
             fitView
+            panOnDrag={[2]}
+            panOnScroll
+            minZoom={0.05}
+            maxZoom={8}
+            zoomOnPinch
+            zoomOnScroll
+            fitViewOptions={{ padding: 0.2 }}
           >
             <Background color="#e5e7eb" gap={gridGap} />
             <MiniMap pannable zoomable />

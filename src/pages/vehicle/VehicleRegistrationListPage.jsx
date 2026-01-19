@@ -37,6 +37,10 @@ export default function VehicleRegistrationListPage() {
   const [selectedSlot, setSelectedSlot] = useState("");
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const formatDate = (date) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString("vi-VN");
+  };
   useEffect(() => {
     const token = getAccessToken();
     if (!token) return;
@@ -117,20 +121,20 @@ export default function VehicleRegistrationListPage() {
 
   /* ================= REJECT ================= */
 
- const handleReject = async () => {
-  if (!rejectionReason.trim()) {
-    alert("Vui lòng nhập lý do từ chối");
-    return;
-  }
+  const handleReject = async () => {
+    if (!rejectionReason.trim()) {
+      alert("Vui lòng nhập lý do từ chối");
+      return;
+    }
 
-  await rejectVehicleRegistration(rejectTarget.registration_id, {
-    rejection_reason: rejectionReason.trim()
-  });
+    await rejectVehicleRegistration(rejectTarget.registration_id, {
+      rejection_reason: rejectionReason.trim()
+    });
 
-  setRejectTarget(null);
-  setRejectionReason("");
-  fetchData();
-};
+    setRejectTarget(null);
+    setRejectionReason("");
+    fetchData();
+  };
 
   /* ================= DELETE ================= */
 
@@ -173,8 +177,36 @@ export default function VehicleRegistrationListPage() {
 ================================ */
 .filter-bar {
   display: flex;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
+}
+
+.filter-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+}
+
+.filter-select {
+  min-width: 220px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background-color: #fff;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.filter-select:hover {
+  border-color: #2563eb;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 .search-input,
@@ -208,18 +240,19 @@ table {
   border-collapse: collapse;
 }
 
-thead {
-  background: #f3f4f6;
+thead th {
+  background: #f8fafc;
+  font-weight: 700;
 }
 
 th {
-  text-align: left;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #374151;
   padding: 12px 10px;
   border-bottom: 1px solid #e5e7eb;
+  vertical-align: middle;
 }
 
 td {
@@ -227,10 +260,21 @@ td {
   font-size: 14px;
   border-bottom: 1px solid #e5e7eb;
   color: #111827;
+  vertical-align: middle;
 }
-
+th:nth-child(2),
+td:nth-child(2) {
+text-align: center;
+}
+td:nth-child(5),
+td:nth-child(6),
+th:nth-child(5),
+th:nth-child(6) {
+  white-space: nowrap;
+}
 .center {
   text-align: center;
+  vertical-align: middle;
 }
 
 tr:hover {
@@ -241,14 +285,11 @@ tr:hover {
    STATUS BADGES
 ================================ */
 .status {
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12.5px;
-  font-weight: 600;
-  display: inline-block;
-  text-transform: capitalize;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
 }
-
 /* Requested = waiting for approve */
 .status.requested,
 .status.pending {
@@ -272,14 +313,16 @@ tr:hover {
    ACTION COLUMN
 ================================ */
 .action-col {
-  min-width: 220px;
+  width: 220px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .action-buttons {
-  display: flex;
+   display: flex;
   justify-content: center;
+  align-items: center; 
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 /* ===============================
@@ -393,6 +436,19 @@ tr:hover {
   gap: 10px;
   margin-top: 16px;
 }
+  
+  td,
+th {
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+tbody tr {
+  height: 56px;
+}
+  table * {
+  box-sizing: border-box;
+}
 `;
   return (
     <>
@@ -401,12 +457,13 @@ tr:hover {
       <div className="container">
         <h2 className="title">Danh sách đăng ký xe</h2>
         {role === "OWNER" && (
-          <div style={{ marginBottom: 16 }}>
+          <div className="filter-bar">
+            <label className="filter-label">Tòa nhà</label>
             <select
+              className="filter-select"
               value={selectedBuilding}
               onChange={(e) => setSelectedBuilding(e.target.value)}
             >
-              <option value="">-- Tất cả tòa nhà --</option>
               {buildings.map((b) => (
                 <option key={b.building_id} value={b.building_id}>
                   {b.name}
@@ -426,8 +483,10 @@ tr:hover {
                   <th>Người đăng ký</th>
                   <th>Biển số</th>
                   <th>Loại xe</th>
-                  <th>Trạng thái</th>
-                  <th className="center">Hành động</th>
+                  <th>Ngày bắt đầu</th>
+                  <th>Ngày kết thúc</th>
+                  <th className="center">Trạng thái</th>
+                  <th className="center action-col">Hành động</th>
                 </tr>
               </thead>
               <tbody>
@@ -438,11 +497,14 @@ tr:hover {
                     <td>{r.license_plate}</td>
                     <td>{VEHICLE_TYPE_LABEL[r.vehicle_type] || "—"}</td>
 
-                    <td className="center">
-                      <span className={`status ${r.status}`}>
-                        {STATUS_LABEL[r.status] || r.status}
-                      </span>
-                    </td>
+                    <td>{formatDate(r.start_date)}</td>
+<td>{formatDate(r.end_date)}</td>
+
+<td className="center">
+  <span className={`status ${r.status}`}>
+    {STATUS_LABEL[r.status] || r.status}
+  </span>
+</td>
 
                     <td className="center action-col">
                       <div className="action-buttons">
@@ -456,14 +518,14 @@ tr:hover {
                             </button>
 
                             <button
-  className="btn reject"
-  onClick={() => {
-    setRejectTarget(r);
-    setRejectionReason("");
-  }}
->
-  Từ chối
-</button>
+                              className="btn reject"
+                              onClick={() => {
+                                setRejectTarget(r);
+                                setRejectionReason("");
+                              }}
+                            >
+                              Từ chối
+                            </button>
                           </>
                         )}
                       </div>
@@ -514,46 +576,46 @@ tr:hover {
           </div>,
           document.body
         )}
-        {rejectTarget &&
-  createPortal(
-    <div className="modal">
-      <div className="modal-content">
-        <h3>
-          Từ chối đăng ký xe {rejectTarget.license_plate}
-        </h3>
+      {rejectTarget &&
+        createPortal(
+          <div className="modal">
+            <div className="modal-content">
+              <h3>
+                Từ chối đăng ký xe {rejectTarget.license_plate}
+              </h3>
 
-        <textarea
-          placeholder="Nhập lý do từ chối..."
-          value={rejectionReason}
-          onChange={(e) => setRejectionReason(e.target.value)}
-          rows={4}
-          style={{
-            width: "100%",
-            marginTop: 8,
-            resize: "none"
-          }}
-        />
+              <textarea
+                placeholder="Nhập lý do từ chối..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={4}
+                style={{
+                  width: "100%",
+                  marginTop: 8,
+                  resize: "none"
+                }}
+              />
 
-        <div style={{ marginTop: 12, textAlign: "right" }}>
-          <button
-            className="btn reject"
-            onClick={handleReject}
-          >
-            Xác nhận từ chối
-          </button>
+              <div style={{ marginTop: 12, textAlign: "right" }}>
+                <button
+                  className="btn reject"
+                  onClick={handleReject}
+                >
+                  Xác nhận từ chối
+                </button>
 
-          <button
-            className="btn"
-            onClick={() => setRejectTarget(null)}
-            style={{ marginLeft: 8 }}
-          >
-            Hủy
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  )}
+                <button
+                  className="btn"
+                  onClick={() => setRejectTarget(null)}
+                  style={{ marginLeft: 8 }}
+                >
+                  Hủy
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

@@ -198,12 +198,10 @@ function EditBuildingPage() {
 
           <Col md={3}>
             <label>Ngày đóng tiền</label>
-            <input
-              type="number"
-              value={billDueDay}
-              disabled={!editService}
-              onChange={(e) => setBillDueDay(e.target.value)}
-            />
+            <input type="number" value={billDueDay} disabled />
+            <div style={{ color: "red", fontSize: "0.8rem", marginTop: "4px" }}>
+              ⚠ Ngày thanh toán không thể chỉnh sửa sau khi tạo
+            </div>
           </Col>
         </Row>
 

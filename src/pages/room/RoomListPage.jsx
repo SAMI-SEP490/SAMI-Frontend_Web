@@ -5,6 +5,7 @@ import {
   updateRoom,
   deactivateRoom,
   activateRoom,
+  removeSecondaryTenantFromRoom,
 } from "../../services/api/rooms";
 import { getAccessToken } from "../../services/http";
 import "./RoomListPage.css";
@@ -28,6 +29,7 @@ function RoomListPage() {
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editRoom, setEditRoom] = useState(null);
+  const [removingUserIds, setRemovingUserIds] = useState([]);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const navigate = useNavigate();
@@ -55,7 +57,7 @@ function RoomListPage() {
     async function fetchData() {
       try {
         const data = await listRooms();
-        setRooms(Array.isArray(data) ? data : data?.items ?? []);
+        setRooms(Array.isArray(data) ? data : (data?.items ?? []));
         console.log("Loaded rooms:", data);
       } catch (error) {
         alert("❌ Lỗi khi tải dữ liệu phòng!");
@@ -79,7 +81,7 @@ function RoomListPage() {
           data = await listAssignedBuildings();
         }
 
-        const raw = Array.isArray(data) ? data : data?.items ?? [];
+        const raw = Array.isArray(data) ? data : (data?.items ?? []);
 
         const normalized = raw
           .map((b) => {
@@ -148,7 +150,7 @@ function RoomListPage() {
   const getUniqueFloors = () => {
     const floors = [
       ...new Set(
-        rooms.map((r) => r.floor).filter((f) => f !== null && f !== undefined)
+        rooms.map((r) => r.floor).filter((f) => f !== null && f !== undefined),
       ),
     ];
     return floors.sort((a, b) => a - b);
@@ -207,7 +209,7 @@ function RoomListPage() {
 
       await updateRoom(roomId, updatedData);
       setRooms((prev) =>
-        prev.map((r) => (r.room_id === roomId ? editRoom : r))
+        prev.map((r) => (r.room_id === roomId ? editRoom : r)),
       );
       setShowEditModal(false);
     } catch (error) {
@@ -231,8 +233,8 @@ function RoomListPage() {
 
       setRooms((prev) =>
         prev.map((r) =>
-          r.room_id === roomId ? { ...r, is_active: !r.is_active } : r
-        )
+          r.room_id === roomId ? { ...r, is_active: !r.is_active } : r,
+        ),
       );
     } catch (error) {
       alert("❌ Lỗi khi thay đổi trạng thái phòng!");
@@ -256,6 +258,45 @@ function RoomListPage() {
     } catch (error) {
       alert("❌ Lỗi khi xóa phòng!");
       console.error(error);
+    }
+  };
+
+  const handleRemoveSecondary = async (tenantUserId, tenantName) => {
+    if (!selectedRoom?.room_id) return;
+
+    const ok = window.confirm(
+      `Bạn chắc chắn muốn xóa người ở phụ "${tenantName}" khỏi phòng ${selectedRoom.room_number}?`,
+    );
+    if (!ok) return;
+
+    try {
+      setRemovingUserIds((p) => [...p, tenantUserId]);
+
+      await removeSecondaryTenantFromRoom(selectedRoom.room_id, tenantUserId);
+
+      // ✅ Update UI ngay, không reload toàn trang
+      setSelectedRoom((prev) => {
+        if (!prev) return prev;
+        const newTenants = (prev.tenants || []).filter(
+          (t) => String(t.user_id) !== String(tenantUserId),
+        );
+        const newCount = Math.max(0, (prev.tenant_count || 0) - 1);
+
+        return { ...prev, tenants: newTenants, tenant_count: newCount };
+      });
+
+      // đồng bộ bảng list bên ngoài (cột Người ở)
+      setRooms((prev) =>
+        prev.map((r) =>
+          r.room_id === selectedRoom.room_id
+            ? { ...r, tenant_count: Math.max(0, (r.tenant_count || 0) - 1) }
+            : r,
+        ),
+      );
+    } catch (e) {
+      alert(e?.message || "❌ Không thể xóa người ở phụ");
+    } finally {
+      setRemovingUserIds((p) => p.filter((id) => id !== tenantUserId));
     }
   };
 
@@ -403,6 +444,7 @@ function RoomListPage() {
               <th>Diện tích (m²)</th>
               <th>Trạng thái</th>
               <th>Người ở</th>
+              <th>Số người tối đa</th>
               <th>Hành động</th>
             </tr>
           </thead>
@@ -410,7 +452,7 @@ function RoomListPage() {
           <tbody>
             {filteredRooms.length === 0 && (
               <tr>
-                <td colSpan={userRole === "OWNER" ? 8 : 7} className="no-data">
+                <td colSpan={userRole === "OWNER" ? 9 : 8} className="no-data">
                   Không có phòng phù hợp
                 </td>
               </tr>
@@ -420,7 +462,9 @@ function RoomListPage() {
               const roomId = room.room_id;
               const loading = loadingIds.includes(roomId);
               const rowClassName = !room.is_active ? "inactive-row" : "";
-
+              const currentCount = room.tenant_count || 0;
+              const maxTenants = room.max_tenants || 1;
+              const isFull = currentCount >= maxTenants;
               return (
                 <tr key={roomId} className={rowClassName}>
                   <td>{index + 1}</td>
@@ -435,9 +479,8 @@ function RoomListPage() {
                   <td>{room.floor || "N/A"}</td>
                   <td>{room.size || "N/A"}</td>
                   <td>{renderStatus(room.status, room.is_active)}</td>
-                  <td style={{ textAlign: "center" }}>
-                    {room.tenant_count || 0}
-                  </td>
+                  <td style={{ textAlign: "center" }}>{currentCount}</td>
+                  <td style={{ textAlign: "center" }}>{maxTenants}</td>
 
                   <td className="action-buttons">
                     <Button
@@ -450,7 +493,8 @@ function RoomListPage() {
                     </Button>
                     {room.status === "occupied" &&
                       room.is_active &&
-                      room.status !== "maintenance" && (
+                      room.status !== "maintenance" &&
+                      !isFull && (
                         <Button
                           size="sm"
                           className="btn publish"
@@ -522,6 +566,14 @@ function RoomListPage() {
                 {getStatusLabel(selectedRoom.status)}
               </p>
               <p>
+                <strong>Ngày tạo:</strong>{" "}
+                {selectedRoom.created_at
+                  ? new Date(selectedRoom.created_at).toLocaleDateString(
+                      "vi-VN",
+                    )
+                  : "N/A"}
+              </p>
+              <p>
                 <strong>Trạng thái hoạt động:</strong>
                 {selectedRoom.is_active ? (
                   <span className="status-active-badge"> ✓ Hoạt động</span>
@@ -536,45 +588,104 @@ function RoomListPage() {
                 <strong>Số người ở:</strong> {selectedRoom.tenant_count || 0}
               </p>
               <p>
+                <strong>Số người tối đa:</strong>{" "}
+                {selectedRoom.max_tenants || 1}
+              </p>
+              <p>
                 <strong>Bảo trì đang chờ:</strong>{" "}
                 {selectedRoom.pending_maintenance || 0}
               </p>
+              {/* ===== DANH SÁCH NGƯỜI THUÊ TRONG PHÒNG ===== */}
+              <div style={{ marginTop: 12 }}>
+                <p style={{ marginBottom: 8 }}>
+                  <strong>Danh sách người thuê trong phòng:</strong>
+                </p>
 
-              {selectedRoom.tenants && selectedRoom.tenants.length > 0 && (
-                <div>
-                  <p>
-                    <strong>Danh sách người ở:</strong>
-                  </p>
-                  <ul>
-                    {selectedRoom.tenants.map((tenant, idx) => (
-                      <li key={idx}>
-                        {tenant.full_name} - {tenant.phone || "N/A"}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                <Table bordered hover size="sm" responsive>
+                  <thead>
+                    <tr style={{ textAlign: "center" }}>
+                      <th>#</th>
+                      <th>Tên</th>
+                      <th>SĐT</th>
+                      <th>Ngày vào ở</th>
+                      <th>Ngày sinh</th>
+                      <th>Vai trò</th>
+                      <th>Hoạt động</th>
+                    </tr>
+                  </thead>
 
-              {selectedRoom.primary_tenant && (
-                <>
-                  <p>
-                    <strong>Người ở chính:</strong>{" "}
-                    {selectedRoom.primary_tenant.full_name}
-                  </p>
-                  <p>
-                    <strong>Điện thoại:</strong>{" "}
-                    {selectedRoom.primary_tenant.phone || "N/A"}
-                  </p>
-                </>
-              )}
-              <p>
-                <strong>Ngày tạo:</strong>{" "}
-                {selectedRoom.created_at
-                  ? new Date(selectedRoom.created_at).toLocaleDateString(
-                      "vi-VN"
-                    )
-                  : "N/A"}
-              </p>
+                  <tbody>
+                    {(selectedRoom?.tenants || []).length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={7}
+                          style={{ textAlign: "center", padding: 12 }}
+                        >
+                          Chưa có người thuê trong phòng
+                        </td>
+                      </tr>
+                    ) : (
+                      (selectedRoom.tenants || []).map((t, idx) => {
+                        const movedIn = t?.moved_in_at
+                          ? new Date(t.moved_in_at).toLocaleDateString("vi-VN")
+                          : "N/A";
+
+                        const birthday = t?.birthday
+                          ? new Date(t.birthday).toLocaleDateString("vi-VN")
+                          : "N/A";
+
+                        const roleLabel =
+                          String(t?.tenant_type || "").toLowerCase() ===
+                          "primary"
+                            ? "Ở chính"
+                            : "Ở phụ";
+
+                        return (
+                          <tr key={t?.user_id ?? idx}>
+                            <td style={{ textAlign: "center" }}>{idx + 1}</td>
+                            <td>{t?.full_name || "N/A"}</td>
+                            <td style={{ textAlign: "center" }}>
+                              {t?.phone || "N/A"}
+                            </td>
+                            <td style={{ textAlign: "center" }}>{movedIn}</td>
+                            <td style={{ textAlign: "center" }}>{birthday}</td>
+                            <td style={{ textAlign: "center" }}>{roleLabel}</td>
+                            <td style={{ textAlign: "center" }}>
+                              {String(t?.tenant_type || "").toLowerCase() ===
+                              "secondary" ? (
+                                <Button
+                                  size="sm"
+                                  variant="danger"
+                                  disabled={removingUserIds.includes(t.user_id)}
+                                  onClick={() =>
+                                    handleRemoveSecondary(
+                                      t.user_id,
+                                      t.full_name || "N/A",
+                                    )
+                                  }
+                                >
+                                  {removingUserIds.includes(t.user_id) ? (
+                                    <>
+                                      <Spinner
+                                        size="sm"
+                                        animation="border"
+                                      />{" "}
+                                    </>
+                                  ) : (
+                                    "🗑 Xóa"
+                                  )}
+                                </Button>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </Table>
+              </div>
             </div>
           )}
         </Modal.Body>

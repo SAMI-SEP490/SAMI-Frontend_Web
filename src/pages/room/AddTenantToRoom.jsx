@@ -1,48 +1,116 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Form, Button, Card, Spinner, Alert } from "react-bootstrap";
-import { listUsers } from "../../services/api/users";
-import { addTenantToRoom } from "../../services/api/rooms";
+import { addTenantToRoom, getRoomById } from "../../services/api/rooms";
+import { lookupTenant } from "../../services/api/tenants";
 
 function AddTenantToRoom() {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
 
-  const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
+
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchTouched, setSearchTouched] = useState(false);
 
   const [movedInAt, setMovedInAt] = useState("");
   const [note, setNote] = useState("");
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // loading khi submit
   const [error, setError] = useState("");
-
-  // ===== LOAD USERS =====
+  const [roomInfo, setRoomInfo] = useState(null);
+  const [contractWindow, setContractWindow] = useState({
+    start: null,
+    end: null,
+    minMoveIn: "", // yyyy-mm-dd
+    maxMoveIn: "", // yyyy-mm-dd
+  });
+  // ===== SEARCH (DEBOUNCE) =====
   useEffect(() => {
-    async function fetchUsers() {
+    const term = searchTerm.trim();
+
+    // Nếu đã chọn user rồi hoặc input rỗng -> clear dropdown
+    if (!term || selectedUser) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchTouched(true);
+
+    const t = setTimeout(async () => {
       try {
-        const res = await listUsers();
-        const data = Array.isArray(res) ? res : res?.data ?? [];
-        setUsers(data);
-      } catch (err) {
-        setError("Không thể tải danh sách người dùng");
+        setSearchLoading(true);
+        setError("");
+
+        // lookupTenant() -> backend sẽ tự loại tenant đã là secondary ở phòng khác
+        const res = await lookupTenant(term);
+
+        // normalize result: object | array | null
+        const arr = Array.isArray(res) ? res : res ? [res] : [];
+
+        setSearchResults(arr);
+      } catch {
+        // 404 hoặc lỗi -> coi như không có kết quả
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(t);
+  }, [searchTerm, selectedUser]);
+
+  useEffect(() => {
+    async function fetchContractWindow() {
+      try {
+        const room = await getRoomById(roomId);
+        setRoomInfo(room);
+
+        // lấy active contract: ưu tiên contracts_history[0], fallback current_contract
+        const active =
+          (Array.isArray(room?.contracts_history) &&
+            room.contracts_history[0]) ||
+          room?.current_contract;
+
+        if (!active?.start_date || !active?.end_date) {
+          // không chặn UI ở đây, vì backend đã chặn; chỉ để trống window
+          return;
+        }
+
+        const start = new Date(active.start_date);
+        const end = new Date(active.end_date);
+
+        const pad = (n) => String(n).padStart(2, "0");
+        const toYMD = (d) =>
+          `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+        // min: SAU start_date => +1 day
+        const min = new Date(
+          start.getFullYear(),
+          start.getMonth(),
+          start.getDate() + 1,
+        );
+
+        // max: end_date - 1 month
+        const max = new Date(end);
+        max.setMonth(max.getMonth() - 1);
+
+        setContractWindow({
+          start,
+          end,
+          minMoveIn: toYMD(min),
+          maxMoveIn: toYMD(max),
+        });
+      } catch {
+        // ignore: BE vẫn chặn ở submit
       }
     }
-    fetchUsers();
-  }, []);
 
-  // ===== FILTER USERS BY PHONE / EMAIL =====
-  const filteredUsers = useMemo(() => {
-    const term = searchTerm.toLowerCase().trim();
-    if (!term) return [];
-
-    return users.filter(
-      (u) =>
-        u.phone?.toLowerCase().includes(term) ||
-        u.email?.toLowerCase().includes(term)
-    );
-  }, [searchTerm, users]);
+    if (roomId) fetchContractWindow();
+  }, [roomId]);
 
   // ===== SUBMIT =====
   const handleSubmit = async (e) => {
@@ -59,6 +127,16 @@ function AddTenantToRoom() {
       return;
     }
 
+    // ✅ Validate theo hợp đồng (nếu đã load được window)
+    if (contractWindow.minMoveIn && movedInAt < contractWindow.minMoveIn) {
+      setError("Ngày đến phải sau ngày bắt đầu hợp đồng");
+      return;
+    }
+    if (contractWindow.maxMoveIn && movedInAt > contractWindow.maxMoveIn) {
+      setError("Ngày đến phải trước ngày kết thúc hợp đồng ít nhất 1 tháng");
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -69,10 +147,12 @@ function AddTenantToRoom() {
       });
 
       alert("✅ Thêm người thuê thành công");
-      navigate(-1); // quay lại trang trước
+      navigate(-1);
     } catch (err) {
       setError(
-        err?.response?.data?.message || "❌ Không thể thêm người thuê vào phòng"
+        err?.response?.data?.message ||
+          err?.message ||
+          "❌ Không thể thêm người thuê vào phòng",
       );
     } finally {
       setLoading(false);
@@ -83,7 +163,10 @@ function AddTenantToRoom() {
     <div className="container mt-4">
       <Card>
         <Card.Header>
-          <strong>➕ Thêm người thuê vào phòng #{roomId}</strong>
+          <strong>
+            ➕ Thêm người thuê vào phòng{" "}
+            {roomInfo?.room_number ? roomInfo.room_number : `#${roomId}`}
+          </strong>
         </Card.Header>
 
         <Card.Body>
@@ -103,19 +186,26 @@ function AddTenantToRoom() {
                 }}
               />
 
+              {/* Loading tìm kiếm (giữ đúng cảm giác cũ) */}
+              {searchLoading && !selectedUser && (
+                <div style={{ marginTop: 6, fontSize: 13, color: "#6b7280" }}>
+                  <Spinner size="sm" animation="border" /> Đang tìm kiếm...
+                </div>
+              )}
+
               {/* DROPDOWN RESULT */}
-              {filteredUsers.length > 0 && !selectedUser && (
+              {searchResults.length > 0 && !selectedUser && (
                 <div
                   style={{
                     border: "1px solid #dee2e6",
                     borderRadius: 6,
-                    marginTop: 4,
+                    marginTop: 6,
                     maxHeight: 200,
                     overflowY: "auto",
                     background: "#fff",
                   }}
                 >
-                  {filteredUsers.map((u) => (
+                  {searchResults.map((u) => (
                     <div
                       key={u.user_id}
                       style={{
@@ -124,6 +214,7 @@ function AddTenantToRoom() {
                       }}
                       onClick={() => {
                         setSelectedUser(u);
+                        setSearchResults([]);
                         setSearchTerm(`${u.full_name} (${u.phone || u.email})`);
                       }}
                       onMouseOver={(e) =>
@@ -135,12 +226,23 @@ function AddTenantToRoom() {
                     >
                       <strong>{u.full_name}</strong>
                       <div style={{ fontSize: 13, color: "#6b7280" }}>
-                        📞 {u.phone || "N/A"} | ✉ {u.email}
+                        📞 {u.phone || "N/A"} | ✉ {u.email || "N/A"}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
+
+              {/* No result */}
+              {!searchLoading &&
+                !selectedUser &&
+                searchTouched &&
+                searchTerm.trim() &&
+                searchResults.length === 0 && (
+                  <div style={{ marginTop: 6, fontSize: 13, color: "#6b7280" }}>
+                    Không tìm thấy người thuê phù hợp
+                  </div>
+                )}
             </Form.Group>
 
             {/* ===== MOVED IN DATE ===== */}
@@ -149,8 +251,16 @@ function AddTenantToRoom() {
               <Form.Control
                 type="date"
                 value={movedInAt}
+                min={contractWindow.minMoveIn || undefined}
+                max={contractWindow.maxMoveIn || undefined}
                 onChange={(e) => setMovedInAt(e.target.value)}
               />
+              {(contractWindow.minMoveIn || contractWindow.maxMoveIn) && (
+                <div style={{ fontSize: 13, color: "#6b7280", marginTop: 6 }}>
+                  Ngày đến hợp lệ: từ <b>{contractWindow.minMoveIn}</b> đến{" "}
+                  <b>{contractWindow.maxMoveIn}</b>
+                </div>
+              )}
             </Form.Group>
 
             {/* ===== NOTE ===== */}

@@ -11,7 +11,7 @@ async function _callRoomsList() {
 
     if (res.status >= 200 && res.status < 300) {
       const payload = res?.data?.data ?? res?.data ?? [];
-      const arr = Array.isArray(payload) ? payload : payload?.items ?? [];
+      const arr = Array.isArray(payload) ? payload : (payload?.items ?? []);
 
       return (Array.isArray(arr) ? arr : [])
         .map((r) => {
@@ -71,7 +71,7 @@ export async function getRoomsByBuildingId(buildingId, params = {}) {
   } catch (error) {
     console.error(
       `Lỗi khi lấy danh sách phòng của tòa nhà ${buildingId}:`,
-      error
+      error,
     );
     throw error;
   }
@@ -80,13 +80,13 @@ export async function getEmptyRoomsByBuildingId(buildingId, params = {}) {
   try {
     const response = await http.get(
       `/room/building/${buildingId}?onlyEmpty=true`,
-      { params }
+      { params },
     );
     return unwrap(response);
   } catch (error) {
     console.error(
       `Lỗi khi lấy danh sách phòng của tòa nhà ${buildingId}:`,
-      error
+      error,
     );
     throw error;
   }
@@ -110,7 +110,7 @@ export async function getRoomStatisticsByBuilding(buildingId) {
   } catch (error) {
     console.error(
       `Lỗi khi lấy thống kê phòng của building ${buildingId}:`,
-      error
+      error,
     );
     throw error;
   }
@@ -190,4 +190,21 @@ export async function addTenantToRoom(roomId, tenantData) {
     console.error(`Lỗi khi thêm tenant vào phòng ${roomId}:`, error);
     throw error;
   }
+}
+
+const un = (res) => res?.data?.data ?? res?.data ?? res;
+
+export async function removeSecondaryTenantFromRoom(roomId, tenantUserId) {
+  const res = await http.delete(`/room/${roomId}/tenants/${tenantUserId}`, {
+    validateStatus: () => true,
+  });
+
+  if (!res || res.status >= 400) {
+    const d = res?.data;
+    const msg =
+      d?.message || d?.error || "Không thể xóa người ở phụ khỏi phòng";
+    throw new Error(msg);
+  }
+
+  return un(res);
 }

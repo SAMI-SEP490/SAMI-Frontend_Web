@@ -10,6 +10,7 @@ function CreateBuildingPage() {
 
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [billDueDay, setBillDueDay] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -18,11 +19,23 @@ function CreateBuildingPage() {
       return;
     }
 
+    if (!billDueDay) {
+      alert("❌ Vui lòng nhập Ngày đóng tiền dịch vụ hàng tháng");
+      return;
+    }
+
+    const day = parseInt(billDueDay);
+    if (isNaN(day) || day < 1 || day > 31) {
+      alert("❌ Ngày đóng tiền phải nằm trong khoảng từ 1 đến 31");
+      return;
+    }
+
     try {
       setSaving(true);
       await createBuilding({
         name,
         address,
+        bill_due_day: day, // ✅ gửi lên backend
         electric_unit_price: null,
         water_unit_price: null,
       });
@@ -31,7 +44,7 @@ function CreateBuildingPage() {
       navigate("/buildings");
     } catch (err) {
       console.error(err);
-      alert("❌ Tạo tòa nhà thất bại");
+      alert(err?.message || "❌ Tạo tòa nhà thất bại");
     } finally {
       setSaving(false);
     }
@@ -47,7 +60,9 @@ function CreateBuildingPage() {
 
         <Row>
           <Col md={6}>
-            <Form.Label>Tên tòa nhà</Form.Label>
+            <Form.Label>
+              Tên tòa nhà <span className="text-danger">*</span>
+            </Form.Label>
             <Form.Control
               value={name}
               placeholder="Nhập tên tòa nhà"
@@ -58,12 +73,36 @@ function CreateBuildingPage() {
 
         <Row className="mt-3">
           <Col md={6}>
-            <Form.Label>Địa chỉ</Form.Label>
+            <Form.Label>
+              Địa chỉ <span className="text-danger">*</span>
+            </Form.Label>
             <Form.Control
               value={address}
               placeholder="Nhập địa chỉ tòa nhà"
               onChange={(e) => setAddress(e.target.value)}
             />
+          </Col>
+        </Row>
+
+        {/* ===== BILL DUE DAY ===== */}
+        <Row className="mt-3">
+          <Col md={6}>
+            <Form.Label>
+              Ngày đóng tiền dịch vụ hàng tháng{" "}
+              <span className="text-danger">*</span>
+            </Form.Label>
+            <Form.Control
+              type="number"
+              min={1}
+              max={31}
+              value={billDueDay}
+              placeholder="Ví dụ: 5"
+              onChange={(e) => setBillDueDay(e.target.value)}
+            />
+            <Form.Text className="text-danger">
+              ⚠ Sau khi tạo tòa nhà, ngày thanh toán sẽ{" "}
+              <b>không thể chỉnh sửa</b>
+            </Form.Text>
           </Col>
         </Row>
       </div>

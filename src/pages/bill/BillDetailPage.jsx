@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Eye, Pencil, Send, Trash } from "react-bootstrap-icons";
+import { Eye, Pencil, Send, Trash, XCircle } from "react-bootstrap-icons"; // Thêm XCircle
 import {
   getBillById,
   updateDraftBill,
@@ -19,6 +19,7 @@ function isPublished(status) {
 
 function renderPublishStatus(status) {
   if (status === "draft") return <span className="status draft">Nháp</span>;
+  if (status === "cancelled") return <span className="status cancelled">Đã hủy</span>; // Thêm style cancelled nếu cần
   return <span className="status published">Đã xuất bản</span>;
 }
 
@@ -26,6 +27,7 @@ function renderPaymentStatus(status) {
   if (status === "paid") return <span className="status paid">Đã thanh toán</span>;
   if (status === "partially_paid") return <span className="status partial">Thanh toán một phần</span>;
   if (status === "overdue") return <span className="status overdue">Quá hạn</span>;
+  if (status === "cancelled") return null; // Không hiện payment status nếu đã hủy
   return <span className="status unpaid">Chưa thanh toán</span>;
 }
 
@@ -82,19 +84,48 @@ export default function BillDetailPage() {
     );
     if (!ok) return;
 
-    await updateDraftBill(id, { status: "issued" });
-    alert("Xuất bản hóa đơn thành công.");
-    
-    const updated = await getBillById(id);
-    setBill(updated);
+    try {
+      await updateDraftBill(id, { status: "issued" });
+      alert("Xuất bản hóa đơn thành công.");
+      
+      const updated = await getBillById(id);
+      setBill(updated);
+    } catch (e) {
+      alert(e.message || "Lỗi khi xuất bản hóa đơn");
+    }
   }
 
+  // Xóa nháp (Chỉ dành cho Draft)
   async function onDelete() {
     if (!bill) return;
-    if (!window.confirm("Xóa hóa đơn nháp này?")) return;
+    if (!window.confirm("Xóa hóa đơn nháp này? Hành động này không thể hoàn tác.")) return;
 
-    await deleteOrCancelBill(id);
-    navigate("/bills");
+    try {
+      await deleteOrCancelBill(id);
+      navigate("/bills");
+    } catch (e) {
+      alert(e.message || "Lỗi khi xóa hóa đơn");
+    }
+  }
+
+  // Hủy hóa đơn (Dành cho Issued / Overdue)
+  async function onCancel() {
+    if (!bill) return;
+    const ok = window.confirm(
+      "Bạn có chắc chắn muốn HỦY hóa đơn này?\n\nHóa đơn sẽ chuyển sang trạng thái 'Đã hủy' và không thể thanh toán được nữa."
+    );
+    if (!ok) return;
+
+    try {
+      await deleteOrCancelBill(id);
+      alert("Đã hủy hóa đơn thành công.");
+      
+      // Reload lại data để cập nhật UI
+      const updated = await getBillById(id);
+      setBill(updated);
+    } catch (e) {
+      alert(e.message || "Lỗi khi hủy hóa đơn");
+    }
   }
 
   if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
@@ -103,6 +134,7 @@ export default function BillDetailPage() {
 
   const status = getBillStatus(bill);
   const published = isPublished(status);
+  const isCancellable = ["issued", "overdue", "partially_paid"].includes(status);
 
   return (
     <div className="container">
@@ -228,6 +260,7 @@ export default function BillDetailPage() {
           <Eye size={14} className="me-2"/> Quay lại
         </button>
 
+        {/* NÚT CHO TRẠNG THÁI NHÁP */}
         {status === "draft" && (
           <>
             <button className="btn btn-warning text-white" onClick={() => navigate(`/bills/${id}/edit`)}>
@@ -242,6 +275,13 @@ export default function BillDetailPage() {
               <Trash size={14} className="me-2"/> Xóa
             </button>
           </>
+        )}
+
+        {/* NÚT CHO TRẠNG THÁI ĐÃ XUẤT BẢN (CÓ THỂ HỦY) */}
+        {isCancellable && (
+            <button className="btn btn-outline-danger" onClick={onCancel}>
+                <XCircle size={14} className="me-2"/> Hủy bỏ
+            </button>
         )}
       </div>
     </div>

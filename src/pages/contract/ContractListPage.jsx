@@ -325,14 +325,14 @@ function ContractListPage() {
                             </WithTooltip>
 
                             {/* 2. Phụ lục (Giữ nguyên) */}
-                            <WithTooltip text="Phụ lục hợp đồng">
-                              <button
-                                  className="btn-icon info"
-                                  onClick={() => navigate(`/contracts/${c.contract_id}/addendum`)}
-                              >
-                                <JournalText />
-                              </button>
-                            </WithTooltip>
+                            {/*<WithTooltip text="Phụ lục hợp đồng">*/}
+                            {/*  <button*/}
+                            {/*      className="btn-icon info"*/}
+                            {/*      onClick={() => navigate(`/contracts/${c.contract_id}/addendum`)}*/}
+                            {/*  >*/}
+                            {/*    <JournalText />*/}
+                            {/*  </button>*/}
+                            {/*</WithTooltip>*/}
 
                             {/* 3. Chỉnh sửa (THAY THẾ nút xem file) */}
                             {/* Chỉ cho phép sửa khi status là pending hoặc rejected */}

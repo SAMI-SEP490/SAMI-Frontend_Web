@@ -49,28 +49,28 @@ export default function UserListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
-const [currentUserRole, setCurrentUserRole] = useState("");
+  const [currentUserRole, setCurrentUserRole] = useState("");
   /* ================= Fetch ================= */
-useEffect(() => {
-  setCurrentUserRole(getRoleFromToken());
-}, []);
   useEffect(() => {
-  (async () => {
-    try {
-      setLoading(true);
-      const data = await listUsers();
-      setUsers((Array.isArray(data) ? data : []).map(normalizeUser));
-    } finally {
-      setLoading(false);
-    }
-  })();
-}, []);
-useEffect(() => {
-  (async () => {
-    const data = await listBuildings();
-    setBuildings(Array.isArray(data) ? data : []);
-  })();
-}, []);
+    setCurrentUserRole(getRoleFromToken());
+  }, []);
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await listUsers();
+        setUsers((Array.isArray(data) ? data : []).map(normalizeUser));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+  useEffect(() => {
+    (async () => {
+      const data = await listBuildings();
+      setBuildings(Array.isArray(data) ? data : []);
+    })();
+  }, []);
   /* ================= Labels ================= */
   const roleLabel = (role) => {
     switch (String(role).toLowerCase()) {
@@ -96,38 +96,44 @@ useEffect(() => {
   };
 
   /* ================= Filter ================= */
-const filteredUsers = useMemo(() => {
-  return users
-    // Không hiển thị OWNER
-    .filter((u) => String(u?.role).toLowerCase() !== "owner")
+  const filteredUsers = useMemo(() => {
+    return (
+      users
+        // Không hiển thị OWNER
+        .filter(
+          (u) =>
+            String(u?.role).toLowerCase() !== "owner" &&
+            String(u?.role).toLowerCase() !== "user"
+        )
 
-    // Search
-    .filter((u) => {
-      if (!search) return true;
-      const s = search.toLowerCase();
-      return (
-        u.full_name.toLowerCase().includes(s) ||
-        u.email.toLowerCase().includes(s)
-      );
-    })
+        // Search
+        .filter((u) => {
+          if (!search) return true;
+          const s = search.toLowerCase();
+          return (
+            u.full_name.toLowerCase().includes(s) ||
+            u.email.toLowerCase().includes(s)
+          );
+        })
 
-    // Role
-    .filter((u) => {
-      if (!roleFilter) return true;
-      return String(u.role).toLowerCase() === roleFilter;
-    })
+        // Role
+        .filter((u) => {
+          if (!roleFilter) return true;
+          return String(u.role).toLowerCase() === roleFilter;
+        })
 
-    // Building (NEW)
-      .filter((u) => {
-  // MANAGER không filter theo building
-  if (currentUserRole === "manager") return true;
+        // Building (NEW)
+        .filter((u) => {
+          // MANAGER không filter theo building
+          if (currentUserRole === "manager") return true;
 
-  if (!buildingFilter) return true;
-  if (!u.building_id) return true;
+          if (!buildingFilter) return true;
+          if (!u.building_id) return true;
 
-  return String(u.building_id) === String(buildingFilter);
-});
-}, [users, search, roleFilter, buildingFilter]);
+          return String(u.building_id) === String(buildingFilter);
+        })
+    );
+  }, [users, search, roleFilter, buildingFilter]);
 
   /* ================= Actions ================= */
   const handleDelete = async (id) => {
@@ -160,20 +166,20 @@ const filteredUsers = useMemo(() => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-{currentUserRole !== "manager" && (
-  <select
-    className="status-select"
-    value={buildingFilter}
-    onChange={(e) => setBuildingFilter(e.target.value)}
-  >
-    <option value="">Tất cả tòa nhà</option>
-    {buildings.map((b) => (
-      <option key={b.building_id} value={b.building_id}>
-        {b.name}
-      </option>
-    ))}
-  </select>
-)}
+        {currentUserRole !== "manager" && (
+          <select
+            className="status-select"
+            value={buildingFilter}
+            onChange={(e) => setBuildingFilter(e.target.value)}
+          >
+            <option value="">Tất cả tòa nhà</option>
+            {buildings.map((b) => (
+              <option key={b.building_id} value={b.building_id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        )}
 
         <select
           className="status-select"
@@ -182,10 +188,9 @@ const filteredUsers = useMemo(() => {
         >
           <option value="">Tất cả vai trò</option>
           {currentUserRole !== "manager" && (
-          <option value="manager">Quản lý</option>
+            <option value="manager">Quản lý</option>
           )}
           <option value="tenant">Người thuê</option>
-          <option value="user">Người dùng</option>
         </select>
 
         <button className="btn add" onClick={() => navigate("/users/create")}>
@@ -220,14 +225,14 @@ const filteredUsers = useMemo(() => {
                   >
                     <Eye size={14} /> Xem
                   </button>
-{(String(u.role).toLowerCase() === "manager" && 
-                  <button
-                    className="btn edit"
-                    onClick={() => navigate(`/users/${u.id}/edit`)}
-                  >
-                    <Pencil size={14} /> Sửa
-                  </button>
-)}
+                  {String(u.role).toLowerCase() === "manager" && (
+                    <button
+                      className="btn edit"
+                      onClick={() => navigate(`/users/${u.id}/edit`)}
+                    >
+                      <Pencil size={14} /> Sửa
+                    </button>
+                  )}
                   {u.status === "inactive" || u.status === "Inactive" ? (
                     <button
                       className="btn publish"

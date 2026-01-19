@@ -1,32 +1,35 @@
-// src/pages/services/UtilityServicePage.js
-// Enforce bill_due_day edit rules + allow view all months + highlight editable period
-
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  listBuildings,
-  getBuildingManagers,
-} from "../../services/api/building";
-import {
-  getUtilityReadingsForm,
-  submitUtilityReadings,
-} from "../../services/api/utility";
+import React, { useEffect, useMemo, useState } from "react";
+import { listBuildings, getBuildingManagers } from "../../services/api/building";
+import { getUtilityReadingsForm, submitUtilityReadings } from "../../services/api/utility";
+import { FiAlertTriangle, FiClock, FiEdit2, FiSave, FiRotateCcw } from "react-icons/fi";
 import "./UtilityServicePage.css";
 
+// Helper format datetime
+const fmtDate = (d) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 export default function UtilityServicePage() {
-  // ================= USER =================
-  const user = JSON.parse(localStorage.getItem("sami:user"));
+  const user = JSON.parse(localStorage.getItem("sami:user") || "{}");
   const role = user?.role;
-  const userId = user?.id;
+  const userId = user?.user_id || user?.id; // Fallback ID
 
   const today = new Date();
-  const didAutoJump = useRef(false);
+  const currentMonth = today.getMonth() + 1;
+  const currentYear = today.getFullYear();
 
-  // ================= STATE =================
+  // --- STATE ---
   const [buildings, setBuildings] = useState([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState(null);
 
-  const [month, setMonth] = useState(today.getMonth() + 1);
-  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(currentMonth);
+  const [year, setYear] = useState(currentYear);
 
   const [rooms, setRooms] = useState([]);
   const [originalRooms, setOriginalRooms] = useState([]);
@@ -35,340 +38,326 @@ export default function UtilityServicePage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ================= HELPERS =================
-  const daysInMonth = (m, y) => new Date(y, m, 0).getDate();
+  // Chế độ sửa số cũ (cho trường hợp thay công tơ)
+  const [editModeOld, setEditModeOld] = useState(false);
 
-  const addMonth = (m, y) =>
-    m === 12 ? { month: 1, year: y + 1 } : { month: m + 1, year: y };
-
-  // ================= DERIVED =================
-  const billDueDay = useMemo(() => {
-    return buildings.find(
-      (b) => Number(b.building_id) === Number(selectedBuildingId)
-    )?.bill_due_day;
-  }, [buildings, selectedBuildingId]);
-
-  /**
-   * THÁNG DUY NHẤT ĐƯỢC PHÉP SỬA
-   */
-  const editablePeriod = useMemo(() => {
-    if (!billDueDay) return null;
-
-    const maxDay = daysInMonth(today.getMonth() + 1, today.getFullYear());
-    const effectiveDueDay = Math.min(billDueDay, maxDay);
-
-    const dueDate = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      effectiveDueDay,
-      0,
-      0,
-      0
-    );
-
-    // Trước ngày chốt → sửa tháng hiện tại
-    if (today < dueDate) {
-      return {
-        month: today.getMonth() + 1,
-        year: today.getFullYear(),
-      };
-    }
-
-    // Từ ngày chốt → sửa tháng tiếp theo
-    return addMonth(today.getMonth() + 1, today.getFullYear());
-  }, [billDueDay]);
-
-  /**
-   * Có được sửa tháng đang xem không
-   */
-  const canEdit = useMemo(() => {
-    if (!editablePeriod) return false;
-    return (
-      Number(month) === Number(editablePeriod.month) &&
-      Number(year) === Number(editablePeriod.year)
-    );
-  }, [month, year, editablePeriod]);
-
-  const hasChanged = useMemo(() => {
-    if (rooms.length !== originalRooms.length) return false;
-    return rooms.some(
-      (r, idx) =>
-        r.new_electric !== originalRooms[idx]?.new_electric ||
-        r.new_water !== originalRooms[idx]?.new_water
-    );
-  }, [rooms, originalRooms]);
-
-  // ================= AUTO JUMP (CHỈ 1 LẦN) =================
+  // --- 1. LOAD BUILDINGS ---
   useEffect(() => {
-    if (!editablePeriod || didAutoJump.current) return;
-    setMonth(editablePeriod.month);
-    setYear(editablePeriod.year);
-    didAutoJump.current = true;
-  }, [editablePeriod]);
-
-  // ================= LOAD BUILDINGS =================
-  useEffect(() => {
-    async function loadBuildings() {
+    async function load() {
       try {
         const all = await listBuildings();
+        let allowed = [];
 
         if (role === "OWNER") {
-          setBuildings(all);
-          if (all.length) setSelectedBuildingId(all[0].building_id);
-          return;
-        }
-
-        const allowed = [];
-        for (const b of all) {
-          const managers = await getBuildingManagers(b.building_id);
-          if (managers.some((m) => Number(m.user_id) === Number(userId))) {
-            allowed.push(b);
+          allowed = all;
+        } else {
+          // MANAGER: Lọc tòa nhà được gán
+          // Cách tối ưu: Gọi API getAssignedBuildings nếu có, hoặc filter thủ công
+          for (const b of all) {
+            try {
+              const mgrs = await getBuildingManagers(b.building_id);
+              if (mgrs.some((m) => Number(m.user_id) === Number(userId))) {
+                allowed.push(b);
+              }
+            } catch { }
           }
         }
 
         setBuildings(allowed);
-        if (allowed.length) setSelectedBuildingId(allowed[0].building_id);
-      } catch (err) {
-        console.error(err);
+        if (allowed.length > 0) setSelectedBuildingId(allowed[0].building_id);
+      } catch (e) {
+        console.error(e);
       }
     }
-
-    loadBuildings();
+    load();
   }, [role, userId]);
 
-  // ================= LOAD READINGS =================
+  // --- 2. LOAD READINGS ---
   useEffect(() => {
     if (!selectedBuildingId) return;
 
-    async function loadReadings() {
+    async function fetchReadings() {
       setLoading(true);
       try {
-        const formData = await getUtilityReadingsForm({
+        const res = await getUtilityReadingsForm({
           building_id: selectedBuildingId,
           month,
           year,
         });
 
-        const mapped = formData.map((r) => ({
+        // Map data để handle null
+        const mapped = (res || []).map((r) => ({
           ...r,
           new_electric: r.new_electric ?? r.old_electric,
           new_water: r.new_water ?? r.old_water,
+          // Giữ giá trị gốc để so sánh thay đổi
+          old_electric_original: r.old_electric,
+          old_water_original: r.old_water,
         }));
 
         setRooms(mapped);
         setOriginalRooms(JSON.parse(JSON.stringify(mapped)));
-      } catch (err) {
-        console.error(err);
+      } catch (e) {
+        console.error(e);
       } finally {
         setLoading(false);
       }
     }
-
-    loadReadings();
+    fetchReadings();
   }, [selectedBuildingId, month, year]);
 
-  // ================= EVENTS =================
+  // --- LOGIC ---
+
+  // 1. Chặn tương lai
+  const isFuture = useMemo(() => {
+    if (year > currentYear) return true;
+    if (year === currentYear && month > currentMonth) return true;
+    return false;
+  }, [month, year, currentMonth, currentYear]);
+
+  // 2. Tính hạn chót (Deadline)
+  const deadlineInfo = useMemo(() => {
+    const building = buildings.find(b => b.building_id === Number(selectedBuildingId));
+    if (!building || !building.bill_closing_day) return null;
+
+    const closingDay = building.bill_closing_day;
+    const deadlineDate = new Date(year, month - 1, closingDay, 23, 30, 0); // 11:30 PM
+    const now = new Date();
+
+    const diffMs = deadlineDate - now;
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+
+    // Chỉ cảnh báo nếu đang xem tháng hiện tại và chưa quá hạn xa
+    if (month !== currentMonth || year !== currentYear) return null;
+
+    // Đã qua hạn
+    if (diffMs < 0) return { status: 'overdue', text: `Đã quá hạn chốt sổ (${closingDay}/${month})` };
+
+    // Sắp đến hạn (còn 3 ngày đổ lại)
+    if (diffDays <= 3) {
+      return {
+        status: 'warning',
+        text: `Sắp đến hạn chốt sổ! Còn ${diffDays > 1 ? diffDays + ' ngày' : diffHours + ' giờ'}`
+      };
+    }
+
+    return null;
+  }, [buildings, selectedBuildingId, month, year, currentMonth, currentYear]);
+
+  // 3. Xử lý thay đổi input
   const handleChange = (roomId, field, value) => {
-    setRooms((prev) =>
-      prev.map((r) =>
-        r.room_id === roomId ? { ...r, [field]: Number(value) } : r
-      )
-    );
+    setRooms(prev => prev.map(r => r.room_id === roomId ? { ...r, [field]: Number(value) } : r));
   };
 
   const handleSave = async () => {
-    const invalid = rooms.some(
-      (r) => r.new_electric < r.old_electric || r.new_water < r.old_water
-    );
-    if (invalid) {
-      alert("Chỉ số mới không được nhỏ hơn chỉ số cũ");
-      return;
-    }
+    // Validate cơ bản
+    const invalid = rooms.some(r => r.new_electric < r.old_electric || r.new_water < r.old_water);
+    if (invalid) return alert("Chỉ số mới không được nhỏ hơn chỉ số cũ!");
 
     setSaving(true);
     try {
-      await submitUtilityReadings({
+      const payload = {
         building_id: selectedBuildingId,
         billing_month: month,
         billing_year: year,
-        readings: rooms.map((r) => ({
-          room_id: r.room_id,
-          new_electric: r.new_electric,
-          new_water: r.new_water,
-        })),
-      });
+        readings: rooms.map(r => {
+          const item = {
+            room_id: r.room_id,
+            new_electric: r.new_electric,
+            new_water: r.new_water,
+          };
+          // Nếu có sửa số cũ, gửi kèm cờ reset
+          if (r.old_electric !== r.old_electric_original) {
+            item.old_electric_override = r.old_electric;
+            item.is_electric_reset = true;
+          }
+          if (r.old_water !== r.old_water_original) {
+            item.old_water_override = r.old_water;
+            item.is_water_reset = true;
+          }
+          return item;
+        })
+      };
 
+      await submitUtilityReadings(payload);
+      alert("✅ Lưu thành công!");
+
+      // Refresh lại data gốc để nút Lưu disable
       setOriginalRooms(JSON.parse(JSON.stringify(rooms)));
-      alert("Lưu chỉ số thành công");
-    } catch (err) {
-      console.error(err);
-      alert("Lỗi khi lưu chỉ số");
+      setEditModeOld(false); // Tắt chế độ sửa số cũ
+    } catch (e) {
+      alert("❌ Lỗi lưu dữ liệu");
+      console.error(e);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCancel = () => {
-    setRooms(JSON.parse(JSON.stringify(originalRooms)));
-  };
+  // Filter
+  const filteredRooms = rooms.filter(r => r.room_number.toLowerCase().includes(search.toLowerCase()));
+  const hasChanged = JSON.stringify(rooms) !== JSON.stringify(originalRooms);
 
-  // ================= FILTER =================
-  const filteredRooms = useMemo(() => {
-    return rooms.filter((r) =>
-      r.room_number.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [rooms, search]);
-
-  // ================= RENDER =================
   return (
-    <div className="container">
-      <h2 className="title">Quản lý dịch vụ điện nước</h2>
+    <div className="container utility-page">
+      <div className="header-row">
+        <h2 className="title">Chốt Điện Nước</h2>
 
-      {/* BILL INFO */}
-      {billDueDay && (
-        <div className="bill-due-box">
-          📅 Ngày chốt điện nước: <b>ngày {billDueDay}</b> hằng tháng <br />
-          👉 Tháng được phép nhập:{" "}
-          <b>
-            {editablePeriod?.month}/{editablePeriod?.year}
-          </b>
-        </div>
-      )}
+        {/* CẢNH BÁO DEADLINE */}
+        {deadlineInfo && (
+          <div className={`deadline-badge ${deadlineInfo.status}`}>
+            <FiAlertTriangle size={18} />
+            <span>{deadlineInfo.text}</span>
+          </div>
+        )}
+      </div>
 
       {/* FILTER BAR */}
       <div className="filter-bar">
         {role === "OWNER" && (
           <div className="filter-item">
-            <label className="filter-label">Tòa nhà</label>
+            <label>Tòa nhà</label>
             <select
+              className="filter-input"
               value={selectedBuildingId || ""}
-              onChange={(e) => setSelectedBuildingId(Number(e.target.value))}
-              className="status-select"
+              onChange={e => setSelectedBuildingId(Number(e.target.value))}
             >
-              {buildings.map((b) => (
-                <option key={b.building_id} value={b.building_id}>
-                  {b.name}
-                </option>
-              ))}
+              {buildings.map(b => <option key={b.building_id} value={b.building_id}>{b.name}</option>)}
             </select>
           </div>
         )}
 
-        <div className="filter-item">
-          <label className="filter-label">Tháng</label>
-          <input
-            type="number"
-            min={1}
-            max={12}
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-            className="search-input"
-          />
-        </div>
-
-        <div className="filter-item">
-          <label className="filter-label">Năm</label>
-          <input
-            type="number"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="search-input"
-          />
+        <div className="filter-item date-group">
+          <label>Kỳ chốt sổ</label>
+          <div className="d-flex gap-2">
+            <select className="filter-input" value={month} onChange={e => setMonth(Number(e.target.value))}>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                <option key={m} value={m}>Tháng {m}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              className="filter-input"
+              value={year}
+              onChange={e => setYear(Number(e.target.value))}
+              style={{ width: 80 }}
+            />
+          </div>
         </div>
 
         <div className="filter-item flex-grow">
-          <label className="filter-label">Tìm phòng</label>
+          <label>Tìm phòng</label>
           <input
-            type="text"
+            className="filter-input"
+            placeholder="Số phòng..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
+            onChange={e => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      {/* READONLY HINT */}
-      {!canEdit && (
-        <div className="readonly-hint">
-          🔒 Tháng {month}/{year} chỉ cho phép xem. Tháng được nhập hiện tại là{" "}
-          <b>
-            {editablePeriod?.month}/{editablePeriod?.year}
-          </b>
-        </div>
-      )}
+      {/* ACTIONS ROW */}
+      <div className="actions-row">
+        <button
+          className={`btn-secondary ${editModeOld ? 'active' : ''}`}
+          onClick={() => setEditModeOld(!editModeOld)}
+          title="Cho phép sửa chỉ số cũ khi thay công tơ"
+        >
+          <FiRotateCcw /> {editModeOld ? "Đang sửa số cũ" : "Báo thay công tơ"}
+        </button>
+
+        <button
+          className="btn-primary"
+          onClick={handleSave}
+          disabled={!hasChanged || saving || isFuture}
+        >
+          {saving ? "Đang lưu..." : <><FiSave /> Lưu thay đổi</>}
+        </button>
+      </div>
 
       {/* TABLE */}
-      {loading ? (
-        <p className="loading-text">Đang tải dữ liệu...</p>
+      {isFuture ? (
+        <div className="no-data">⏳ Không thể nhập liệu cho tương lai.</div>
+      ) : loading ? (
+        <div className="loading-text">Đang tải dữ liệu...</div>
       ) : (
         <div className="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>Phòng</th>
-                <th>Điện cũ</th>
-                <th>Điện mới</th>
-                <th>Nước cũ</th>
-                <th>Nước mới</th>
+                <th className="center">Phòng</th>
+                <th className="center text-warning">Điện Cũ</th>
+                <th className="center text-warning">Điện Mới</th>
+                <th className="center text-info">Nước Cũ</th>
+                <th className="center text-info">Nước Mới</th>
+                <th className="center">Cập nhật cuối</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRooms.map((r) => (
+              {filteredRooms.map(r => (
                 <tr key={r.room_id}>
-                  <td>{r.room_number}</td>
-                  <td>{r.old_electric}</td>
+                  <td className="center fw-bold">{r.room_number}</td>
+
+                  {/* ĐIỆN CŨ */}
                   <td>
                     <input
                       type="number"
-                      value={r.new_electric}
-                      disabled={!canEdit}
-                      onChange={(e) =>
-                        handleChange(r.room_id, "new_electric", e.target.value)
-                      }
-                      className="table-input"
+                      className={`table-input text-end ${editModeOld ? 'editable-old' : 'readonly'}`}
+                      value={r.old_electric}
+                      disabled={!editModeOld}
+                      onChange={e => handleChange(r.room_id, 'old_electric', e.target.value)}
                     />
                   </td>
-                  <td>{r.old_water}</td>
+
+                  {/* ĐIỆN MỚI */}
                   <td>
                     <input
                       type="number"
-                      value={r.new_water}
-                      disabled={!canEdit}
-                      onChange={(e) =>
-                        handleChange(r.room_id, "new_water", e.target.value)
-                      }
-                      className="table-input"
+                      className="table-input text-end fw-bold"
+                      value={r.new_electric}
+                      onChange={e => handleChange(r.room_id, 'new_electric', e.target.value)}
                     />
+                    <div className="diff-badge">+{r.new_electric - r.old_electric}</div>
+                  </td>
+
+                  {/* NƯỚC CŨ */}
+                  <td>
+                    <input
+                      type="number"
+                      className={`table-input text-end ${editModeOld ? 'editable-old' : 'readonly'}`}
+                      value={r.old_water}
+                      disabled={!editModeOld}
+                      onChange={e => handleChange(r.room_id, 'old_water', e.target.value)}
+                    />
+                  </td>
+
+                  {/* NƯỚC MỚI */}
+                  <td>
+                    <input
+                      type="number"
+                      className="table-input text-end fw-bold"
+                      value={r.new_water}
+                      onChange={e => handleChange(r.room_id, 'new_water', e.target.value)}
+                    />
+                    <div className="diff-badge">+{r.new_water - r.old_water}</div>
+                  </td>
+
+                  {/* LAST UPDATED */}
+                  <td className="center small text-muted">
+                    {r.recorded_date ? (
+                      <>
+                        <FiClock size={12} className="me-1" />
+                        {fmtDate(r.recorded_date)}
+                      </>
+                    ) : "—"}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-
-          {filteredRooms.length === 0 && (
-            <p className="no-data">Không có phòng nào</p>
-          )}
+          {filteredRooms.length === 0 && <div className="no-data">Không có phòng nào.</div>}
         </div>
       )}
-
-      {/* ACTION */}
-      <div className="action-buttons bottom">
-        <button
-          className="btn add"
-          disabled={!hasChanged || saving || !canEdit}
-          onClick={handleSave}
-        >
-          💾 Lưu
-        </button>
-
-        <button
-          className="btn delete"
-          disabled={!hasChanged}
-          onClick={handleCancel}
-        >
-          ↩ Hủy
-        </button>
-      </div>
     </div>
   );
 }

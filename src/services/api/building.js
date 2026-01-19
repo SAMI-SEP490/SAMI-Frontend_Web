@@ -114,3 +114,39 @@ export async function removeManager(buildingId, userId) {
   );
   return unwrap(data);
 }
+
+/**
+ * [MỚI] Lấy danh sách tòa nhà cần chốt sổ trong tháng này
+ * Logic:
+ * - Lấy ds tòa nhà (Assigned hoặc All tùy role)
+ * - So sánh ngày hiện tại >= bill_closing_day
+ * - (Tùy chọn) Kiểm tra xem đã chốt sổ tháng này chưa (cần API check status)
+ * - Hiện tại ta làm version đơn giản: Cứ đến ngày >= closing_day là hiện nhắc nhở.
+ */
+export async function getBuildingsNeedClosing(role, userId) {
+  try {
+    let buildings = [];
+    if (role === "MANAGER") {
+      buildings = await listAssignedBuildings();
+    } else if (role === "OWNER") {
+      const res = await listBuildings({ limit: 100 }); // Lấy hết để check
+      buildings = res.data || res;
+    }
+
+    const today = new Date();
+    const currentDay = today.getDate();
+
+    // Lọc các tòa nhà có ngày chốt sổ = ngày hiện tại
+    // Ví dụ: Hôm nay ngày 20, tòa chốt ngày 20 -> Cần chốt (nếu chưa làm)
+    // Tòa chốt ngày 25 -> Chưa đến hạn -> Không hiện
+    const needClosing = buildings.filter(b => {
+      const closingDay = b.bill_closing_day;
+      return closingDay && currentDay === closingDay;
+    });
+
+    return needClosing;
+  } catch (error) {
+    console.error("Lỗi check chốt sổ:", error);
+    return [];
+  }
+}

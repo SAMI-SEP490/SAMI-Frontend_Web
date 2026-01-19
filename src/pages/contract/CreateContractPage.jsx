@@ -210,12 +210,26 @@ function CreateContractPage() {
 
         return () => clearTimeout(timer);
     }, [searchQuery, form.building_id]);
-    // --- HANDLERS ---
     const handleBuildingChange = async (e) => {
         const bId = e.target.value;
-        // Reset room & tenant form data only (keep found tenant UI if desired, or reset it too)
-        setForm(prev => ({ ...prev, building_id: bId, room_number: "", room_id: "" }));
+
+        // 1. Reset Form: Cập nhật Building, đồng thời XÓA Room và Tenant
+        setForm(prev => ({
+            ...prev,
+            building_id: bId,
+            room_number: "",
+            room_id: "",
+            tenant_user_id: "" // [NEW] Reset ID khách thuê trong form
+        }));
+
+        // 2. Reset UI/State liên quan
         setRooms([]);
+        setFoundTenant(null);   // [NEW] Bỏ chọn khách hiện tại
+        setSearchQuery("");     // [NEW] Xóa chữ trong ô tìm kiếm
+        setSearchResults([]);   // [NEW] Xóa danh sách gợi ý cũ
+        setShowDropdown(false); // [NEW] Ẩn dropdown
+
+        // 3. Gọi API lấy danh sách phòng mới
         if (bId) {
             try {
                 const res = await getEmptyRoomsByBuildingId(bId);

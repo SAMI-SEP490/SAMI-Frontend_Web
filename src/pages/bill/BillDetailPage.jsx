@@ -87,7 +87,7 @@ export default function BillDetailPage() {
     try {
       await updateDraftBill(id, { status: "issued" });
       alert("Xuất bản hóa đơn thành công.");
-      
+
       const updated = await getBillById(id);
       setBill(updated);
     } catch (e) {
@@ -119,7 +119,7 @@ export default function BillDetailPage() {
     try {
       await deleteOrCancelBill(id);
       alert("Đã hủy hóa đơn thành công.");
-      
+
       // Reload lại data để cập nhật UI
       const updated = await getBillById(id);
       setBill(updated);
@@ -154,7 +154,7 @@ export default function BillDetailPage() {
             <label className="text-muted small">Tên hóa đơn / Mô tả</label>
             <div className="fw-bold fs-5">{getBillTitle(bill)}</div>
           </div>
-          
+
           <div className="col-md-3">
             <label className="text-muted small">Phòng</label>
             <div className="fw-bold">{getRoomLabel(bill)}</div>
@@ -168,8 +168,8 @@ export default function BillDetailPage() {
           <div className="col-md-6">
             <label className="text-muted small">Kỳ thanh toán</label>
             <div>
-              {new Date(bill.billing_period_start).toLocaleDateString('vi-VN')} 
-              <span className="mx-2">➔</span> 
+              {new Date(bill.billing_period_start).toLocaleDateString('vi-VN')}
+              <span className="mx-2">➔</span>
               {new Date(bill.billing_period_end).toLocaleDateString('vi-VN')}
             </div>
           </div>
@@ -189,99 +189,99 @@ export default function BillDetailPage() {
           <h5 className="m-0">Chi tiết phí dịch vụ</h5>
         </div>
         <table className="table table-hover mb-0">
-            <thead className="table-light">
-                <tr>
-                    <th style={{width: '40%'}}>Khoản mục</th>
-                    <th className="text-center" style={{width: '15%'}}>SL</th>
-                    <th className="text-end" style={{width: '20%'}}>Đơn giá</th>
-                    <th className="text-end" style={{width: '25%'}}>Thành tiền</th>
-                </tr>
-            </thead>
-            <tbody>
-                {bill.service_charges?.map((item, idx) => (
-                    <tr key={idx}>
-                        <td>
-                            <div className="fw-medium">{item.service_type}</div>
-                            {item.description && (
-                                <div className="text-muted small fst-italic mt-1">
-                                    <i className="bi bi-info-circle me-1"></i>
-                                    {item.description}
-                                </div>
-                            )}
-                        </td>
-                        <td className="text-center align-middle">{item.quantity}</td>
-                        <td className="text-end align-middle">{Number(item.unit_price || item.amount).toLocaleString()}</td>
-                        <td className="text-end align-middle fw-bold">{Number(item.amount).toLocaleString()}</td>
-                    </tr>
-                ))}
-                {(!bill.service_charges || bill.service_charges.length === 0) && (
-                    <tr>
-                        <td colSpan={4} className="text-center py-4 text-muted">
-                            Không có chi tiết (Hóa đơn cũ hoặc chưa cập nhật)
-                        </td>
-                    </tr>
-                )}
-            </tbody>
-            <tfoot>
-                {/* Penalty Row */}
-                {Number(bill.penalty_amount) > 0 && (
-                    <tr>
-                        <td colSpan={3} className="text-end text-danger">Phạt quá hạn:</td>
-                        <td className="text-end text-danger fw-bold">
-                            + {Number(bill.penalty_amount).toLocaleString()} đ
-                        </td>
-                    </tr>
-                )}
-                
-                {/* Total Row */}
-                <tr className="table-primary">
-                    <td colSpan={3} className="text-end fw-bold fs-6 pt-3">TỔNG CỘNG:</td>
-                    <td className="text-end fw-bold text-primary fs-5 pt-3">
-                        {(Number(bill.total_amount) + Number(bill.penalty_amount || 0)).toLocaleString()} đ
-                    </td>
-                </tr>
+          <thead className="table-light">
+            <tr>
+              <th style={{ width: '40%' }}>Khoản mục</th>
+              <th className="text-center" style={{ width: '15%' }}>SL</th>
+              <th className="text-end" style={{ width: '20%' }}>Đơn giá</th>
+              <th className="text-end" style={{ width: '25%' }}>Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bill.service_charges?.map((item, idx) => (
+              <tr key={idx}>
+                <td>
+                  <div className="fw-medium">{item.service_type}</div>
+                  {item.description && (
+                    <div className="text-muted small fst-italic mt-1">
+                      <i className="bi bi-info-circle me-1"></i>
+                      {item.description}
+                    </div>
+                  )}
+                </td>
+                <td className="text-center align-middle">{item.quantity}</td>
+                <td className="text-end align-middle">{Number(item.unit_price || item.amount).toLocaleString()}</td>
+                <td className="text-end align-middle fw-bold">{Number(item.amount).toLocaleString()}</td>
+              </tr>
+            ))}
+            {(!bill.service_charges || bill.service_charges.length === 0) && (
+              <tr>
+                <td colSpan={4} className="text-center py-4 text-muted">
+                  Không có chi tiết (Hóa đơn cũ hoặc chưa cập nhật)
+                </td>
+              </tr>
+            )}
+          </tbody>
+          <tfoot>
+            {/* Penalty Row */}
+            {Number(bill.penalty_amount) > 0 && (
+              <tr>
+                <td colSpan={3} className="text-end text-danger">Phạt quá hạn:</td>
+                <td className="text-end text-danger fw-bold">
+                  + {Number(bill.penalty_amount).toLocaleString()} đ
+                </td>
+              </tr>
+            )}
 
-                {/* Paid Row */}
-                {Number(bill.paid_amount) > 0 && (
-                   <tr className="table-success">
-                      <td colSpan={3} className="text-end fw-bold text-success">Đã thanh toán:</td>
-                      <td className="text-end fw-bold text-success">
-                          - {Number(bill.paid_amount).toLocaleString()} đ
-                      </td>
-                   </tr>
-                )}
-            </tfoot>
+            {/* Total Row */}
+            <tr className="table-primary">
+              <td colSpan={3} className="text-end fw-bold fs-6 pt-3">TỔNG CỘNG:</td>
+              <td className="text-end fw-bold text-primary fs-5 pt-3">
+                {(Number(bill.total_amount) + Number(bill.penalty_amount || 0)).toLocaleString()} đ
+              </td>
+            </tr>
+
+            {/* Paid Row */}
+            {Number(bill.paid_amount) > 0 && (
+              <tr className="table-success">
+                <td colSpan={3} className="text-end fw-bold text-success">Đã thanh toán:</td>
+                <td className="text-end fw-bold text-success">
+                  - {Number(bill.paid_amount).toLocaleString()} đ
+                </td>
+              </tr>
+            )}
+          </tfoot>
         </table>
       </div>
 
       {/* ACTION BUTTONS */}
       <div className="action-buttons d-flex gap-2 mt-4 justify-content-end">
         <button className="btn btn-secondary" onClick={() => navigate("/bills")}>
-          <Eye size={14} className="me-2"/> Quay lại
+          <Eye size={14} className="me-2" /> Quay lại
         </button>
 
         {/* NÚT CHO TRẠNG THÁI NHÁP */}
         {status === "draft" && (
           <>
             <button className="btn btn-warning text-white" onClick={() => navigate(`/bills/${id}/edit`)}>
-              <Pencil size={14} className="me-2"/> Sửa
+              <Pencil size={14} className="me-2" /> Sửa
             </button>
 
             <button className="btn btn-primary" onClick={onPublish}>
-              <Send size={14} className="me-2"/> Xuất bản
+              <Send size={14} className="me-2" /> Xuất bản
             </button>
 
             <button className="btn btn-danger" onClick={onDelete}>
-              <Trash size={14} className="me-2"/> Xóa
+              <Trash size={14} className="me-2" /> Xóa
             </button>
           </>
         )}
 
         {/* NÚT CHO TRẠNG THÁI ĐÃ XUẤT BẢN (CÓ THỂ HỦY) */}
         {isCancellable && (
-            <button className="btn btn-outline-danger" onClick={onCancel}>
-                <XCircle size={14} className="me-2"/> Hủy bỏ
-            </button>
+          <button className="btn btn-outline-danger" onClick={onCancel}>
+            <XCircle size={14} className="me-2" /> Hủy bỏ
+          </button>
         )}
       </div>
     </div>

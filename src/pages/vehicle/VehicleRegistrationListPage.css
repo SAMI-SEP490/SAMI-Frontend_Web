@@ -29,8 +29,36 @@
 ================================ */
 .filter-bar {
   display: flex;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
+}
+
+.filter-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+}
+
+.filter-select {
+  min-width: 220px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background-color: #fff;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.filter-select:hover {
+  border-color: #2563eb;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 .search-input,
@@ -64,18 +92,19 @@ table {
   border-collapse: collapse;
 }
 
-thead {
-  background: #f3f4f6;
+thead th {
+  background: #f8fafc;
+  font-weight: 700;
 }
 
 th {
-  text-align: left;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #374151;
   padding: 12px 10px;
   border-bottom: 1px solid #e5e7eb;
+  vertical-align: middle;
 }
 
 td {
@@ -83,10 +112,21 @@ td {
   font-size: 14px;
   border-bottom: 1px solid #e5e7eb;
   color: #111827;
+  vertical-align: middle;
 }
-
+th:nth-child(2),
+td:nth-child(2) {
+text-align: left;
+}
+td:nth-child(5),
+td:nth-child(6),
+th:nth-child(5),
+th:nth-child(6) {
+  white-space: nowrap;
+}
 .center {
   text-align: center;
+  vertical-align: middle;
 }
 
 tr:hover {
@@ -97,14 +137,11 @@ tr:hover {
    STATUS BADGES
 ================================ */
 .status {
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12.5px;
-  font-weight: 600;
-  display: inline-block;
-  text-transform: capitalize;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
 }
-
 /* Requested = waiting for approve */
 .status.requested,
 .status.pending {
@@ -128,14 +165,16 @@ tr:hover {
    ACTION COLUMN
 ================================ */
 .action-col {
-  min-width: 220px;
+  width: 220px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .action-buttons {
-  display: flex;
+   display: flex;
   justify-content: center;
+  align-items: center; 
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 /* ===============================
@@ -248,4 +287,10 @@ tr:hover {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
+}
+  
+td,
+th {
+  line-height: 1.4;
+  vertical-align: middle;
 }

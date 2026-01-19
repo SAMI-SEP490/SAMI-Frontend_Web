@@ -95,13 +95,8 @@ const SideBar = () => {
       />
       <MenuButton
         label="Phương tiện"
-        active={isActive("/vehicle")}
-        onClick={() => navigate("/vehicle")}
-      />
-      <MenuButton
-        label="Chỗ đậu xe"
-        active={isActive("/parking-slots")}
-        onClick={() => navigate("/parking-slots")}
+        active={isActive("/vehicle/")}
+        onClick={() => navigate("/vehicle/")}
       />
       <MenuButton
         label="Dịch vụ tiện ích"
@@ -128,6 +123,11 @@ const SideBar = () => {
         label="Sơ đồ tầng"
         active={isActive("/floorplan/view")}
         onClick={() => navigate("/floorplan/view")}
+      />
+      <MenuButton
+        label="Chỗ đậu xe"
+        active={isActive("/parking-slots")}
+        onClick={() => navigate("/parking-slots")}
       />
     </div>
   );

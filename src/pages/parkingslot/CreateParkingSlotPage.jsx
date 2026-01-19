@@ -87,10 +87,150 @@ export default function CreateParkingSlotPage() {
       setLoading(false);
     }
   }
+const pageStyle = `/* ================= ROOT ================= */
+:root {
+  --primary: #2563eb;
+  --primary-light: #dbeafe;
+  --danger: #dc2626;
+  --text-main: #111827;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --bg: #f9fafb;
+}
 
+/* ================= PAGE ================= */
+.container {
+  max-width: 460px;   
+  margin: 60px auto;
+  padding: 28px 28px 24px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* ================= TITLE ================= */
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e3a8a;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* ================= FORM ================= */
+.form-box {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* ================= INPUT / SELECT ================= */
+.form-group input,
+.form-group select {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px #dbeafe;
+}
+
+.form-group input::placeholder {
+  color: var(--text-muted);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* Disabled (MANAGER building) */
+.form-group input:disabled {
+  background: #f3f4f6;
+  color: #374151;
+  cursor: not-allowed;
+}
+
+/* ================= ERROR ================= */
+.error-text {
+  font-size: 13px;
+  color: var(--danger);
+  background: #fee2e2;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+}
+
+/* ================= ACTIONS ================= */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* ================= BUTTON ================= */
+.btn {
+  min-width: 110px;
+  height: 42px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Cancel */
+.btn.cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn.cancel:hover {
+  background: #e5e7eb;
+}
+
+/* Add */
+.btn.add {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.btn.add:hover {
+  background: #1d4ed8;
+}
+
+.btn.add:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+`
   return (
+<>   
+<style>{pageStyle}</style>
     <div className="container">
-      <h2 className="title">➕ Thêm Chỗ Đỗ Xe</h2>
+      <h2 className="title"> Thêm Chỗ Đỗ Xe</h2>
 
       <form className="form-box" onSubmit={handleSubmit}>
         {/* BUILDING */}
@@ -141,8 +281,8 @@ export default function CreateParkingSlotPage() {
             onChange={(e) => setSlotType(e.target.value)}
           >
             <option value="">-- Chọn loại xe --</option>
-            <option value="two_wheeler">Xe máy</option>
-            <option value="four_wheeler">Ô tô</option>
+            <option value="two_wheeler">Xe 2 bánh</option>
+            <option value="four_wheeler">Xe 4 bánh</option>
           </select>
         </div>
 
@@ -165,5 +305,6 @@ export default function CreateParkingSlotPage() {
         </div>
       </form>
     </div>
+    </> 
   );
 }

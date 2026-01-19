@@ -1,8 +1,7 @@
 // src/pages/services/UtilityServicePage.js
-// Created: 2026-01-01
-// Updated: FIX manager cannot see data, fix user_id compare, keep multi-request logic
+// Enforce bill_due_day edit rules + allow view all months + highlight editable period
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   listBuildings,
   getBuildingManagers,
@@ -13,20 +12,16 @@ import {
 } from "../../services/api/utility";
 import "./UtilityServicePage.css";
 
-/**
- * Trang quản lý / nhập chỉ số điện nước
- * - OWNER: chọn tòa nhà
- * - MANAGER: chỉ xem tòa nhà mình quản lý
- */
 export default function UtilityServicePage() {
-  // ---------------- USER ----------------
+  // ================= USER =================
   const user = JSON.parse(localStorage.getItem("sami:user"));
   const role = user?.role;
   const userId = user?.id;
 
   const today = new Date();
+  const didAutoJump = useRef(false);
 
-  // ---------------- STATE ----------------
+  // ================= STATE =================
   const [buildings, setBuildings] = useState([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState(null);
 
@@ -40,34 +35,62 @@ export default function UtilityServicePage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ---------------- HELPERS ----------------
+  // ================= HELPERS =================
   const daysInMonth = (m, y) => new Date(y, m, 0).getDate();
 
-  const canEditThisMonth = (billDueDay) => {
-    if (!billDueDay) return false;
+  const addMonth = (m, y) =>
+    m === 12 ? { month: 1, year: y + 1 } : { month: m + 1, year: y };
 
-    const maxDay = daysInMonth(month, year);
-    const effectiveDueDay = Math.min(billDueDay, maxDay);
-    const dueDate = new Date(year, month - 1, effectiveDueDay, 23, 59, 59);
-
-    return today <= dueDate;
-  };
-
-  // ---------------- DERIVED ----------------
+  // ================= DERIVED =================
   const billDueDay = useMemo(() => {
     return buildings.find(
       (b) => Number(b.building_id) === Number(selectedBuildingId)
     )?.bill_due_day;
   }, [buildings, selectedBuildingId]);
 
-  const canEdit = useMemo(
-    () => canEditThisMonth(billDueDay),
-    [billDueDay, month, year]
-  );
+  /**
+   * THÁNG DUY NHẤT ĐƯỢC PHÉP SỬA
+   */
+  const editablePeriod = useMemo(() => {
+    if (!billDueDay) return null;
+
+    const maxDay = daysInMonth(today.getMonth() + 1, today.getFullYear());
+    const effectiveDueDay = Math.min(billDueDay, maxDay);
+
+    const dueDate = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      effectiveDueDay,
+      0,
+      0,
+      0
+    );
+
+    // Trước ngày chốt → sửa tháng hiện tại
+    if (today < dueDate) {
+      return {
+        month: today.getMonth() + 1,
+        year: today.getFullYear(),
+      };
+    }
+
+    // Từ ngày chốt → sửa tháng tiếp theo
+    return addMonth(today.getMonth() + 1, today.getFullYear());
+  }, [billDueDay]);
+
+  /**
+   * Có được sửa tháng đang xem không
+   */
+  const canEdit = useMemo(() => {
+    if (!editablePeriod) return false;
+    return (
+      Number(month) === Number(editablePeriod.month) &&
+      Number(year) === Number(editablePeriod.year)
+    );
+  }, [month, year, editablePeriod]);
 
   const hasChanged = useMemo(() => {
     if (rooms.length !== originalRooms.length) return false;
-
     return rooms.some(
       (r, idx) =>
         r.new_electric !== originalRooms[idx]?.new_electric ||
@@ -75,57 +98,45 @@ export default function UtilityServicePage() {
     );
   }, [rooms, originalRooms]);
 
-  // ---------------- LOAD BUILDINGS ----------------
+  // ================= AUTO JUMP (CHỈ 1 LẦN) =================
+  useEffect(() => {
+    if (!editablePeriod || didAutoJump.current) return;
+    setMonth(editablePeriod.month);
+    setYear(editablePeriod.year);
+    didAutoJump.current = true;
+  }, [editablePeriod]);
+
+  // ================= LOAD BUILDINGS =================
   useEffect(() => {
     async function loadBuildings() {
       try {
         const all = await listBuildings();
 
-        // OWNER: thấy tất cả
         if (role === "OWNER") {
           setBuildings(all);
-          if (all.length) {
-            setSelectedBuildingId(all[0].building_id);
-          }
+          if (all.length) setSelectedBuildingId(all[0].building_id);
           return;
         }
 
-        // MANAGER: lọc theo manager
         const allowed = [];
-
         for (const b of all) {
-          try {
-            const managers = await getBuildingManagers(b.building_id);
-
-            const isManager = managers.some(
-              (m) => Number(m.user_id) === Number(userId)
-            );
-
-            if (isManager) {
-              allowed.push(b);
-            }
-          } catch (err) {
-            console.error(
-              "Error loading managers of building",
-              b.building_id,
-              err
-            );
+          const managers = await getBuildingManagers(b.building_id);
+          if (managers.some((m) => Number(m.user_id) === Number(userId))) {
+            allowed.push(b);
           }
         }
 
         setBuildings(allowed);
-        if (allowed.length) {
-          setSelectedBuildingId(allowed[0].building_id);
-        }
+        if (allowed.length) setSelectedBuildingId(allowed[0].building_id);
       } catch (err) {
-        console.error("Error loading buildings", err);
+        console.error(err);
       }
     }
-    console.log("Loading buildings for role:", role, "userId:", userId);
+
     loadBuildings();
   }, [role, userId]);
 
-  // ---------------- LOAD READINGS ----------------
+  // ================= LOAD READINGS =================
   useEffect(() => {
     if (!selectedBuildingId) return;
 
@@ -147,7 +158,7 @@ export default function UtilityServicePage() {
         setRooms(mapped);
         setOriginalRooms(JSON.parse(JSON.stringify(mapped)));
       } catch (err) {
-        console.error("Error loading readings", err);
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -156,7 +167,7 @@ export default function UtilityServicePage() {
     loadReadings();
   }, [selectedBuildingId, month, year]);
 
-  // ---------------- EVENTS ----------------
+  // ================= EVENTS =================
   const handleChange = (roomId, field, value) => {
     setRooms((prev) =>
       prev.map((r) =>
@@ -169,7 +180,6 @@ export default function UtilityServicePage() {
     const invalid = rooms.some(
       (r) => r.new_electric < r.old_electric || r.new_water < r.old_water
     );
-
     if (invalid) {
       alert("Chỉ số mới không được nhỏ hơn chỉ số cũ");
       return;
@@ -191,7 +201,7 @@ export default function UtilityServicePage() {
       setOriginalRooms(JSON.parse(JSON.stringify(rooms)));
       alert("Lưu chỉ số thành công");
     } catch (err) {
-      console.error("Error saving readings", err);
+      console.error(err);
       alert("Lỗi khi lưu chỉ số");
     } finally {
       setSaving(false);
@@ -202,23 +212,34 @@ export default function UtilityServicePage() {
     setRooms(JSON.parse(JSON.stringify(originalRooms)));
   };
 
-  // ---------------- FILTER ----------------
+  // ================= FILTER =================
   const filteredRooms = useMemo(() => {
     return rooms.filter((r) =>
       r.room_number.toLowerCase().includes(search.toLowerCase())
     );
   }, [rooms, search]);
 
-  // ---------------- RENDER ----------------
+  // ================= RENDER =================
   return (
     <div className="container">
       <h2 className="title">Quản lý dịch vụ điện nước</h2>
+
+      {/* BILL INFO */}
+      {billDueDay && (
+        <div className="bill-due-box">
+          📅 Ngày chốt điện nước: <b>ngày {billDueDay}</b> hằng tháng <br />
+          👉 Tháng được phép nhập:{" "}
+          <b>
+            {editablePeriod?.month}/{editablePeriod?.year}
+          </b>
+        </div>
+      )}
 
       {/* FILTER BAR */}
       <div className="filter-bar">
         {role === "OWNER" && (
           <div className="filter-item">
-            <label className="filter-label">Tòa nhà:</label>
+            <label className="filter-label">Tòa nhà</label>
             <select
               value={selectedBuildingId || ""}
               onChange={(e) => setSelectedBuildingId(Number(e.target.value))}
@@ -234,7 +255,7 @@ export default function UtilityServicePage() {
         )}
 
         <div className="filter-item">
-          <label className="filter-label">Tháng:</label>
+          <label className="filter-label">Tháng</label>
           <input
             type="number"
             min={1}
@@ -246,7 +267,7 @@ export default function UtilityServicePage() {
         </div>
 
         <div className="filter-item">
-          <label className="filter-label">Năm:</label>
+          <label className="filter-label">Năm</label>
           <input
             type="number"
             value={year}
@@ -256,16 +277,25 @@ export default function UtilityServicePage() {
         </div>
 
         <div className="filter-item flex-grow">
-          <label className="filter-label">Tìm phòng:</label>
+          <label className="filter-label">Tìm phòng</label>
           <input
             type="text"
-            placeholder="Nhập tên phòng..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="search-input"
           />
         </div>
       </div>
+
+      {/* READONLY HINT */}
+      {!canEdit && (
+        <div className="readonly-hint">
+          🔒 Tháng {month}/{year} chỉ cho phép xem. Tháng được nhập hiện tại là{" "}
+          <b>
+            {editablePeriod?.month}/{editablePeriod?.year}
+          </b>
+        </div>
+      )}
 
       {/* TABLE */}
       {loading ? (
@@ -275,18 +305,18 @@ export default function UtilityServicePage() {
           <table>
             <thead>
               <tr>
-                <th className="center">Phòng</th>
-                <th className="center">Điện cũ</th>
-                <th className="center">Điện mới</th>
-                <th className="center">Nước cũ</th>
-                <th className="center">Nước mới</th>
+                <th>Phòng</th>
+                <th>Điện cũ</th>
+                <th>Điện mới</th>
+                <th>Nước cũ</th>
+                <th>Nước mới</th>
               </tr>
             </thead>
             <tbody>
               {filteredRooms.map((r) => (
                 <tr key={r.room_id}>
-                  <td className="center">{r.room_number}</td>
-                  <td className="center">{r.old_electric}</td>
+                  <td>{r.room_number}</td>
+                  <td>{r.old_electric}</td>
                   <td>
                     <input
                       type="number"
@@ -298,7 +328,7 @@ export default function UtilityServicePage() {
                       className="table-input"
                     />
                   </td>
-                  <td className="center">{r.old_water}</td>
+                  <td>{r.old_water}</td>
                   <td>
                     <input
                       type="number"
@@ -316,7 +346,7 @@ export default function UtilityServicePage() {
           </table>
 
           {filteredRooms.length === 0 && (
-            <p className="no-data">Không có phòng nào.</p>
+            <p className="no-data">Không có phòng nào</p>
           )}
         </div>
       )}
@@ -328,7 +358,7 @@ export default function UtilityServicePage() {
           disabled={!hasChanged || saving || !canEdit}
           onClick={handleSave}
         >
-          💾 Lưu thay đổi
+          💾 Lưu
         </button>
 
         <button

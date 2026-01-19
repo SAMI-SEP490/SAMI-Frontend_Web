@@ -10,24 +10,21 @@ function CreateBuildingPage() {
 
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
-  const [billDueDay, setBillDueDay] = useState("");
+  const [billClosingDay, setBillClosingDay] = useState("");
+  
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!name.trim() || !address.trim()) {
-      alert("❌ Vui lòng nhập đầy đủ Tên và Địa chỉ");
+    // Validate cơ bản
+    if (!name.trim() || !address.trim() || !billClosingDay) {
+      alert("❌ Vui lòng nhập đầy đủ: Tên, Địa chỉ và Ngày chốt sổ.");
       return;
     }
 
-    if (!billDueDay) {
-      alert("❌ Vui lòng nhập Ngày đóng tiền dịch vụ hàng tháng");
-      return;
-    }
-
-    const day = parseInt(billDueDay);
-    if (isNaN(day) || day < 1 || day > 31) {
-      alert("❌ Ngày đóng tiền phải nằm trong khoảng từ 1 đến 31");
-      return;
+    const day = parseInt(billClosingDay);
+    if (isNaN(day) || day < 1 || day > 28) {
+        alert("❌ Ngày chốt sổ phải từ 1 đến 28.");
+        return;
     }
 
     try {
@@ -35,7 +32,7 @@ function CreateBuildingPage() {
       await createBuilding({
         name,
         address,
-        bill_due_day: day, // ✅ gửi lên backend
+        bill_closing_day: day, // [NEW] Gửi lên API
         electric_unit_price: null,
         water_unit_price: null,
       });
@@ -84,26 +81,22 @@ function CreateBuildingPage() {
           </Col>
         </Row>
 
-        {/* ===== BILL DUE DAY ===== */}
+        {/* [NEW] Thêm trường Ngày chốt sổ */}
         <Row className="mt-3">
-          <Col md={6}>
-            <Form.Label>
-              Ngày đóng tiền dịch vụ hàng tháng{" "}
-              <span className="text-danger">*</span>
-            </Form.Label>
-            <Form.Control
-              type="number"
-              min={1}
-              max={31}
-              value={billDueDay}
-              placeholder="Ví dụ: 5"
-              onChange={(e) => setBillDueDay(e.target.value)}
-            />
-            <Form.Text className="text-danger">
-              ⚠ Sau khi tạo tòa nhà, ngày thanh toán sẽ{" "}
-              <b>không thể chỉnh sửa</b>
-            </Form.Text>
-          </Col>
+            <Col md={3}>
+                <Form.Label>Ngày chốt sổ (1-28) <span className="text-danger">*</span></Form.Label>
+                <Form.Control
+                    type="number"
+                    min="1"
+                    max="28"
+                    value={billClosingDay}
+                    placeholder="VD: 15"
+                    onChange={(e) => setBillClosingDay(e.target.value)}
+                />
+                <Form.Text className="text-muted">
+                    Ngày dùng để chốt điện nước hàng tháng.
+                </Form.Text>
+            </Col>
         </Row>
       </div>
 

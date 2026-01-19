@@ -118,10 +118,10 @@ function ViewBuildingDetail() {
           </Col>
 
           <Col md={3}>
-            <label className="view-label">Ngày đóng tiền</label>
+            <label className="view-label">Ngày chốt sổ</label> {/* Đổi Label */}
             <div className="view-value">
-              {building.bill_due_day
-                ? `Ngày ${building.bill_due_day}`
+              {building.bill_closing_day
+                ? `Ngày ${building.bill_closing_day}`
                 : "Chưa thiết lập"}
             </div>
           </Col>

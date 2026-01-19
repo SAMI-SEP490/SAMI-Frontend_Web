@@ -1,12 +1,11 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createDraftBill } from "@/services/api/bills";
-import { listAssignedBuildings, listBuildings, getBuildingById } from "@/services/api/building";
+import { listAssignedBuildings, listBuildings } from "@/services/api/building";
 import { getRoomsByBuildingId, getRoomById } from "@/services/api/rooms";
 import { getUserById } from "@/services/api/users";
-import { getUtilityReadingsForm, submitUtilityReadings } from "@/services/api/utility"; 
 import { getAccessToken } from "@/services/http";
-import { Trash, Calculator, ExclamationCircle, CloudUpload } from "react-bootstrap-icons";
+import { Trash, Plus, Save } from "react-bootstrap-icons";
 
 // --- HELPERS ---
 const getRole = () => {
@@ -32,8 +31,6 @@ export default function CreateBillPage() {
   // --- STATE ---
   const [buildings, setBuildings] = useState([]);
   const [selectedBuilding, setSelectedBuilding] = useState("");
-  const [buildingConfig, setBuildingConfig] = useState(null);
-
   const [rooms, setRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState("");
   
@@ -41,29 +38,18 @@ export default function CreateBillPage() {
   const [tenantUserId, setTenantUserId] = useState("");
   const [tenantName, setTenantName] = useState("");
 
-  // Bill Info
-  const [billType, setBillType] = useState("utilities");
+  // Bill Info (Mặc định là 'other' vì không làm điện nước ở đây nữa)
+  const [billType, setBillType] = useState("other");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [description, setDescription] = useState("");
 
-  // Utility Readings State
-  const [utilityData, setUtilityData] = useState({
-    old_electric: 0,
-    new_electric: 0,
-    old_water: 0,
-    new_water: 0
-  });
-
-  // Service Charges (Dùng chung cho cả 2 loại bill)
-  const [charges, setCharges] = useState([]);
+  // Service Charges
+  const [charges, setCharges] = useState([
+    { service_type: "", amount: 0, quantity: 1, unit_price: 0, description: "" }
+  ]);
   const [loading, setLoading] = useState(false);
-
-  // Điều kiện để cho phép nhập số mới
-  const isInputReady = useMemo(() => {
-    return selectedBuilding && selectedRoom && isValidDate(periodEnd);
-  }, [selectedBuilding, selectedRoom, periodEnd]);
 
   // --- 1. Fetch Buildings ---
   useEffect(() => {
@@ -76,25 +62,16 @@ export default function CreateBillPage() {
     })();
   }, [role]);
 
-  // --- 2. Fetch Room List + Config ---
+  // --- 2. Fetch Room List ---
   useEffect(() => {
-    if (!selectedBuilding) { setRooms([]); setBuildingConfig(null); return; }
+    if (!selectedBuilding) { setRooms([]); return; }
     (async () => {
       const resRooms = await getRoomsByBuildingId(selectedBuilding);
       setRooms(Array.isArray(resRooms) ? resRooms : []);
-      try {
-          const resBuilding = await getBuildingById(selectedBuilding);
-          const b = resBuilding?.data || resBuilding;
-          setBuildingConfig({
-              electric_price: Number(b.electric_unit_price || 0),
-              water_price: Number(b.water_unit_price || 0),
-              service_fee: Number(b.service_fee || 0)
-          });
-      } catch (e) { console.error(e); }
     })();
   }, [selectedBuilding]);
 
-  // --- 3. Fetch Contract ---
+  // --- 3. Fetch Contract & Tenant ---
   useEffect(() => {
     if(!selectedRoom) { setActiveContract(null); setTenantUserId(""); setTenantName(""); return; }
     (async () => {
@@ -117,78 +94,7 @@ export default function CreateBillPage() {
     })();
   }, [selectedRoom]);
 
-  // --- 4. Logic UTILITY: Load Old Readings ---
-  useEffect(() => {
-    // Chỉ chạy khi đã đủ điều kiện (Có phòng, Có ngày kết thúc)
-    if (billType === 'utilities' && isInputReady) {
-        (async () => {
-            const d = new Date(periodEnd);
-            const month = d.getMonth() + 1;
-            const year = d.getFullYear();
-
-            const res = await getUtilityReadingsForm({ 
-                building_id: selectedBuilding, 
-                month, 
-                year 
-            });
-            
-            const roomData = Array.isArray(res) ? res.find(r => String(r.room_id) === String(selectedRoom)) : null;
-
-            if (roomData) {
-                setUtilityData(prev => ({
-                    ...prev,
-                    old_electric: roomData.old_electric || 0,
-                    old_water: roomData.old_water || 0,
-                    // Reset số mới bằng số cũ để user nhập, hoặc lấy số mới nếu đã có
-                    new_electric: roomData.new_electric || roomData.old_electric || 0,
-                    new_water: roomData.new_water || roomData.old_water || 0,
-                }));
-            } else {
-                // Trường hợp không tìm thấy (VD: tháng đầu tiên), reset về 0
-                setUtilityData({ old_electric: 0, new_electric: 0, old_water: 0, new_water: 0 });
-            }
-        })();
-    }
-  }, [billType, isInputReady, selectedBuilding, selectedRoom, periodEnd]);
-
-  // --- 5. Auto Calculate Charges ---
-  useEffect(() => {
-    if (billType !== 'utilities' || !buildingConfig) return;
-
-    const elecUsage = Math.max(0, utilityData.new_electric - utilityData.old_electric);
-    const waterUsage = Math.max(0, utilityData.new_water - utilityData.old_water);
-
-    const elecCost = elecUsage * buildingConfig.electric_price;
-    const waterCost = waterUsage * buildingConfig.water_price;
-    const serviceFee = buildingConfig.service_fee;
-
-    const autoCharges = [
-        {
-            service_type: "Tiền điện",
-            quantity: elecUsage,
-            unit_price: buildingConfig.electric_price,
-            amount: elecCost,
-            description: `Số cũ: ${utilityData.old_electric} - Số mới: ${utilityData.new_electric}`
-        },
-        {
-            service_type: "Tiền nước",
-            quantity: waterUsage,
-            unit_price: buildingConfig.water_price,
-            amount: waterCost,
-            description: `Số cũ: ${utilityData.old_water} - Số mới: ${utilityData.new_water}`
-        },
-        {
-            service_type: "Phí dịch vụ chung",
-            quantity: 1,
-            unit_price: serviceFee,
-            amount: serviceFee,
-            description: "Vệ sinh, thang máy, rác..."
-        }
-    ];
-    setCharges(autoCharges);
-  }, [utilityData, billType, buildingConfig]);
-
-  // --- Handlers ---
+  // --- HANDLERS ---
   const totalAmount = useMemo(() => charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0), [charges]);
 
   const addCharge = () => setCharges([...charges, { service_type: "", amount: 0, quantity: 1, unit_price: 0, description: "" }]);
@@ -205,7 +111,6 @@ export default function CreateBillPage() {
     setCharges(newCharges);
   };
 
-  // --- [UPDATE 2] MAIN SUBMIT FUNCTION ---
   const onSubmit = async () => {
     if (!activeContract) return alert("Phòng này chưa có hợp đồng!");
     if (!isValidDate(periodStart) || !isValidDate(periodEnd) || !isValidDate(dueDate)) {
@@ -215,55 +120,30 @@ export default function CreateBillPage() {
         return alert("Ngày bắt đầu không thể lớn hơn ngày kết thúc!");
     }
 
+    if (charges.length === 0 || totalAmount <= 0) {
+        return alert("Vui lòng nhập ít nhất một khoản phí hợp lệ.");
+    }
+
     setLoading(true);
     try {
-      // BƯỚC 1: NẾU LÀ BILL ĐIỆN NƯỚC -> GỌI API LƯU CHỈ SỐ TRƯỚC
-      if (billType === 'utilities') {
-        const d = new Date(periodEnd);
-        const month = d.getMonth() + 1;
-        const year = d.getFullYear();
-
-        // Chuẩn bị payload đúng format của submitUtilityReadings
-        const utilityPayload = {
-            building_id: Number(selectedBuilding),
-            billing_month: month,
-            billing_year: year,
-            readings: [
-                {
-                    room_id: Number(selectedRoom),
-                    new_electric: Number(utilityData.new_electric),
-                    new_water: Number(utilityData.new_water),
-                    // Có thể gửi kèm old_electric_override nếu backend hỗ trợ sửa số cũ
-                }
-            ]
-        };
-
-        console.log("Submitting Utility Readings:", utilityPayload);
-        await submitUtilityReadings(utilityPayload);
-      }
-
-      // BƯỚC 2: TẠO BILL DRAFT
       const payload = {
         contract_id: activeContract.contract_id,
         tenant_user_id: tenantUserId,
-        bill_type: billType,
+        bill_type: billType, // 'other' or 'monthly_rent'
         billing_period_start: periodStart,
         billing_period_end: periodEnd,
         due_date: dueDate,
-        description: description || (billType === 'utilities' ? "Hóa đơn điện nước" : "Hóa đơn khác"),
+        description: description || "Hóa đơn dịch vụ",
         total_amount: totalAmount,
         status: 'draft',
         service_charges: charges
       };
 
       await createDraftBill(payload);
-      
-      alert(billType === 'utilities' ? "Đã cập nhật chỉ số & Lưu nháp thành công!" : "Đã lưu nháp thành công!");
+      alert("Đã lưu nháp thành công!");
       nav("/bills");
-
     } catch (e) {
-      console.error(e);
-      alert(e.message || "Lỗi khi xử lý dữ liệu");
+      alert(e.message || "Lỗi tạo hóa đơn");
     } finally {
       setLoading(false);
     }
@@ -271,7 +151,7 @@ export default function CreateBillPage() {
 
   return (
     <div className="container py-4">
-      <h3 className="mb-4">Tạo Hóa Đơn</h3>
+      <h3 className="mb-4">Tạo Hóa Đơn Dịch Vụ / Khác</h3>
       
       <div className="row">
         {/* CỘT TRÁI: THÔNG TIN CHUNG */}
@@ -305,28 +185,16 @@ export default function CreateBillPage() {
                 <div className="mb-2">
                     <label className="form-label small text-muted">Loại hóa đơn</label>
                     <select className="form-select" value={billType} onChange={e => setBillType(e.target.value)}>
-                        <option value="utilities">Điện nước & Dịch vụ</option>
                         <option value="other">Khác</option>
                     </select>
                 </div>
                 <div className="mb-2">
-                    <label className="form-label small text-muted">Kỳ thanh toán (Từ - Đến)</label>
+                    <label className="form-label small text-muted">Kỳ thanh toán</label>
                     <div className="d-flex gap-1">
                         <input type="date" className="form-control form-control-sm" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
                         <span className="align-self-center">-</span>
-                        <input 
-                            type="date" 
-                            className={`form-control form-control-sm ${!periodEnd && billType === 'utilities' ? 'border-danger' : ''}`} 
-                            value={periodEnd} 
-                            onChange={e => setPeriodEnd(e.target.value)} 
-                        />
+                        <input type="date" className="form-control form-control-sm" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
                     </div>
-                    {/* Cảnh báo nếu chưa chọn ngày đến */}
-                    {!isValidDate(periodEnd) && billType === 'utilities' && (
-                        <div className="text-danger small mt-1">
-                            <ExclamationCircle className="me-1"/> Vui lòng chọn "Đến ngày" để lấy chỉ số.
-                        </div>
-                    )}
                 </div>
                 <div className="mb-2">
                     <label className="form-label small text-muted">Hạn đóng tiền</label>
@@ -339,100 +207,24 @@ export default function CreateBillPage() {
             </div>
         </div>
 
-        {/* CỘT PHẢI: TÍNH TOÁN & CHI TIẾT */}
+        {/* CỘT PHẢI: CHI TIẾT */}
         <div className="col-md-8">
-            {/* KHU VỰC NHẬP CHỈ SỐ (CHỈ HIỆN KHI CHỌN UTILITIES) */}
-            {billType === 'utilities' && buildingConfig && (
-                <div className="card p-3 mb-3 shadow-sm border-primary border-2">
-                    <h6 className="fw-bold text-primary mb-3">
-                        <Calculator className="me-2"/>
-                        Nhập chỉ số Điện / Nước
-                    </h6>
-                    
-                    {/* Cảnh báo block input */}
-                    {!isInputReady && (
-                        <div className="alert alert-warning py-2 mb-3">
-                            <ExclamationCircle className="me-2"/>
-                            Vui lòng chọn <strong>Phòng</strong> và <strong>Ngày kết thúc (Đến ngày)</strong> để nhập chỉ số.
-                        </div>
-                    )}
-
-                    <div className="row g-3">
-                        {/* ĐIỆN */}
-                        <div className="col-md-6">
-                            <div className="p-2 bg-light rounded border">
-                                <strong className="d-block mb-2 text-warning">⚡ ĐIỆN ({fmtMoney(buildingConfig.electric_price)} đ/số)</strong>
-                                <div className="row">
-                                    <div className="col-6">
-                                        <label className="small text-muted">Số cũ</label>
-                                        <input type="number" className="form-control" value={utilityData.old_electric} readOnly tabIndex={-1} disabled={!isInputReady}/>
-                                    </div>
-                                    <div className="col-6">
-                                        <label className="small text-muted fw-bold">Số mới</label>
-                                        <input 
-                                            type="number" 
-                                            className="form-control border-warning" 
-                                            value={utilityData.new_electric} 
-                                            onChange={e => setUtilityData({...utilityData, new_electric: Number(e.target.value)})}
-                                            disabled={!isInputReady}
-                                            placeholder={!isInputReady ? "Chọn ngày..." : ""}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="text-end small mt-1">
-                                    Tiêu thụ: <strong>{Math.max(0, utilityData.new_electric - utilityData.old_electric)}</strong> số
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* NƯỚC */}
-                        <div className="col-md-6">
-                            <div className="p-2 bg-light rounded border">
-                                <strong className="d-block mb-2 text-info">💧 NƯỚC ({fmtMoney(buildingConfig.water_price)} đ/khối)</strong>
-                                <div className="row">
-                                    <div className="col-6">
-                                        <label className="small text-muted">Số cũ</label>
-                                        <input type="number" className="form-control" value={utilityData.old_water} readOnly tabIndex={-1} disabled={!isInputReady}/>
-                                    </div>
-                                    <div className="col-6">
-                                        <label className="small text-muted fw-bold">Số mới</label>
-                                        <input 
-                                            type="number" 
-                                            className="form-control border-info" 
-                                            value={utilityData.new_water} 
-                                            onChange={e => setUtilityData({...utilityData, new_water: Number(e.target.value)})}
-                                            disabled={!isInputReady}
-                                            placeholder={!isInputReady ? "Chọn ngày..." : ""}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="text-end small mt-1">
-                                    Tiêu thụ: <strong>{Math.max(0, utilityData.new_water - utilityData.old_water)}</strong> khối
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* BẢNG CHI TIẾT PHÍ */}
             <div className="card p-3 shadow-sm">
                 <div className="d-flex justify-content-between align-items-center mb-3">
                     <h6 className="fw-bold m-0">Chi tiết thanh toán</h6>
-                    {/* Chỉ cho thêm dòng nếu là bill Other, bill Utility tự động tính */}
-                    {billType === 'other' && (
-                        <button className="btn btn-sm btn-outline-secondary" onClick={addCharge}>+ Thêm phí</button>
-                    )}
+                    <button className="btn btn-sm btn-outline-primary" onClick={addCharge}>
+                        <Plus size={18}/> Thêm dòng
+                    </button>
                 </div>
 
                 <table className="table table-hover table-bordered align-middle">
                     <thead className="table-light">
                         <tr className="small text-center">
-                            <th style={{width: '30%'}}>Khoản phí</th>
-                            <th style={{width: '10%'}}>SL</th>
+                            <th style={{width: '35%'}}>Khoản phí</th>
+                            <th style={{width: '15%'}}>SL</th>
                             <th style={{width: '20%'}}>Đơn giá</th>
                             <th style={{width: '20%'}}>Thành tiền</th>
-                            {billType === 'other' && <th style={{width: '5%'}}></th>}
+                            <th style={{width: '10%'}}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -442,26 +234,28 @@ export default function CreateBillPage() {
                                     <input 
                                         className="form-control form-control-sm" 
                                         value={c.service_type} 
-                                        readOnly={billType === 'utilities'} 
                                         onChange={e=>updateCharge(i, 'service_type', e.target.value)} 
                                         placeholder="Tên phí..." 
                                     />
-                                    {c.description && <div className="small text-muted fst-italic mt-1">{c.description}</div>}
+                                    <input 
+                                        className="form-control form-control-sm mt-1 text-muted fst-italic" 
+                                        value={c.description} 
+                                        onChange={e=>updateCharge(i, 'description', e.target.value)} 
+                                        placeholder="Ghi chú..." 
+                                    />
                                 </td>
                                 <td>
                                     <input type="number" className="form-control form-control-sm text-center" 
-                                        value={c.quantity} readOnly={billType === 'utilities'} onChange={e=>updateCharge(i, 'quantity', e.target.value)} />
+                                        value={c.quantity} onChange={e=>updateCharge(i, 'quantity', e.target.value)} />
                                 </td>
                                 <td>
                                     <input type="number" className="form-control form-control-sm text-end" 
-                                        value={c.unit_price || 0} readOnly={billType === 'utilities'} onChange={e=>updateCharge(i, 'unit_price', e.target.value)} />
+                                        value={c.unit_price} onChange={e=>updateCharge(i, 'unit_price', e.target.value)} />
                                 </td>
                                 <td className="text-end fw-bold">{fmtMoney(c.amount)}</td>
-                                {billType === 'other' && (
-                                    <td className="text-center">
-                                        <button className="btn btn-sm text-danger" onClick={()=>removeCharge(i)}><Trash/></button>
-                                    </td>
-                                )}
+                                <td className="text-center">
+                                    <button className="btn btn-sm text-danger" onClick={()=>removeCharge(i)}><Trash/></button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -469,7 +263,7 @@ export default function CreateBillPage() {
                         <tr>
                             <td colSpan={3} className="text-end fw-bold">TỔNG CỘNG:</td>
                             <td className="text-end fw-bold text-danger fs-5">{fmtMoney(totalAmount)}</td>
-                            {billType === 'other' && <td></td>}
+                            <td></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -477,16 +271,12 @@ export default function CreateBillPage() {
                 <div className="d-flex justify-content-end gap-2 mt-3">
                     <button className="btn btn-light" onClick={()=>nav('/bills')}>Hủy bỏ</button>
                     <button 
-                        className="btn btn-warning px-4 fw-bold d-flex align-items-center gap-2" 
+                        className="btn btn-warning px-4 fw-bold" 
                         onClick={onSubmit} 
                         disabled={loading || !activeContract}
                     >
-                        {loading ? "Đang xử lý..." : (
-                            <>
-                                {billType === 'utilities' ? <CloudUpload/> : null}
-                                {billType === 'utilities' ? " Lưu Nháp & Cập nhật chỉ số" : " Lưu Nháp"}
-                            </>
-                        )}
+                        <Save className="me-2"/>
+                        {loading ? "Đang xử lý..." : "Lưu Nháp"}
                     </button>
                 </div>
             </div>

@@ -180,3 +180,21 @@ export async function precheckDuplicateBill(roomId, periodStart) {
     return true; // Fail open (allow creation, let backend validate)
   }
 }
+
+// Trigger auto-billing manually
+export async function refreshBillStatus() {
+  const res = await http.post("/bill/refresh-status", null, { validateStatus: () => true });
+  if (res.status >= 400) throw new Error(extractServerError(res));
+  return un(res);
+}
+
+// Extend overdue bill
+export async function extendBill(id, penaltyAmount = 0) {
+  const res = await http.post(
+    `/bill/extend/${id}`, 
+    { penalty_amount: Number(penaltyAmount) }, 
+    { validateStatus: () => true }
+  );
+  if (res.status >= 400) throw new Error(extractServerError(res));
+  return un(res);
+}

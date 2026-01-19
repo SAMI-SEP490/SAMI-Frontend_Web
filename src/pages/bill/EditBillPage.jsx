@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Trash, Plus, ArrowLeft, Save, Pencil, Lock } from "react-bootstrap-icons";
 import { getBillById, updateDraftBill } from "../../services/api/bills";
 
@@ -16,7 +16,6 @@ function getBillStatus(b) {
 }
 
 function extractRoomLabel(bill) {
-  // Try flattened first, then nested contract
   if (bill.room?.room_number) return bill.room.room_number;
   const contract = bill.contract;
   if (!contract) return "—";
@@ -50,30 +49,24 @@ export default function EditBillPage() {
     description: ""
   });
 
-  // Dynamic Service Charges
   const [charges, setCharges] = useState([]);
 
-  // Auto-Calc Total
   const totalAmount = useMemo(() => {
     return charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   }, [charges]);
 
-  // Check if bill is utilities (Locked mode)
-  const isUtilityBill = form.bill_type === 'utilities';
+  // Lock logic if utility bill
+  const isLocked = form.bill_type === 'utilities';
 
-  /* ========== LOAD DATA ========== */
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       try {
         setLoading(true);
         setErr("");
-
         const numId = Number(id);
         if (!Number.isFinite(numId)) throw new Error("Invalid Bill ID");
 
-        // 1. Get Bill
         const detail = await getBillById(numId);
 
         if (getBillStatus(detail) !== "draft") {
@@ -84,14 +77,12 @@ export default function EditBillPage() {
 
         if (cancelled) return;
 
-        // 2. Prepare Static Info
-        const roomLbl = extractRoomLabel(detail);
-        const payerNm = detail.tenant?.user?.full_name || `User #${detail.tenant_user_id}`;
-        const creatorNm = detail.creator?.full_name || "System";
+        setStaticInfo({ 
+            roomLabel: extractRoomLabel(detail), 
+            payerName: detail.tenant?.user?.full_name || `User #${detail.tenant_user_id}`, 
+            creatorName: detail.creator?.full_name || "System" 
+        });
 
-        setStaticInfo({ roomLabel: roomLbl, payerName: payerNm, creatorName: creatorNm });
-
-        // 3. Populate Form
         setForm({
           bill_type: detail.bill_type || "monthly_rent",
           billing_period_start: parseDate(detail.billing_period_start),
@@ -100,17 +91,16 @@ export default function EditBillPage() {
           description: detail.description || "",
         });
 
-        // 4. Populate Charges
         if (detail.service_charges && detail.service_charges.length > 0) {
           setCharges(detail.service_charges.map(c => ({
             service_type: c.service_type,
             quantity: c.quantity,
-            unit_price: c.unit_price || c.amount, // Fallback logic
+            unit_price: c.unit_price || c.amount,
             amount: c.amount, 
             description: c.description || ""
           })));
         } else {
-          setCharges([{ service_type: "Tiền thuê", quantity: 1, amount: detail.total_amount || 0, unit_price: detail.total_amount || 0 }]);
+          setCharges([{ service_type: "Chi phí", quantity: 1, amount: detail.total_amount || 0, unit_price: detail.total_amount || 0 }]);
         }
 
       } catch (e) {
@@ -119,12 +109,10 @@ export default function EditBillPage() {
         if (!cancelled) setLoading(false);
       }
     }
-
     load();
     return () => { cancelled = true; };
   }, [id, navigate]);
 
-  /* ========== HANDLERS ========== */
   const onFormChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
@@ -133,8 +121,6 @@ export default function EditBillPage() {
   const updateCharge = (index, field, value) => {
     const newCharges = [...charges];
     newCharges[index][field] = value;
-
-    // Sync amount if unit_price or quantity changes
     if (field === 'unit_price' || field === 'quantity') {
       const q = Number(field === 'quantity' ? value : newCharges[index].quantity);
       const p = Number(field === 'unit_price' ? value : newCharges[index].unit_price);
@@ -143,18 +129,12 @@ export default function EditBillPage() {
     setCharges(newCharges);
   };
 
-  const addCharge = () => {
-    setCharges([...charges, { service_type: "", quantity: 1, unit_price: 0, amount: 0, description: "" }]);
-  };
-
-  const removeCharge = (index) => {
-    setCharges(charges.filter((_, i) => i !== index));
-  };
+  const addCharge = () => setCharges([...charges, { service_type: "", quantity: 1, unit_price: 0, amount: 0, description: "" }]);
+  const removeCharge = (index) => setCharges(charges.filter((_, i) => i !== index));
 
   const onSubmit = async () => {
     try {
       setSubmitting(true);
-
       const payload = {
         ...form,
         total_amount: totalAmount,
@@ -210,17 +190,16 @@ export default function EditBillPage() {
         <div className="row g-3 mb-4">
           <div className="col-md-3">
             <label className="form-label fw-bold">Loại hóa đơn</label>
-            {/* Nếu là Utility thì disable loại hóa đơn luôn để tránh đổi lung tung */}
             <select 
                 className="form-select" 
                 name="bill_type" 
                 value={form.bill_type} 
                 onChange={onFormChange}
-                disabled={isUtilityBill} 
+                disabled={isLocked} // Không cho đổi loại nếu là Utility
             >
+              <option value="other">Khác</option>
               <option value="monthly_rent">Tiền phòng</option>
               <option value="utilities">Điện nước</option>
-              <option value="other">Khác</option>
             </select>
           </div>
           <div className="col-md-3">
@@ -246,12 +225,10 @@ export default function EditBillPage() {
           <div className="d-flex justify-content-between align-items-center mb-2">
             <div className="d-flex align-items-center gap-2">
                 <label className="form-label fw-bold mb-0">Chi tiết phí</label>
-                {/* Hiển thị Lock icon nếu là utility */}
-                {isUtilityBill && <span className="badge bg-warning text-dark"><Lock className="me-1"/> Đã khóa (Điện nước)</span>}
+                {isLocked && <span className="badge bg-warning text-dark"><Lock className="me-1"/> Đã khóa (Điện nước)</span>}
             </div>
             
-            {/* Chỉ hiện nút thêm nếu KHÔNG PHẢI utility */}
-            {!isUtilityBill && (
+            {!isLocked && (
                 <button className="btn btn-sm btn-outline-primary" onClick={addCharge}>
                 <Plus size={18} /> Thêm dòng
                 </button>
@@ -265,7 +242,7 @@ export default function EditBillPage() {
                 <th style={{ width: '15%' }}>Số lượng</th>
                 <th style={{ width: '20%' }}>Đơn giá</th>
                 <th style={{ width: '20%' }}>Thành tiền</th>
-                {!isUtilityBill && <th style={{ width: '5%' }}></th>}
+                {!isLocked && <th style={{ width: '5%' }}></th>}
               </tr>
             </thead>
             <tbody>
@@ -275,34 +252,33 @@ export default function EditBillPage() {
                     <input className="form-control form-control-sm mb-1"
                       value={c.service_type}
                       onChange={e => updateCharge(i, 'service_type', e.target.value)}
-                      placeholder="VD: Điện"
-                      readOnly={isUtilityBill} // LOCK
+                      placeholder="VD: Phí vệ sinh"
+                      readOnly={isLocked}
                     />
                     <input className="form-control form-control-sm text-muted fst-italic"
                       value={c.description}
                       onChange={e => updateCharge(i, 'description', e.target.value)}
                       placeholder="Ghi chú (tùy chọn)"
-                      readOnly={isUtilityBill}
                     />
                   </td>
                   <td>
                     <input type="number" className="form-control form-control-sm text-center"
                       value={c.quantity}
                       onChange={e => updateCharge(i, 'quantity', e.target.value)}
-                      readOnly={isUtilityBill} // LOCK
+                      readOnly={isLocked}
                     />
                   </td>
                   <td>
                     <input type="number" className="form-control form-control-sm text-end"
                       value={c.unit_price}
                       onChange={e => updateCharge(i, 'unit_price', e.target.value)}
-                      readOnly={isUtilityBill} // LOCK
+                      readOnly={isLocked}
                     />
                   </td>
                   <td className="text-end fw-bold">
                     {fmtMoney(Number(c.quantity) * Number(c.unit_price))}
                   </td>
-                  {!isUtilityBill && (
+                  {!isLocked && (
                       <td className="text-center">
                         <button className="btn btn-sm text-danger" onClick={() => removeCharge(i)}>
                           <Trash />
@@ -316,7 +292,7 @@ export default function EditBillPage() {
                 <tr>
                     <td colSpan={3} className="text-end fw-bold">TỔNG CỘNG:</td>
                     <td className="text-end fw-bold text-danger fs-5">{fmtMoney(totalAmount)}</td>
-                    {!isUtilityBill && <td></td>}
+                    {!isLocked && <td></td>}
                 </tr>
             </tfoot>
           </table>

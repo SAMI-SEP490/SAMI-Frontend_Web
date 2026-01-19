@@ -1,9 +1,10 @@
+// src/pages/building/EditBuildingPage.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Form, Button, Spinner, Row, Col, Badge } from "react-bootstrap";
 import {
   updateBuilding,
-  getBuildingById, // ✅ DÙNG API NÀY
+  getBuildingById,
   getBuildingManagers,
 } from "../../services/api/building";
 import "./EditBuildingPage.css";
@@ -26,20 +27,18 @@ function EditBuildingPage() {
   const [electricPrice, setElectricPrice] = useState(0);
   const [waterPrice, setWaterPrice] = useState(0);
   const [serviceFee, setServiceFee] = useState(0);
-  const [billDueDay, setBillDueDay] = useState("");
+  const [billClosingDay, setBillClosingDay] = useState(""); // [UPDATE] Đổi tên state
 
   // ===== PARKING =====
   const [editParking, setEditParking] = useState(false);
   const [max4WheelSlot, setMax4WheelSlot] = useState(0);
   const [max2WheelSlot, setMax2WheelSlot] = useState(0);
 
-  // ===== LOAD DATA (FIX CHÍNH Ở ĐÂY) =====
+  // ===== LOAD DATA =====
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
-
-        // ✅ LOAD CHI TIẾT TÒA NHÀ
         const b = await getBuildingById(id);
 
         if (!b) {
@@ -55,9 +54,9 @@ function EditBuildingPage() {
         setElectricPrice(b.electric_unit_price ?? 0);
         setWaterPrice(b.water_unit_price ?? 0);
         setServiceFee(b.service_fee ?? 0);
-        setBillDueDay(b.bill_due_day ?? "");
+        setBillClosingDay(b.bill_closing_day ?? ""); // [UPDATE] Load closing day
 
-        // ✅ PARKING – GIỜ SẼ LÊN ĐÚNG
+        // Parking
         setMax4WheelSlot(b.max_4_wheel_slot ?? 0);
         setMax2WheelSlot(b.max_2_wheel_slot ?? 0);
 
@@ -90,9 +89,8 @@ function EditBuildingPage() {
         electric_unit_price: Number(electricPrice),
         water_unit_price: Number(waterPrice),
         service_fee: Number(serviceFee),
-        bill_due_day: billDueDay ? Number(billDueDay) : null,
+        // [NOTE] bill_closing_day không gửi lên vì không cho sửa
 
-        // PARKING
         max_4_wheel_slot: Number(max4WheelSlot),
         max_2_wheel_slot: Number(max2WheelSlot),
       });
@@ -122,7 +120,6 @@ function EditBuildingPage() {
       {/* BASIC INFO */}
       <div className="section-card">
         <h5 className="section-title">Thông tin cơ bản</h5>
-
         <Row>
           <Col md={6}>
             <Form.Label>Tên tòa nhà</Form.Label>
@@ -132,7 +129,6 @@ function EditBuildingPage() {
             />
           </Col>
         </Row>
-
         <Row className="mt-3">
           <Col md={6}>
             <Form.Label>Địa chỉ</Form.Label>
@@ -142,17 +138,12 @@ function EditBuildingPage() {
             />
           </Col>
         </Row>
-
         <div className="mt-3">
           <Form.Label>Quản lý tòa nhà</Form.Label>
           <div className="manager-list">
             {managers.length > 0
               ? managers.map((m) => (
-                  <Badge
-                    key={m.user_id}
-                    bg="secondary"
-                    className="manager-badge"
-                  >
+                  <Badge key={m.user_id} bg="secondary" className="manager-badge">
                     {m.full_name}
                   </Badge>
                 ))
@@ -164,7 +155,6 @@ function EditBuildingPage() {
       {/* SERVICES */}
       <div className="section-card">
         <h5 className="section-title">Dịch vụ</h5>
-
         <Row>
           <Col md={3}>
             <label>Giá điện</label>
@@ -175,7 +165,6 @@ function EditBuildingPage() {
               onChange={(e) => setElectricPrice(e.target.value)}
             />
           </Col>
-
           <Col md={3}>
             <label>Giá nước</label>
             <input
@@ -185,7 +174,6 @@ function EditBuildingPage() {
               onChange={(e) => setWaterPrice(e.target.value)}
             />
           </Col>
-
           <Col md={3}>
             <label>Phí dịch vụ</label>
             <input
@@ -195,13 +183,16 @@ function EditBuildingPage() {
               onChange={(e) => setServiceFee(e.target.value)}
             />
           </Col>
-
+          
+          {/* [UPDATE] Ngày chốt sổ: Luôn Disabled và có Label khác */}
           <Col md={3}>
-            <label>Ngày đóng tiền</label>
-            <input type="number" value={billDueDay} disabled />
-            <div style={{ color: "red", fontSize: "0.8rem", marginTop: "4px" }}>
-              ⚠ Ngày thanh toán không thể chỉnh sửa sau khi tạo
-            </div>
+            <label className="text-muted">Ngày chốt sổ (Cố định)</label>
+            <input
+              type="number"
+              value={billClosingDay}
+              disabled={true} // Luôn khóa
+              style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}
+            />
           </Col>
         </Row>
 
@@ -216,7 +207,6 @@ function EditBuildingPage() {
       {/* PARKING */}
       <div className="section-card">
         <h5 className="section-title">Bãi đỗ xe</h5>
-
         <Row>
           <Col md={3}>
             <label>Số xe 4 bánh</label>
@@ -227,7 +217,6 @@ function EditBuildingPage() {
               onChange={(e) => setMax4WheelSlot(e.target.value)}
             />
           </Col>
-
           <Col md={3}>
             <label>Số xe 2 bánh</label>
             <input
@@ -238,7 +227,6 @@ function EditBuildingPage() {
             />
           </Col>
         </Row>
-
         <Button
           style={{ marginTop: "10px" }}
           onClick={() => setEditParking(!editParking)}

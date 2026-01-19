@@ -245,7 +245,7 @@ export default function UserListPage() {
                       className="btn delete"
                       onClick={() => handleDelete(u.id)}
                     >
-                      <Trash size={14} /> Xóa
+                      <Trash size={14} /> Ngừng hoạt động
                     </button>
                   )}
                 </td>

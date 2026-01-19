@@ -43,6 +43,8 @@ function CreateContractPage() {
     const [searchLoading, setSearchLoading] = useState(false);
     const [searchError, setSearchError] = useState("");
 
+    const [errors, setErrors] = useState({});
+
     // Form State
     const [form, setForm] = useState({
         building_id: "",
@@ -61,6 +63,81 @@ function CreateContractPage() {
         files: []
     });
 
+    const validateForm = () => {
+        const newErrors = {}; // Object chứa lỗi
+
+        // 1. Validate File
+        if (!form.files || form.files.length === 0) {
+            newErrors.files = "Vui lòng tải lên ít nhất 1 file hợp đồng.";
+        }
+
+        // 2. Validate Room & Tenant
+        if (!form.building_id) newErrors.building_id = "Vui lòng chọn tòa nhà.";
+        if (!form.room_id) newErrors.room_id = "Vui lòng chọn phòng.";
+        if (!form.tenant_user_id) newErrors.tenant_user_id = "Vui lòng tìm kiếm và xác nhận khách thuê.";
+
+        // 3. Validate Rent
+        const rent = parseFloat(form.rent_amount);
+        if (!form.rent_amount || isNaN(rent) || rent <= 0) {
+            newErrors.rent_amount = "Tiền thuê phải là số dương lớn hơn 0.";
+        } else if (rent > 1000000000) {
+            newErrors.rent_amount = "Tiền thuê quá lớn (giới hạn 1 tỷ).";
+        }
+
+        // 4. Validate Deposit
+        const deposit = form.deposit_amount ? parseFloat(form.deposit_amount) : 0;
+        if (deposit < 0) {
+            newErrors.deposit_amount = "Tiền cọc không được là số âm.";
+        } else if (rent > 0 && deposit > rent * 12) { // Chỉ check chéo khi rent hợp lệ
+            newErrors.deposit_amount = "Tiền cọc không được vượt quá 1 năm tiền nhà.";
+        }
+
+        // 5. Validate Dates
+        if (!form.start_date) {
+            newErrors.start_date = "Vui lòng chọn ngày bắt đầu.";
+        } else {
+            // [NEW] Check ngày bắt đầu không quá cũ (6 tháng)
+            const startDate = new Date(form.start_date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Tạo mốc 6 tháng trước
+            const minDate = new Date();
+            minDate.setMonth(today.getMonth() - 6);
+            minDate.setHours(0, 0, 0, 0);
+
+            if (startDate < minDate) {
+                newErrors.start_date = "Ngày bắt đầu không được quá 6 tháng trong quá khứ.";
+            }
+        }
+
+        if (!form.duration_months) {
+            newErrors.duration_months = "Vui lòng nhập thời hạn.";
+        } else if (parseInt(form.duration_months) > 60) {
+            // [NEW] Check thời hạn tối đa 5 năm
+            newErrors.duration_months = "Thời hạn thuê tối đa là 60 tháng (5 năm).";
+        }
+
+
+        // Check End Date Tương lai
+        if (form.end_date) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const endDate = new Date(form.end_date);
+            if (endDate <= today) {
+                // Lỗi này có thể hiển thị ở start_date hoặc duration_months tùy bạn
+                newErrors.end_date = "Ngày kết thúc phải ở tương lai. Kiểm tra lại ngày bắt đầu hoặc thời hạn.";
+            }
+        }
+
+        // 6. Validate Penalty
+        const rate = parseFloat(form.penalty_rate);
+        if (isNaN(rate) || rate < 0.01 || rate > 1) {
+            newErrors.penalty_rate = "Tỷ lệ phạt phải từ 0.01% đến 1%.";
+        }
+
+        return newErrors;
+    };
     // --- EFFECT: Calculate End Date automatically ---
     useEffect(() => {
         if (form.start_date && form.duration_months) {
@@ -140,9 +217,15 @@ function CreateContractPage() {
         // [UPDATE] Không gọi getTenantsByRoomId nữa
     };
 
-    // [NEW] Handler tìm kiếm Tenant
     const handleSearchTenant = async () => {
         if (!searchQuery.trim()) return;
+
+        if (!form.building_id) {
+            setSearchError("Vui lòng chọn Tòa nhà trước khi tìm khách thuê.");
+            // Focus lại vào ô chọn tòa nhà để nhắc nhở (optional)
+            document.getElementsByName("building_id")[0]?.focus();
+            return;
+        }
 
         setSearchLoading(true);
         setSearchError("");
@@ -150,15 +233,17 @@ function CreateContractPage() {
         setForm(prev => ({...prev, tenant_user_id: ""}));
 
         try {
-            const tenant = await lookupTenant(searchQuery);
+            // [UPDATE] Truyền thêm form.building_id vào hàm lookup
+            const tenant = await lookupTenant(searchQuery, form.building_id);
+
             if (tenant) {
                 setFoundTenant(tenant);
                 setForm(prev => ({...prev, tenant_user_id: tenant.user_id}));
+                if (errors.tenant_user_id) setErrors(prev => ({...prev, tenant_user_id: null}));
             } else {
-                setSearchError("Không tìm thấy khách thuê này.");
+                setSearchError("Không tìm thấy khách thuê này trong tòa nhà.");
             }
         } catch (err) {
-            // Check 404
             if (err.response && err.response.status === 404) {
                 setSearchError("Không tìm thấy dữ liệu (404).");
             } else {
@@ -185,11 +270,20 @@ function CreateContractPage() {
             return;
         }
         setForm(prev => ({ ...prev, files: selectedFiles }));
+        if (errors.files) {
+            setErrors(prev => ({ ...prev, files: null }));
+        }
     };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm(prev => ({ ...prev, [name]: value }));
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: null }));
+        }
+        if (errors.files) {
+            setErrors(prev => ({ ...prev, files: null }));
+        }
     };
 
     // --- AI HANDLER ---
@@ -276,15 +370,21 @@ function CreateContractPage() {
     // --- SUBMIT ---
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // 1. Validate
+        const validationErrors = validateForm();
+
+        // 2. Nếu có lỗi (Object không rỗng) -> Set state lỗi và dừng submit
+        if (Object.keys(validationErrors).length > 0) {
+            setErrors(validationErrors);
+            // Optional: Scroll lên đầu trang hoặc tới lỗi đầu tiên
+            return;
+        }
+
+        // 3. Nếu không có lỗi -> Submit
         setSubmitting(true);
         try {
-            if (!form.room_id || !form.tenant_user_id) throw new Error("Vui lòng chọn phòng và xác nhận khách thuê.");
-
-            const rate = parseFloat(form.penalty_rate);
-            if (isNaN(rate) || rate < 0.01 || rate > 1) {
-                throw new Error("Tỷ lệ phạt phải từ 0.01% đến 1%.");
-            }
-
+            // ... (Logic gọi API giữ nguyên như cũ) ...
             const formData = new FormData();
             Object.keys(form).forEach(key => {
                 if (key === 'files') {
@@ -300,7 +400,9 @@ function CreateContractPage() {
             alert("Tạo hợp đồng thành công!");
             navigate("/contracts");
         } catch (error) {
-            alert("Lỗi: " + (error?.response?.data?.message || error?.message));
+            const message = error?.response?.data?.message || error?.message || "Có lỗi xảy ra";
+            // Nếu backend trả về lỗi cụ thể cho field nào đó, bạn có thể map vào đây
+            alert("Lỗi server: " + message);
         } finally {
             setSubmitting(false);
         }
@@ -371,7 +473,7 @@ function CreateContractPage() {
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearchTenant())}
-                                        disabled={!!foundTenant} // Disable khi đã tìm thấy
+                                        disabled={!!foundTenant || !form.building_id}
                                     />
                                     {foundTenant ? (
                                         <Button variant="outline-danger" onClick={handleClearTenant}>
@@ -383,7 +485,7 @@ function CreateContractPage() {
                                         </Button>
                                     )}
                                 </div>
-                                {searchError && <div className="text-danger small mb-2">{searchError}</div>}
+                                {errors.tenant_user_id && <div className="text-danger small mt-1">{errors.tenant_user_id}</div>}
 
                                 {/* 2. THẺ THÔNG TIN (USER CARD) */}
                                 {foundTenant && (
@@ -429,15 +531,38 @@ function CreateContractPage() {
                         <Row className="mb-4">
                             <Col md={4}>
                                 <label className="form-label">Ngày bắt đầu <span className="required">*</span></label>
-                                <input type="date" name="start_date" className="form-control" value={form.start_date} onChange={handleChange} required />
+                                <input
+                                    type="date"
+                                    name="start_date"
+                                    className={`form-control ${errors.start_date ? 'is-invalid' : ''}`}
+                                    value={form.start_date}
+                                    onChange={handleChange}
+                                />
+                                {errors.start_date && <div className="invalid-feedback">{errors.start_date}</div>}
                             </Col>
+
                             <Col md={4}>
                                 <label className="form-label">Thời hạn (Tháng) <span className="required">*</span></label>
-                                <input type="number" name="duration_months" className="form-control" value={form.duration_months} onChange={handleChange} min="1" required />
+                                <input
+                                    type="number"
+                                    name="duration_months"
+                                    className={`form-control ${errors.duration_months ? 'is-invalid' : ''}`}
+                                    value={form.duration_months}
+                                    onChange={handleChange}
+                                    min="1"
+                                />
+                                {errors.duration_months && <div className="invalid-feedback">{errors.duration_months}</div>}
                             </Col>
+
                             <Col md={4}>
                                 <label className="form-label">Ngày kết thúc (Dự kiến)</label>
-                                <input type="text" className="form-control" value={form.end_date} readOnly />
+                                <input
+                                    type="text"
+                                    className={`form-control ${errors.end_date ? 'is-invalid' : ''}`} // Hiển thị đỏ nếu ngày kết thúc sai
+                                    value={form.end_date}
+                                    readOnly
+                                />
+                                {errors.end_date && <div className="invalid-feedback">{errors.end_date}</div>}
                             </Col>
                         </Row>
                         <Row className="mb-4">
@@ -458,35 +583,51 @@ function CreateContractPage() {
                         <Row className="mb-4">
                             <Col md={4}>
                                 <label className="form-label">Giá thuê (VNĐ) <span className="required">*</span></label>
-                                <div className="input-group">
-                                    <input type="number" name="rent_amount" className="form-control" value={form.rent_amount} onChange={handleChange} required placeholder="Ví dụ: 5000000" />
+                                <div className="input-group has-validation"> {/* Thêm class has-validation để bo góc đẹp hơn với bootstrap */}
+                                    <input
+                                        type="number"
+                                        name="rent_amount"
+                                        className={`form-control ${errors.rent_amount ? 'is-invalid' : ''}`}
+                                        value={form.rent_amount}
+                                        onChange={handleChange}
+                                        placeholder="Ví dụ: 5000000"
+                                    />
                                     <span className="input-group-text">₫</span>
+                                    {/* Invalid feedback phải nằm sau input để hiển thị đúng trong input-group */}
+                                    {errors.rent_amount && <div className="invalid-feedback">{errors.rent_amount}</div>}
                                 </div>
                             </Col>
+
                             <Col md={4}>
                                 <label className="form-label">Tiền đặt cọc (VNĐ)</label>
-                                <div className="input-group">
-                                    <input type="number" name="deposit_amount" className="form-control" value={form.deposit_amount} onChange={handleChange} placeholder="0" />
+                                <div className="input-group has-validation">
+                                    <input
+                                        type="number"
+                                        name="deposit_amount"
+                                        className={`form-control ${errors.deposit_amount ? 'is-invalid' : ''}`}
+                                        value={form.deposit_amount}
+                                        onChange={handleChange}
+                                        placeholder="0"
+                                    />
                                     <span className="input-group-text">₫</span>
+                                    {errors.deposit_amount && <div className="invalid-feedback">{errors.deposit_amount}</div>}
                                 </div>
                             </Col>
+
                             <Col md={4}>
                                 <label className="form-label">Phạt quá hạn (%) <span className="required">*</span></label>
-                                <div className="input-group">
+                                <div className="input-group has-validation">
                                     <input
                                         type="number"
                                         name="penalty_rate"
-                                        className="form-control"
+                                        className={`form-control ${errors.penalty_rate ? 'is-invalid' : ''}`}
                                         value={form.penalty_rate}
                                         onChange={handleChange}
-                                        min="0.01"
-                                        max="1"
                                         step="0.01"
-                                        required
                                     />
                                     <span className="input-group-text">% / ngày</span>
+                                    {errors.penalty_rate && <div className="invalid-feedback">{errors.penalty_rate}</div>}
                                 </div>
-                                <small className="text-muted" style={{fontSize: '11px'}}>Từ 0.01% - 1%</small>
                             </Col>
                         </Row>
 
@@ -512,7 +653,9 @@ function CreateContractPage() {
                                             </div>
                                         </div>
                                     )}
+
                                 </div>
+                                {errors.files && <div className="text-danger small mt-1">{errors.files}</div>}
                             </Col>
                             <Col md={6}>
                                 <label className="form-label">Ghi chú bổ sung</label>

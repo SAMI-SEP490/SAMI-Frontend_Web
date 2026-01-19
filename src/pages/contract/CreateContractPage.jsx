@@ -41,8 +41,8 @@ function CreateContractPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [foundTenant, setFoundTenant] = useState(null);
     const [searchLoading, setSearchLoading] = useState(false);
-    const [searchError, setSearchError] = useState("");
-
+    const [searchResults, setSearchResults] = useState([]); // [NEW] Danh sách gợi ý từ API
+    const [showDropdown, setShowDropdown] = useState(false);
     const [errors, setErrors] = useState({});
 
     // Form State
@@ -106,8 +106,14 @@ function CreateContractPage() {
             minDate.setMonth(today.getMonth() - 6);
             minDate.setHours(0, 0, 0, 0);
 
+            const maxFutureDate = new Date();
+            maxFutureDate.setMonth(today.getMonth() + 1);
+            maxFutureDate.setHours(0, 0, 0, 0);
+
             if (startDate < minDate) {
                 newErrors.start_date = "Ngày bắt đầu không được quá 6 tháng trong quá khứ.";
+            } else if (startDate > maxFutureDate) {
+                newErrors.start_date = "Ngày bắt đầu không được vượt quá 1 tháng kể từ hôm nay.";
             }
         }
 
@@ -192,6 +198,18 @@ function CreateContractPage() {
         fetchBuildings();
     }, [userRole]);
 
+    useEffect(() => {
+        // Chỉ tìm kiếm khi đã chọn tòa nhà và chuỗi tìm kiếm đủ dài (>3 ký tự)
+        if (!searchQuery || searchQuery.length < 3 || !form.building_id || foundTenant) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            handleSearchTenant(searchQuery); // Gọi hàm tìm kiếm
+        }, 600); // Delay 600ms chờ người dùng gõ xong
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, form.building_id]);
     // --- HANDLERS ---
     const handleBuildingChange = async (e) => {
         const bId = e.target.value;
@@ -217,42 +235,46 @@ function CreateContractPage() {
         // [UPDATE] Không gọi getTenantsByRoomId nữa
     };
 
-    const handleSearchTenant = async () => {
-        if (!searchQuery.trim()) return;
-
-        if (!form.building_id) {
-            setSearchError("Vui lòng chọn Tòa nhà trước khi tìm khách thuê.");
-            // Focus lại vào ô chọn tòa nhà để nhắc nhở (optional)
-            document.getElementsByName("building_id")[0]?.focus();
+    const handleSearchTenant = async (queryInput = searchQuery) => {
+        if (!queryInput.trim()) {
+            setSearchResults([]);
+            setShowDropdown(false);
             return;
         }
 
+        if (!form.building_id) return;
+
         setSearchLoading(true);
-        setSearchError("");
-        setFoundTenant(null);
-        setForm(prev => ({...prev, tenant_user_id: ""}));
-
         try {
-            // [UPDATE] Truyền thêm form.building_id vào hàm lookup
-            const tenant = await lookupTenant(searchQuery, form.building_id);
+            const results = await lookupTenant(queryInput, form.building_id);
 
-            if (tenant) {
-                setFoundTenant(tenant);
-                setForm(prev => ({...prev, tenant_user_id: tenant.user_id}));
-                if (errors.tenant_user_id) setErrors(prev => ({...prev, tenant_user_id: null}));
+            if (Array.isArray(results) && results.length > 0) {
+                setSearchResults(results);
             } else {
-                setSearchError("Không tìm thấy khách thuê này trong tòa nhà.");
+                setSearchResults([]);
             }
+            // [QUAN TRỌNG] Luôn hiện dropdown sau khi tìm kiếm xong,
+            // dù có kết quả hay không, để hiển thị thông báo "Không tìm thấy"
+            setShowDropdown(true);
+
         } catch (err) {
-            if (err.response && err.response.status === 404) {
-                setSearchError("Không tìm thấy dữ liệu (404).");
-            } else {
-                setSearchError("Lỗi hệ thống khi tìm kiếm.");
-            }
+            console.error(err);
+            setSearchResults([]);
+            setShowDropdown(true); // Vẫn hiện dropdown để báo lỗi hoặc trống
         } finally {
             setSearchLoading(false);
         }
     };
+    const handleSelectTenant = (tenant) => {
+        setFoundTenant(tenant); // Lưu người được chọn
+        setForm(prev => ({...prev, tenant_user_id: tenant.user_id})); // Gán vào form
+        setSearchQuery(tenant.full_name || tenant.phone); // Điền tên/sđt vào ô input cho đẹp
+        setShowDropdown(false); // Ẩn dropdown
+        setSearchResults([]); // Xóa kết quả tìm kiếm thừa
+        if (errors.tenant_user_id) setErrors(prev => ({...prev, tenant_user_id: null}));
+    };
+
+
 
     const handleClearTenant = () => {
         setFoundTenant(null);
@@ -283,6 +305,28 @@ function CreateContractPage() {
         }
         if (errors.files) {
             setErrors(prev => ({ ...prev, files: null }));
+        }
+    };
+
+    const formatCurrency = (value) => {
+        if (!value) return "";
+        // Xóa các ký tự không phải số để đảm bảo an toàn
+        const number = Number(String(value).replace(/\D/g, ""));
+        return new Intl.NumberFormat("vi-VN").format(number);
+    };
+
+    // 2. Hàm xử lý khi người dùng nhập tiền
+    const handleCurrencyChange = (e) => {
+        const { name, value } = e.target;
+
+        // Chỉ lấy số (0-9), loại bỏ dấu chấm/phẩy và chữ cái
+        const rawValue = value.replace(/\D/g, "");
+
+        setForm(prev => ({ ...prev, [name]: rawValue }));
+
+        // Xóa lỗi nếu có
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: null }));
         }
     };
 
@@ -461,67 +505,115 @@ function CreateContractPage() {
                             </Col>
 
                             {/* [UPDATE] CỘT CHỌN KHÁCH THUÊ MỚI */}
-                            <Col md={4}>
+                            <Col md={4} className="position-relative"> {/* Thêm position-relative để căn dropdown */}
                                 <label className="form-label">Khách thuê <span className="required">*</span></label>
 
-                                {/* 1. Ô Input tìm kiếm */}
-                                <div className="input-group mb-2">
+                                <div className="input-group">
+        <span className="input-group-text bg-light">
+            {searchLoading ? <Spinner size="sm"/> : <Search />}
+        </span>
                                     <input
                                         type="text"
-                                        className={`form-control ${searchError ? 'is-invalid' : ''}`}
-                                        placeholder="Nhập SĐT hoặc CCCD..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearchTenant())}
-                                        disabled={!!foundTenant || !form.building_id}
+                                        // [FIX LỖI REACT]: Thêm || "" để đảm bảo không bao giờ bị undefined
+                                        className={`form-control ${errors.tenant_user_id ? 'is-invalid' : ''}`}
+                                        placeholder="Nhập SĐT, Tên hoặc CCCD..."
+                                        value={searchQuery || ""}
+                                        onChange={(e) => {
+                                            setSearchQuery(e.target.value);
+                                            // Nếu xóa trắng thì reset tenant đã chọn
+                                            if (e.target.value === "") {
+                                                setFoundTenant(null);
+                                                setForm(prev => ({...prev, tenant_user_id: ""}));
+                                            }
+                                        }}
+                                        onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                                        // Tắt autocomplete mặc định của trình duyệt đè lên
+                                        autoComplete="off"
+                                        disabled={!!foundTenant} // Khóa khi đã chọn (muốn tìm lại phải bấm nút X)
                                     />
-                                    {foundTenant ? (
-                                        <Button variant="outline-danger" onClick={handleClearTenant}>
-                                            <XLg /> Bỏ chọn
-                                        </Button>
-                                    ) : (
-                                        <Button variant="outline-primary" onClick={handleSearchTenant} disabled={searchLoading}>
-                                            {searchLoading ? <Spinner size="sm"/> : <Search />} Tìm
+                                    {/* Nút Xóa/Bỏ chọn */}
+                                    {(foundTenant || searchQuery) && (
+                                        <Button
+                                            variant="outline-secondary"
+                                            onClick={() => {
+                                                handleClearTenant(); // Nhớ đảm bảo hàm này reset cả searchQuery, foundTenant
+                                                setSearchResults([]);
+                                                setShowDropdown(false);
+                                            }}
+                                        >
+                                            <XLg />
                                         </Button>
                                     )}
                                 </div>
+
+                                {/* [NEW] DROPDOWN GỢI Ý */}
+                                {showDropdown && !foundTenant && (
+                                    <div className="list-group position-absolute w-100 shadow-lg" style={{zIndex: 1000, maxHeight: '300px', overflowY: 'auto', top: '75px'}}>
+
+                                        {/* TRƯỜNG HỢP 1: CÓ DỮ LIỆU */}
+                                        {searchResults.length > 0 ? (
+                                            searchResults.map((t) => (
+                                                <button
+                                                    key={t.user_id}
+                                                    type="button"
+                                                    className="list-group-item list-group-item-action d-flex align-items-center gap-2"
+                                                    onClick={() => handleSelectTenant(t)}
+                                                >
+                                                    <div style={{width: 30, height: 30, background: '#eee', borderRadius: '50%', display:'flex', alignItems:'center', justifyContent:'center', flexShrink: 0}}>
+                                                        {t.avatar_url ? <img src={t.avatar_url} alt="" style={{width:'100%', height:'100%', borderRadius:'50%'}}/> : <b>{t.full_name?.charAt(0)}</b>}
+                                                    </div>
+                                                    <div className="flex-grow-1 text-start">
+                                                        <div className="fw-bold small">{t.full_name}</div>
+                                                        <div className="text-muted" style={{fontSize: '0.8rem'}}>
+                                                            {t.phone} - {t.id_number}
+                                                        </div>
+                                                    </div>
+                                                    {t.room && (
+                                                        <span className="badge bg-info text-dark">P.{t.room.room_number}</span>
+                                                    )}
+                                                </button>
+                                            ))
+                                        ) : (
+                                            /* TRƯỜNG HỢP 2: KHÔNG TÌM THẤY (SEARCH RESULTS RỖNG) */
+                                            <div className="list-group-item text-center py-3 text-muted">
+                                                <Search size={24} className="mb-2 text-secondary opacity-50"/>
+                                                <p className="mb-0 small">Không tìm thấy khách thuê nào.</p>
+                                                <small className="fst-italic opacity-75">Vui lòng kiểm tra lại SĐT hoặc CCCD.</small>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ERROR MESSAGE */}
                                 {errors.tenant_user_id && <div className="text-danger small mt-1">{errors.tenant_user_id}</div>}
 
-                                {/* 2. THẺ THÔNG TIN (USER CARD) */}
+                                {/* THẺ THÔNG TIN (USER CARD) - GIỮ NGUYÊN HOẶC CẢI TIẾN NHẸ */}
                                 {foundTenant && (
-                                    <Card className="tenant-info-card border-success">
+                                    <Card className="tenant-info-card border-success mt-2 shadow-sm animate__animated animate__fadeIn">
                                         <Card.Body className="p-2">
                                             <div className="d-flex align-items-center gap-3">
-                                                {/* Avatar */}
-                                                <div className="avatar-placeholder">
+                                                <div className="avatar-placeholder bg-success-subtle text-success">
                                                     {foundTenant.avatar_url ? (
                                                         <Image src={foundTenant.avatar_url} roundedCircle style={{width:40, height:40, objectFit:'cover'}} />
                                                     ) : (
-                                                        <span className="fw-bold">{foundTenant.full_name?.charAt(0).toUpperCase()}</span>
+                                                        <span className="fw-bold fs-5">{foundTenant.full_name?.charAt(0).toUpperCase()}</span>
                                                     )}
                                                 </div>
-
-                                                {/* Info Text */}
                                                 <div className="flex-grow-1 overflow-hidden">
                                                     <div className="fw-bold text-success text-truncate">{foundTenant.full_name}</div>
-                                                    <div className="small text-muted d-flex align-items-center gap-1">
-                                                        <Telephone size={10}/> {foundTenant.phone}
-                                                    </div>
-                                                    <div className="small text-muted d-flex align-items-center gap-1">
-                                                        <PersonBadge size={10}/> {foundTenant.id_number || "Chưa có CCCD"}
+                                                    <div className="small text-secondary d-flex align-items-center gap-2">
+                                                        <span><Telephone size={10}/> {foundTenant.phone}</span>
+                                                        <span>|</span>
+                                                        <span><PersonBadge size={10}/> {foundTenant.id_number || "--"}</span>
                                                     </div>
                                                 </div>
-
-                                                {/* Icon Check */}
-                                                <div className="text-success fs-4 me-1">
+                                                <div className="text-success fs-4 me-2">
                                                     <CheckCircleFill />
                                                 </div>
                                             </div>
                                         </Card.Body>
                                     </Card>
                                 )}
-
-                                {/* Hidden Input để đảm bảo validate HTML hoạt động (nếu cần) */}
                                 <input type="hidden" name="tenant_user_id" value={form.tenant_user_id} required />
                             </Col>
                         </Row>
@@ -583,17 +675,22 @@ function CreateContractPage() {
                         <Row className="mb-4">
                             <Col md={4}>
                                 <label className="form-label">Giá thuê (VNĐ) <span className="required">*</span></label>
-                                <div className="input-group has-validation"> {/* Thêm class has-validation để bo góc đẹp hơn với bootstrap */}
+                                <div className="input-group has-validation">
                                     <input
-                                        type="number"
+                                        type="text" // [SỬA] Đổi thành text để hiện dấu chấm
                                         name="rent_amount"
                                         className={`form-control ${errors.rent_amount ? 'is-invalid' : ''}`}
-                                        value={form.rent_amount}
-                                        onChange={handleChange}
-                                        placeholder="Ví dụ: 5000000"
+
+                                        // [SỬA] Format giá trị hiển thị
+                                        value={formatCurrency(form.rent_amount)}
+
+                                        // [SỬA] Dùng hàm xử lý riêng
+                                        onChange={handleCurrencyChange}
+
+                                        placeholder="Ví dụ: 5.000.000"
+                                        maxLength={15} // Giới hạn độ dài để tránh số quá lớn
                                     />
                                     <span className="input-group-text">₫</span>
-                                    {/* Invalid feedback phải nằm sau input để hiển thị đúng trong input-group */}
                                     {errors.rent_amount && <div className="invalid-feedback">{errors.rent_amount}</div>}
                                 </div>
                             </Col>
@@ -602,12 +699,16 @@ function CreateContractPage() {
                                 <label className="form-label">Tiền đặt cọc (VNĐ)</label>
                                 <div className="input-group has-validation">
                                     <input
-                                        type="number"
+                                        type="text" // [SỬA]
                                         name="deposit_amount"
                                         className={`form-control ${errors.deposit_amount ? 'is-invalid' : ''}`}
-                                        value={form.deposit_amount}
-                                        onChange={handleChange}
+
+                                        // [SỬA]
+                                        value={formatCurrency(form.deposit_amount)}
+                                        onChange={handleCurrencyChange}
+
                                         placeholder="0"
+                                        maxLength={15}
                                     />
                                     <span className="input-group-text">₫</span>
                                     {errors.deposit_amount && <div className="invalid-feedback">{errors.deposit_amount}</div>}

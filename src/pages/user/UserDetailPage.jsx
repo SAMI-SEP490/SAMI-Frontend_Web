@@ -9,7 +9,8 @@ const pick = (...vals) => {
   return undefined;
 };
 const normalizeTenant = (u) => ({
-  room: u?.room_name || "—", // service đã map sẵn
+  building: u?.building_name || `Tòa nhà #${u?.building_id ?? "—"}`,
+  room: u?.room_name || "—",
   idNumber: u?.id_number || "—",
   tenantSince: u?.tenant_since || null,
   note: u?.note || "—",
@@ -19,7 +20,6 @@ const normalizeManager = (u) => ({
   building: u?.building_name || `Tòa nhà #${u?.building_id ?? "—"}`,
   note: u?.note || "—",
 });
-
 
 // normalize giống UserListPage
 const normalizeUser = (u) => ({
@@ -31,6 +31,8 @@ const normalizeUser = (u) => ({
   status: pick(u?.status, "active"),
   gender: pick(u?.gender, "—"),
   birthday: pick(u?.birthday, "—"),
+  building_id: pick(u?.building_id, null),
+  building_name: pick(u?.building_name, null),
   deleted_at: u?.deleted_at ?? null,
 });
 const formatDateVN = (value) => {
@@ -42,7 +44,8 @@ const formatDateVN = (value) => {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
-};const genderLabel = (g) => {
+};
+const genderLabel = (g) => {
   switch (String(g).toLowerCase()) {
     case "male":
       return "Nam";
@@ -71,16 +74,17 @@ export default function UserDetailPage() {
         if (!mounted) return;
         const normalized = normalizeUser(data);
 
-if (String(normalized.role).toLowerCase() === "tenant") {
-  normalized.tenant = normalizeTenant(data);
-}
+        if (String(normalized.role).toLowerCase() === "tenant") {
+          normalized.tenant = normalizeTenant(data);
+          console.log("NORMALIZED TENANT", normalized.tenant);
+        }
 
-if (String(normalized.role).toLowerCase() === "manager") {
-  normalized.manager = normalizeManager(data);
-}
+        if (String(normalized.role).toLowerCase() === "manager") {
+          normalized.manager = normalizeManager(data);
+        }
 
-setUser(normalized);
-console.log("RAW USER", data);
+        setUser(normalized);
+        console.log("RAW USER", data);
       } catch (e) {
         setErr(
           e?.response?.data?.message ||
@@ -117,7 +121,7 @@ console.log("RAW USER", data);
   if (loading) return <div style={{ padding: 24 }}>Đang tải...</div>;
   if (err) return <div style={{ padding: 24, color: "#E11D48" }}>{err}</div>;
   if (!user) return null;
-const isManager = String(user.role).toLowerCase() === "manager";
+  const isManager = String(user.role).toLowerCase() === "manager";
 
   return (
     <div className="user-detail-page">
@@ -175,102 +179,100 @@ display: flex;
           background: #e5e7eb;
         }
       `}</style>
-<div>
-      <h1 style={{ textAlign: "center" }}>Chi tiết người dùng</h1>
+      <div>
+        <h1 style={{ textAlign: "center" }}>Chi tiết người dùng</h1>
 
-      <div className="card">
-        <div className="row">
-          <div className="label">ID</div>
-          <div className="value">{user.id}</div>
-        </div>
+        <div className="card">
+          <div className="row">
+            <div className="label">ID</div>
+            <div className="value">{user.id}</div>
+          </div>
 
-        <div className="row">
-          <div className="label">Họ tên</div>
-          <div className="value">{user.full_name}</div>
-        </div>
+          <div className="row">
+            <div className="label">Họ tên</div>
+            <div className="value">{user.full_name}</div>
+          </div>
 
-        <div className="row">
-          <div className="label">Email</div>
-          <div className="value">{user.email}</div>
-        </div>
+          <div className="row">
+            <div className="label">Email</div>
+            <div className="value">{user.email}</div>
+          </div>
 
-        <div className="row">
-          <div className="label">Số điện thoại</div>
-          <div className="value">{user.phone}</div>
-        </div>
+          <div className="row">
+            <div className="label">Số điện thoại</div>
+            <div className="value">{user.phone}</div>
+          </div>
 
-        <div className="row">
-          <div className="label">Vai trò</div>
-          <div className="value">{roleLabel(user.role)}</div>
-        </div>
+          <div className="row">
+            <div className="label">Vai trò</div>
+            <div className="value">{roleLabel(user.role)}</div>
+          </div>
 
-        <div className="row">
-          <div className="label">Trạng thái</div>
-          <div className="value">{statusLabel(user)}</div>
-        </div>
+          <div className="row">
+            <div className="label">Trạng thái</div>
+            <div className="value">{statusLabel(user)}</div>
+          </div>
 
-        <div className="row">
-          <div className="label">Giới tính</div>
-          <div className="value">{genderLabel(user.gender)}</div>
-        </div>
+          <div className="row">
+            <div className="label">Giới tính</div>
+            <div className="value">{genderLabel(user.gender)}</div>
+          </div>
 
-        <div className="row">
-          <div className="label">Ngày sinh</div>
-          <div className="value">{formatDateVN(user.birthday)}</div>
-        </div>
-{user.role.toLowerCase() === "tenant" && user.tenant && (
-  <>
-    <h3 style={{ marginTop: 24 }}>Thông tin người thuê</h3>
+          <div className="row">
+            <div className="label">Ngày sinh</div>
+            <div className="value">{formatDateVN(user.birthday)}</div>
+          </div>
+          {user.role.toLowerCase() === "tenant" && user.tenant && (
+            <>
+              <h3 style={{ marginTop: 24 }}>Thông tin người thuê</h3>
 
-    <div className="row">
-      <div className="label">Tòa nhà</div>
-      <div className="value">{user.tenant.building}</div>
-    </div>
+              <div className="row">
+                <div className="label">Tòa nhà</div>
+                <div className="value">{user.tenant.building}</div>
+              </div>
 
-    <div className="row">
-      <div className="label">CCCD / CMND</div>
-      <div className="value">{user.tenant.idNumber}</div>
-    </div>
+              <div className="row">
+                <div className="label">CCCD / CMND</div>
+                <div className="value">{user.tenant.idNumber}</div>
+              </div>
 
-    <div className="row">
-      <div className="label">Ghi chú</div>
-      <div className="value">{user.tenant.note}</div>
-    </div>
-  </>
-)}
-{user.role.toLowerCase() === "manager" && user.manager && (
-  <>
-    <h3 style={{ marginTop: 24 }}>Thông tin quản lý</h3>
+              <div className="row">
+                <div className="label">Ghi chú</div>
+                <div className="value">{user.tenant.note}</div>
+              </div>
+            </>
+          )}
+          {user.role.toLowerCase() === "manager" && user.manager && (
+            <>
+              <h3 style={{ marginTop: 24 }}>Thông tin quản lý</h3>
 
-    <div className="row">
-      <div className="label">Tòa nhà</div>
-      <div className="value">{user.manager.building}</div>
-    </div>
+              <div className="row">
+                <div className="label">Tòa nhà</div>
+                <div className="value">{user.manager.building}</div>
+              </div>
 
-    <div className="row">
-      <div className="label">Ghi chú</div>
-      <div className="value">{user.manager.note}</div>
-    </div>
-  </>
-)}
+              <div className="row">
+                <div className="label">Ghi chú</div>
+                <div className="value">{user.manager.note}</div>
+              </div>
+            </>
+          )}
 
-        <div className="actions">
-          <button
-            className="btn btn-gray"
-            onClick={() => navigate("/users")}
-          >
-            Quay lại
-          </button>
-          {isManager && (
-    <button
-      className="btn btn-primary"
-      onClick={() => navigate(`/users/${user.id}/edit`)}
-    >
-      Sửa thông tin
-    </button>
-  )}
+          <div className="actions">
+            <button className="btn btn-gray" onClick={() => navigate("/users")}>
+              Quay lại
+            </button>
+            {isManager && (
+              <button
+                className="btn btn-primary"
+                onClick={() => navigate(`/users/${user.id}/edit`)}
+              >
+                Sửa thông tin
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </div></div>
+    </div>
   );
 }

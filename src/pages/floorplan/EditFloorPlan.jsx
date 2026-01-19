@@ -107,7 +107,7 @@ const rectsOverlap = (a, b) =>
 
 const getBuildingPolygonFromNodes = (nodes) => {
   const building = (nodes || []).find(
-    (n) => n?.type === "building" && Array.isArray(n?.data?.points)
+    (n) => n?.type === "building" && Array.isArray(n?.data?.points),
   );
   if (!building) return null;
   const bx = Number(building?.position?.x || 0);
@@ -212,7 +212,7 @@ const Icon = ({ name, size = 16 }) => {
   }
 };
 
-function EditableLabel({ text, onCommit }) {
+function EditableLabel({ text, onCommit, fontSize = 13 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(text);
 
@@ -263,11 +263,11 @@ function EditableLabel({ text, onCommit }) {
             borderRadius: 6,
             background: "#fff",
             minWidth: 70,
-            fontSize: 13,
+            fontSize, // ✅ dùng fontSize
           }}
         />
       ) : (
-        <span style={{ userSelect: "none", fontSize: 13 }}>{text}</span>
+        <span style={{ userSelect: "none", fontSize }}>{text}</span> // ✅ dùng fontSize
       )}
     </div>
   );
@@ -300,16 +300,21 @@ function BuildingNode({ data }) {
 
   const moveVertex = (idx, dx, dy) => {
     const next = pts.map((p, i) =>
-      i === idx ? { x: snap(p.x + dx, grid), y: snap(p.y + dy, grid) } : p
+      i === idx ? { x: snap(p.x + dx, grid), y: snap(p.y + dy, grid) } : p,
     );
     onChangePoints?.(next);
   };
 
-  const { w, h } = bboxOf(pts);
+  const { minX, minY, w, h } = bboxOf(pts);
 
   return (
     <div style={{ width: w, height: h }}>
-      <svg width={w} height={h} style={{ display: "block" }}>
+      <svg
+        width={w}
+        height={h}
+        viewBox={`${minX} ${minY} ${w} ${h}`}
+        style={{ display: "block", overflow: "visible" }}
+      >
         <path
           d={pathFromPoints(pts)}
           fill={fill}
@@ -378,7 +383,11 @@ function BlockNode({ data }) {
       >
         <Icon name={icon} size={16} />
       </span>
-      <EditableLabel text={label} onCommit={(t) => onChangeLabel?.(t)} />
+      <EditableLabel
+        text={label}
+        fontSize={Number(data?.fontSize || 13)}
+        onCommit={(t) => onChangeLabel?.(t)}
+      />
     </div>
   );
 }
@@ -442,13 +451,16 @@ function FloorplanEdit() {
   const [pxPerMeter, setPxPerMeter] = useState(80);
   const [selectedId, setSelectedId] = useState(null);
   const [loadingLayout, setLoadingLayout] = useState(true);
+  const [sizeDraft, setSizeDraft] = useState({ w: "", h: "" });
+  const [labelFontSize, setLabelFontSize] = useState(13);
+  const [labelFontSizeDraft, setLabelFontSizeDraft] = useState("13");
 
   const activeBuildingObj = useMemo(
     () =>
       buildings.find(
-        (b) => String(b.building_id) === String(activeBuilding || "")
+        (b) => String(b.building_id) === String(activeBuilding || ""),
       ),
-    [buildings, activeBuilding]
+    [buildings, activeBuilding],
   );
 
   const floorOptions = useMemo(() => {
@@ -464,6 +476,10 @@ function FloorplanEdit() {
       }
     }
   }, [floorOptions, activeFloor]);
+
+  useEffect(() => {
+    setLabelFontSizeDraft(String(labelFontSize || 0));
+  }, [labelFontSize]);
 
   /* Load list building (CHỈ LOAD 1 LẦN) */
   useEffect(() => {
@@ -504,6 +520,26 @@ function FloorplanEdit() {
     };
   }, []);
 
+  const applyFontSizeToAll = useCallback(
+    (fontPx) => {
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.type === "building") return n;
+
+          // chỉ các node có label/room_number mới cần font
+          const hasText =
+            typeof n?.data?.label === "string" ||
+            typeof n?.data?.room_number === "string";
+
+          if (!hasText) return n;
+
+          return { ...n, data: { ...n.data, fontSize: fontPx } };
+        }),
+      );
+    },
+    [setNodes],
+  );
+
   /* Inject callback cho building + block/small */
   const injectCallbacks = useCallback(() => {
     setNodes((nds) =>
@@ -521,8 +557,8 @@ function FloorplanEdit() {
                   curr.map((m) =>
                     m.id === n.id
                       ? { ...m, data: { ...m.data, points: nextPts } }
-                      : m
-                  )
+                      : m,
+                  ),
                 ),
             },
           };
@@ -562,14 +598,14 @@ function FloorplanEdit() {
                         label: txt,
                       },
                     };
-                  })
+                  }),
                 ),
             },
           };
         }
 
         return n;
-      })
+      }),
     );
   }, [gridGap, setNodes]);
 
@@ -587,29 +623,74 @@ function FloorplanEdit() {
         const e = Array.isArray(layout.edges) ? layout.edges : [];
 
         // ✅ FIX: Sync label với room_number khi load data
+        const lockedIds = Array.isArray(detail?.locked_room_ids)
+          ? detail.locked_room_ids.map((x) => Number(x)).filter(Boolean)
+          : [];
+
+        const hasLocked = lockedIds.length > 0;
+
         const fixedNodes = n.map((node) => {
-          // Chỉ xử lý node phòng
-          if (
-            node.type === "block" &&
-            node.data?.icon === "room" &&
-            node.data?.room_number
-          ) {
+          // 1) normalize room_number <-> label
+          if (node.type === "block" && node.data?.icon === "room") {
+            const rn = String(node.data?.room_number ?? "").trim();
+            const lb = String(node.data?.label ?? "").trim();
+
+            const room_number = rn || lb; // fallback label -> room_number
+            const label = room_number || "Phòng";
+
+            const rid = node.data?.room_id ? Number(node.data.room_id) : null;
+            const isLocked = rid && lockedIds.includes(rid);
+
             return {
               ...node,
+              draggable: !isLocked,
+              selectable: !isLocked,
               data: {
                 ...node.data,
-                label: node.data.room_number || "Phòng",
+                room_number,
+                label,
+                locked: isLocked,
               },
             };
           }
+
+          // 2) nếu có locked room => khóa luôn building shape
+          if (
+            hasLocked &&
+            (node.type === "building" || node.id === "building")
+          ) {
+            return {
+              ...node,
+              draggable: false,
+              selectable: false,
+            };
+          }
+
           return node;
         });
+
+        const metaFont = Number(layout?.meta?.labelFontSize || 13);
+
+        const nodesWithFont = fixedNodes.map((node) => {
+          if (node.type === "building") return node;
+          return {
+            ...node,
+            data: {
+              ...(node.data || {}),
+              fontSize: node?.data?.fontSize ?? metaFont,
+            },
+          };
+        });
+
+        setNodes(nodesWithFont);
 
         setNodes(fixedNodes);
         setEdges(e);
 
         if (layout.meta?.pxPerMeter) setPxPerMeter(layout.meta.pxPerMeter);
         if (layout.meta?.gridGap) setGridGap(layout.meta.gridGap);
+        if (layout.meta?.labelFontSize)
+          setLabelFontSize(Number(layout.meta.labelFontSize));
 
         if (detail.building?.building_id)
           setActiveBuilding(String(detail.building.building_id));
@@ -629,6 +710,36 @@ function FloorplanEdit() {
       canceled = true;
     };
   }, [planId, setNodes, setEdges]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setSizeDraft({ w: "", h: "" });
+      return;
+    }
+
+    const n = nodes.find((x) => x.id === selectedId);
+    if (!n) {
+      setSizeDraft({ w: "", h: "" });
+      return;
+    }
+
+    let wM = 0;
+    let hM = 0;
+
+    if (n.type === "building" && Array.isArray(n?.data?.points)) {
+      const box = bboxOf(n.data.points);
+      wM = box.w / pxPerMeter;
+      hM = box.h / pxPerMeter;
+    } else {
+      wM = Number(n?.data?.w || 0) / pxPerMeter;
+      hM = Number(n?.data?.h || 0) / pxPerMeter;
+    }
+
+    setSizeDraft({
+      w: Number.isFinite(wM) && wM > 0 ? String(Number(wM.toFixed(2))) : "",
+      h: Number.isFinite(hM) && hM > 0 ? String(Number(hM.toFixed(2))) : "",
+    });
+  }, [selectedId, nodes, pxPerMeter]);
 
   /* Sau khi layout load xong mới inject + fitView */
   useEffect(() => {
@@ -691,6 +802,7 @@ function FloorplanEdit() {
             size: null,
             color: "#1e40af",
             icon: "room",
+            fontSize: labelFontSize,
           },
         },
         corridor: {
@@ -704,6 +816,7 @@ function FloorplanEdit() {
             h: 2 * pxPerMeter,
             color: "#475569",
             icon: "corridor",
+            fontSize: labelFontSize,
           },
         },
         door: {
@@ -718,6 +831,7 @@ function FloorplanEdit() {
             bg: "#e0f2fe",
             color: "#0369a1",
             icon: "door",
+            fontSize: labelFontSize,
           },
         },
         stairs: {
@@ -732,6 +846,7 @@ function FloorplanEdit() {
             bg: "#fce7f3",
             color: "#be185d",
             icon: "stairs",
+            fontSize: labelFontSize,
           },
         },
         elevator: {
@@ -746,6 +861,7 @@ function FloorplanEdit() {
             bg: "#ede9fe",
             color: "#6d28d9",
             icon: "elevator",
+            fontSize: labelFontSize,
           },
         },
         exit: {
@@ -760,6 +876,7 @@ function FloorplanEdit() {
             bg: "#dcfce7",
             color: "#16a34a",
             icon: "exit",
+            fontSize: labelFontSize,
           },
         },
         ext: {
@@ -774,6 +891,7 @@ function FloorplanEdit() {
             bg: "#fee2e2",
             color: "#dc2626",
             icon: "extinguisher",
+            fontSize: labelFontSize,
           },
         },
         clinic: {
@@ -788,6 +906,7 @@ function FloorplanEdit() {
             bg: "#fef3c7",
             color: "#92400e",
             icon: "clinic",
+            fontSize: labelFontSize,
           },
         },
       };
@@ -805,7 +924,7 @@ function FloorplanEdit() {
         setTimeout(injectCallbacks, 0);
       }
     },
-    [pxPerMeter, rf, gridGap, injectCallbacks, setNodes]
+    [pxPerMeter, rf, gridGap, labelFontSize, injectCallbacks, setNodes],
   );
 
   const selectedNode = nodes.find((n) => n.id === selectedId);
@@ -814,17 +933,17 @@ function FloorplanEdit() {
     selectedNode.type === "block" &&
     selectedNode.data?.icon === "room"
   );
-  let lengthM = null;
-  let widthM = null;
+  // let lengthM = null;
+  // let widthM = null;
 
-  if (selectedNode?.type === "building") {
-    const box = bboxOf(selectedNode.data.points);
-    lengthM = box.w / pxPerMeter;
-    widthM = box.h / pxPerMeter;
-  } else if (selectedNode) {
-    lengthM = (selectedNode.data.w || 0) / pxPerMeter;
-    widthM = (selectedNode.data.h || 0) / pxPerMeter;
-  }
+  // if (selectedNode?.type === "building") {
+  //   const box = bboxOf(selectedNode.data.points);
+  //   lengthM = box.w / pxPerMeter;
+  //   widthM = box.h / pxPerMeter;
+  // } else if (selectedNode) {
+  //   lengthM = (selectedNode.data.w || 0) / pxPerMeter;
+  //   widthM = (selectedNode.data.h || 0) / pxPerMeter;
+  // }
 
   const updateSizeMeters = (field, m) => {
     if (!selectedNode) return;
@@ -838,8 +957,8 @@ function FloorplanEdit() {
         nds.map((n) =>
           n.id === "building"
             ? { ...n, data: { ...n.data, points: scaled } }
-            : n
-        )
+            : n,
+        ),
       );
     } else {
       const px = Math.max(0, Number(m || 0) * pxPerMeter);
@@ -865,14 +984,14 @@ function FloorplanEdit() {
               size, // VD: "12m2"
             },
           };
-        })
+        }),
       );
     }
   };
 
   const validateRoomNodesBeforeSave = (nodesList) => {
     const roomNodes = (nodesList || []).filter(
-      (n) => n?.type === "block" && n?.data?.icon === "room"
+      (n) => n?.type === "block" && n?.data?.icon === "room",
     );
 
     if (roomNodes.length === 0) return null;
@@ -958,6 +1077,7 @@ function FloorplanEdit() {
             pxPerMeter,
             gridGap,
             updatedAt: Date.now(),
+            labelFontSize,
           },
         },
       };
@@ -965,7 +1085,9 @@ function FloorplanEdit() {
       await updateFloorPlan(planId, payload);
 
       alert("Đã cập nhật sơ đồ tầng thành công!");
-      navigate(-1); // quay lại màn view
+      navigate(
+        `/floorplan/view?building=${activeBuilding}&floor=${activeFloor}`,
+      );
     } catch (err) {
       console.error(err);
       alert(err?.message || "Lỗi khi cập nhật sơ đồ tầng");
@@ -1048,7 +1170,11 @@ function FloorplanEdit() {
           }}
         >
           <button
-            onClick={() => navigate("/floorplan/view")}
+            onClick={() =>
+              navigate(
+                `/floorplan/view?building=${activeBuilding}&floor=${activeFloor}`,
+              )
+            }
             style={{
               padding: "8px 12px",
               borderRadius: 8,
@@ -1212,6 +1338,60 @@ function FloorplanEdit() {
                 }}
               />
             </div>
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Cỡ chữ (px)</div>
+
+              <input
+                value={labelFontSizeDraft}
+                inputMode="numeric"
+                onChange={(e) => {
+                  const raw = e.target.value;
+
+                  // cho phép rỗng để user xoá gõ lại, và chỉ nhận số
+                  if (raw === "") {
+                    setLabelFontSizeDraft("");
+                    return;
+                  }
+                  if (!/^\d+$/.test(raw)) return;
+
+                  setLabelFontSizeDraft(raw); // ✅ chỉ hiện đúng số bạn gõ, không nhảy
+                }}
+                onBlur={() => {
+                  const raw = (labelFontSizeDraft || "").trim();
+                  if (raw === "") {
+                    setLabelFontSizeDraft(String(labelFontSize));
+                    return;
+                  }
+
+                  let n = Number(raw);
+                  if (!Number.isFinite(n)) {
+                    setLabelFontSizeDraft(String(labelFontSize));
+                    return;
+                  }
+
+                  // clamp chỉ khi commit
+                  n = Math.max(8, Math.min(40, n));
+
+                  setLabelFontSize(n);
+                  setLabelFontSizeDraft(String(n));
+                  applyFontSizeToAll(n);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") {
+                    setLabelFontSizeDraft(String(labelFontSize));
+                    e.currentTarget.blur();
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  marginTop: 4,
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -1262,7 +1442,7 @@ function FloorplanEdit() {
                               label: v || "Phòng", // <-- quan trọng: có số thì hiện số, không có thì hiện "Phòng"
                             },
                           };
-                        })
+                        }),
                       );
                     }}
                     placeholder="VD: 101"
@@ -1274,10 +1454,24 @@ function FloorplanEdit() {
                 <input
                   style={inputStyle}
                   type="text"
-                  value={lengthM ?? ""}
-                  onChange={(e) =>
-                    updateSizeMeters("w", Number(e.target.value))
-                  }
+                  inputMode="decimal"
+                  value={sizeDraft.w}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    // chỉ cho nhập số (có thể có .), cho phép rỗng để xoá gõ lại
+                    if (!/^\d*([.]\d*)?$/.test(raw)) return;
+                    setSizeDraft((s) => ({ ...s, w: raw }));
+                  }}
+                  onBlur={() => {
+                    const raw = (sizeDraft.w || "").trim();
+                    if (raw === "" || raw === ".") return;
+                    const num = Number(raw);
+                    if (!Number.isFinite(num)) return;
+                    updateSizeMeters("w", num);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
                 />
               </div>
               <div>
@@ -1285,10 +1479,23 @@ function FloorplanEdit() {
                 <input
                   style={inputStyle}
                   type="text"
-                  value={widthM ?? ""}
-                  onChange={(e) =>
-                    updateSizeMeters("h", Number(e.target.value))
-                  }
+                  inputMode="decimal"
+                  value={sizeDraft.h}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (!/^\d*([.]\d*)?$/.test(raw)) return;
+                    setSizeDraft((s) => ({ ...s, h: raw }));
+                  }}
+                  onBlur={() => {
+                    const raw = (sizeDraft.h || "").trim();
+                    if (raw === "" || raw === ".") return;
+                    const num = Number(raw);
+                    if (!Number.isFinite(num)) return;
+                    updateSizeMeters("h", num); // ✅ rộng là "h"
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
                 />
               </div>
             </div>
@@ -1377,8 +1584,12 @@ function FloorplanEdit() {
           }
           fitView
           panOnDrag={[2]}
-          panOnScroll={false}
-          zoomOnScroll={false}
+          panOnScroll
+          minZoom={0.05}
+          maxZoom={8}
+          zoomOnPinch
+          zoomOnScroll
+          fitViewOptions={{ padding: 0.2 }}
           style={{ width: "100%", height: "100%" }}
           onSelectionChange={({ nodes: sel }) =>
             setSelectedId(sel?.[0]?.id || null)

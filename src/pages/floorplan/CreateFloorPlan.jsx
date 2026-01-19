@@ -18,6 +18,8 @@ import { listBuildings } from "../../services/api/building";
 import {
   createFloorPlan,
   getNextFloorNumber,
+  listFloorPlans,
+  getFloorPlanDetail,
 } from "../../services/api/floorplan";
 import { getUserRole } from "../../utils/auth";
 
@@ -110,7 +112,7 @@ const rectsOverlap = (a, b) =>
 
 const getBuildingPolygonFromNodes = (nodes) => {
   const building = (nodes || []).find(
-    (n) => n?.type === "building" && Array.isArray(n?.data?.points)
+    (n) => n?.type === "building" && Array.isArray(n?.data?.points),
   );
   if (!building) return null;
   const bx = Number(building?.position?.x || 0);
@@ -215,7 +217,7 @@ const Icon = ({ name, size = 16 }) => {
   }
 };
 
-function EditableLabel({ text, onCommit }) {
+function EditableLabel({ text, onCommit, fontSize = 13 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(text);
 
@@ -266,11 +268,11 @@ function EditableLabel({ text, onCommit }) {
             borderRadius: 6,
             background: "#fff",
             minWidth: 70,
-            fontSize: 13,
+            fontSize, // ✅ dùng fontSize
           }}
         />
       ) : (
-        <span style={{ userSelect: "none", fontSize: 13 }}>{text}</span>
+        <span style={{ userSelect: "none", fontSize }}>{text}</span> // ✅ dùng fontSize
       )}
     </div>
   );
@@ -303,16 +305,21 @@ function BuildingNode({ data }) {
 
   const moveVertex = (idx, dx, dy) => {
     const next = pts.map((p, i) =>
-      i === idx ? { x: snap(p.x + dx, grid), y: snap(p.y + dy, grid) } : p
+      i === idx ? { x: snap(p.x + dx, grid), y: snap(p.y + dy, grid) } : p,
     );
     onChangePoints?.(next);
   };
 
-  const { w, h } = bboxOf(pts);
+  const { minX, minY, w, h } = bboxOf(pts);
 
   return (
     <div style={{ width: w, height: h }}>
-      <svg width={w} height={h} style={{ display: "block" }}>
+      <svg
+        width={w}
+        height={h}
+        viewBox={`${minX} ${minY} ${w} ${h}`}
+        style={{ display: "block", overflow: "visible" }}
+      >
         <path
           d={pathFromPoints(pts)}
           fill={fill}
@@ -350,6 +357,7 @@ function BlockNode({ data }) {
     icon = "room",
     room_number,
     onChangeLabel,
+    fontSize = 13,
   } = data || {};
 
   const displayText =
@@ -389,10 +397,11 @@ function BlockNode({ data }) {
 
       {/* Room: không cho edit label bằng double click nữa, chỉ hiển thị số phòng */}
       {icon === "room" ? (
-        <span style={{ userSelect: "none", fontSize: 13 }}>{displayText}</span>
+        <span style={{ userSelect: "none", fontSize }}>{displayText}</span>
       ) : (
         <EditableLabel
           text={displayText}
+          fontSize={fontSize}
           onCommit={(t) => onChangeLabel?.(t)}
         />
       )}
@@ -409,6 +418,7 @@ function SmallNode({ data }) {
     color = "#92400e",
     icon = "door",
     onChangeLabel,
+    fontSize = 13,
   } = data || {};
   return (
     <div
@@ -428,7 +438,11 @@ function SmallNode({ data }) {
       }}
     >
       <Icon name={icon} size={16} />
-      <EditableLabel text={label} onCommit={(t) => onChangeLabel?.(t)} />
+      <EditableLabel
+        text={label}
+        fontSize={fontSize}
+        onCommit={(t) => onChangeLabel?.(t)}
+      />
     </div>
   );
 }
@@ -455,6 +469,9 @@ function FloorplanEditor() {
   const [gridGap, setGridGap] = useState(40);
   const [pxPerMeter, setPxPerMeter] = useState(80);
   const [selectedId, setSelectedId] = useState(null);
+  const [sizeDraft, setSizeDraft] = useState({ w: "", h: "" });
+  const [labelFontSize, setLabelFontSize] = useState(13);
+  const [labelFontSizeDraft, setLabelFontSizeDraft] = useState("13");
 
   const nodeTypes = useMemo(
     () => ({
@@ -463,15 +480,15 @@ function FloorplanEditor() {
       small: SmallNode,
       roomNode: BlockNode,
     }),
-    []
+    [],
   );
 
   const activeBuildingObj = useMemo(
     () =>
       buildings.find(
-        (b) => String(b.building_id) === String(activeBuilding || "")
+        (b) => String(b.building_id) === String(activeBuilding || ""),
       ),
-    [buildings, activeBuilding]
+    [buildings, activeBuilding],
   );
   // ===== FLOOR RULE =====
   const nextFloor = nextFloorFromDB ?? 1;
@@ -481,6 +498,7 @@ function FloorplanEditor() {
     if (!nextFloorFromDB || nextFloorFromDB <= 1) return [];
     return Array.from({ length: nextFloorFromDB - 1 }, (_, i) => String(i + 1));
   }, [nextFloorFromDB]);
+
   useEffect(() => {
     if (floorOptions.length > 0) {
       if (!floorOptions.includes(String(activeFloor))) {
@@ -488,6 +506,112 @@ function FloorplanEditor() {
       }
     }
   }, [floorOptions, activeFloor]);
+
+  useEffect(() => {
+    setLabelFontSizeDraft(String(labelFontSize || 0));
+  }, [labelFontSize]);
+
+  const applyFontSizeToAll = useCallback(
+    (nextFont) => {
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.type === "building") return n;
+          return {
+            ...n,
+            data: { ...(n.data || {}), fontSize: nextFont },
+          };
+        }),
+      );
+    },
+    [setNodes],
+  );
+
+  // ✅ Prefill: nếu đang tạo tầng > 1 thì tự copy shape (node building) từ tầng 1 của cùng building
+  useEffect(() => {
+    if (!activeBuilding) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const floorNum = Number(activeFloor || 0);
+
+        // Chỉ áp dụng cho tầng 2 trở lên
+        if (!Number.isFinite(floorNum) || floorNum <= 1) return;
+
+        // Nếu user đã có building node rồi thì không ghi đè
+        const hasBuildingAlready = nodes?.some((n) => n?.type === "building");
+        if (hasBuildingAlready) return;
+
+        const buildingIdInt = parseInt(activeBuilding, 10);
+        if (!buildingIdInt || Number.isNaN(buildingIdInt)) return;
+
+        // 1) Tìm floor plan của tầng 1
+        const { items } = await listFloorPlans({
+          building_id: buildingIdInt,
+          floor_number: 1,
+        });
+
+        if (cancelled) return;
+
+        const floor1Plan = Array.isArray(items) ? items[0] : null;
+        if (!floor1Plan?.plan_id) return;
+
+        // 2) Lấy detail để có layout nodes
+        const detail = await getFloorPlanDetail(floor1Plan.plan_id);
+        if (cancelled) return;
+
+        const rawNodes = Array.isArray(detail?.layout?.nodes)
+          ? detail.layout.nodes
+          : [];
+
+        // 3) Lấy node building (shape)
+        const floor1BuildingNode = rawNodes.find(
+          (n) => n?.type === "building" && Array.isArray(n?.data?.points),
+        );
+        if (!floor1BuildingNode) return;
+
+        // 4) Clone sang canvas create (chỉ building shape)
+        const clonedBuilding = {
+          ...floor1BuildingNode,
+          id: "building",
+          draggable: true,
+          dragHandle: ".building__drag",
+          selectable: true,
+          style: {
+            ...(floor1BuildingNode.style || {}),
+            zIndex: 0,
+          },
+          data: {
+            ...(floor1BuildingNode.data || {}),
+            grid: gridGap,
+          },
+        };
+
+        setNodes((curr) => {
+          if (curr?.some((n) => n?.type === "building")) return curr;
+          return [clonedBuilding, ...(curr || [])];
+        });
+
+        // edges để trống vẫn ok vì building shape không cần edges
+        // không setEdges([]) nếu bạn muốn giữ edges user tự tạo sau này
+        // setEdges([]);
+
+        // đảm bảo callbacks được gắn (giống cơ chế bạn đang dùng)
+        setTimeout(() => {
+          injectCallbacks();
+        }, 0);
+      } catch (err) {
+        // Fail thì thôi, không chặn create
+        console.error("Prefill floor-1 building shape error:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBuilding, activeFloor]);
 
   useEffect(() => {
     const role = getUserRole();
@@ -517,6 +641,87 @@ function FloorplanEditor() {
       cancelled = true;
     };
   }, [activeBuilding]);
+  // ✅ AUTO IMPORT: copy building shape của tầng 1 cho tầng mới (chỉ copy node "building")
+  useEffect(() => {
+    if (!activeBuilding) return;
+
+    // chỉ auto-import khi đang tạo tầng > 1
+    const next = Number(nextFloorFromDB ?? 1);
+    if (!Number.isFinite(next) || next <= 1) return;
+
+    // nếu user đã có building rồi thì không override nữa
+    const hasBuilding = nodes.some(
+      (n) => n?.type === "building" && n?.id === "building",
+    );
+    if (hasBuilding) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // 1) lấy danh sách floorplan của tầng 1 trong cùng building
+        const res = await listFloorPlans({
+          building_id: activeBuilding,
+          floor_number: 1,
+          page: 1,
+          limit: 50,
+        });
+
+        if (cancelled) return;
+
+        const items = res?.items || [];
+        if (items.length === 0) return;
+
+        // ưu tiên bản mới nhất (updated_at lớn nhất)
+        const latest = [...items].sort(
+          (a, b) =>
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        )[0];
+
+        if (!latest?.plan_id) return;
+
+        // 2) lấy detail để có layout.nodes
+        const detail = await getFloorPlanDetail(latest.plan_id);
+        if (cancelled) return;
+
+        const layoutNodes = detail?.layout?.nodes || [];
+        const buildingNode = layoutNodes.find(
+          (n) => n?.type === "building" && Array.isArray(n?.data?.points),
+        );
+
+        if (!buildingNode) return;
+
+        // 3) tạo building node mới cho canvas hiện tại
+        const importedBuilding = {
+          id: "building",
+          type: "building",
+          position: buildingNode.position || { x: 60, y: 40 },
+          draggable: true,
+          dragHandle: ".building__drag",
+          selectable: true,
+          style: { zIndex: 0 },
+          data: {
+            points: buildingNode.data.points, // ✅ cái quan trọng nhất: shape points
+            grid: gridGap,
+          },
+        };
+
+        // 4) set vào nodes (chỉ set building)
+        setNodes((prev) => [
+          importedBuilding,
+          ...prev.filter((n) => n.id !== "building"),
+        ]);
+        setSelectedId("building");
+      } catch (err) {
+        console.error("Auto-import building shape error:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // 👇 nodes trong deps để hasBuilding check đúng
+  }, [activeBuilding, nextFloorFromDB, nodes, gridGap, setNodes]);
 
   // load list building (CHỈ LOAD 1 LẦN)
   useEffect(() => {
@@ -579,8 +784,8 @@ function FloorplanEditor() {
                   curr.map((m) =>
                     m.id === n.id
                       ? { ...m, data: { ...m.data, points: nextPts } }
-                      : m
-                  )
+                      : m,
+                  ),
                 ),
             },
           };
@@ -617,14 +822,14 @@ function FloorplanEditor() {
                       ...m,
                       data: { ...m.data, label: txt },
                     };
-                  })
+                  }),
                 ),
             },
           };
         }
 
         return n;
-      })
+      }),
     );
   }, [gridGap, setNodes]);
 
@@ -639,6 +844,91 @@ function FloorplanEditor() {
     }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBuilding]);
+
+  // ✅ Auto import shape tòa nhà từ tầng 1 (cùng building) khi tạo tầng mới (>=2)
+  useEffect(() => {
+    if (!activeBuilding) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const floorNum = Number(activeFloor || 0);
+        if (!Number.isFinite(floorNum) || floorNum <= 1) return;
+
+        // nếu canvas đã có building rồi thì không import nữa
+        const hasBuilding = (nodes || []).some((n) => n?.type === "building");
+        if (hasBuilding) return;
+
+        const buildingIdInt = parseInt(activeBuilding, 10);
+        if (!buildingIdInt || Number.isNaN(buildingIdInt)) return;
+
+        // 1) lấy floorplan tầng 1
+        const { items } = await listFloorPlans({
+          building_id: buildingIdInt,
+          floor_number: 1,
+        });
+
+        if (cancelled) return;
+
+        const floor1Plan = Array.isArray(items) ? items[0] : null;
+        if (!floor1Plan?.plan_id) return;
+
+        // 2) lấy detail tầng 1 để có layout
+        const detailRes = await getFloorPlanDetail(floor1Plan.plan_id);
+        if (cancelled) return;
+
+        // unwrap có thể trả {data: {...}} hoặc trả thẳng {...}
+        const detail = detailRes?.data ?? detailRes;
+
+        // layout có thể là object hoặc string JSON
+        let layout = detail?.layout;
+        if (typeof layout === "string") {
+          try {
+            layout = JSON.parse(layout);
+          } catch {
+            layout = null;
+          }
+        }
+
+        const rawNodes = Array.isArray(layout?.nodes) ? layout.nodes : [];
+
+        // 3) tìm node building có points
+        const floor1BuildingNode = rawNodes.find(
+          (n) => n?.type === "building" && Array.isArray(n?.data?.points),
+        );
+        if (!floor1BuildingNode) return;
+
+        // 4) clone sang create canvas
+        const clonedBuilding = {
+          ...floor1BuildingNode,
+          id: "building",
+          draggable: true,
+          dragHandle: ".building__drag",
+          selectable: true,
+          style: { ...(floor1BuildingNode.style || {}), zIndex: 0 },
+          data: { ...(floor1BuildingNode.data || {}), grid: gridGap },
+        };
+
+        setNodes((curr) => {
+          if ((curr || []).some((n) => n?.type === "building")) return curr;
+          return [clonedBuilding, ...(curr || [])];
+        });
+
+        // gắn callbacks lại
+        setTimeout(() => {
+          injectCallbacks();
+        }, 0);
+      } catch (err) {
+        console.error("Auto import floor-1 building shape error:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBuilding, activeFloor, gridGap, injectCallbacks, nodes]);
 
   useEffect(() => {
     injectCallbacks();
@@ -699,6 +989,7 @@ function FloorplanEditor() {
             size: null,
             color: "#1e40af",
             icon: "room",
+            fontSize: labelFontSize,
           },
         },
         corridor: {
@@ -712,6 +1003,7 @@ function FloorplanEditor() {
             h: 2 * pxPerMeter,
             color: "#475569",
             icon: "corridor",
+            fontSize: labelFontSize,
           },
         },
         door: {
@@ -726,6 +1018,7 @@ function FloorplanEditor() {
             bg: "#e0f2fe",
             color: "#0369a1",
             icon: "door",
+            fontSize: labelFontSize,
           },
         },
         stairs: {
@@ -740,6 +1033,7 @@ function FloorplanEditor() {
             bg: "#fce7f3",
             color: "#be185d",
             icon: "stairs",
+            fontSize: labelFontSize,
           },
         },
         elevator: {
@@ -754,6 +1048,7 @@ function FloorplanEditor() {
             bg: "#ede9fe",
             color: "#6d28d9",
             icon: "elevator",
+            fontSize: labelFontSize,
           },
         },
         exit: {
@@ -768,6 +1063,7 @@ function FloorplanEditor() {
             bg: "#dcfce7",
             color: "#16a34a",
             icon: "exit",
+            fontSize: labelFontSize,
           },
         },
         ext: {
@@ -782,6 +1078,7 @@ function FloorplanEditor() {
             bg: "#fee2e2",
             color: "#dc2626",
             icon: "extinguisher",
+            fontSize: labelFontSize,
           },
         },
         clinic: {
@@ -796,6 +1093,7 @@ function FloorplanEditor() {
             bg: "#fef3c7",
             color: "#92400e",
             icon: "clinic",
+            fontSize: labelFontSize,
           },
         },
       };
@@ -813,7 +1111,7 @@ function FloorplanEditor() {
         setTimeout(injectCallbacks, 0);
       }
     },
-    [pxPerMeter, rf, gridGap, injectCallbacks, setNodes]
+    [pxPerMeter, rf, gridGap, injectCallbacks, setNodes, labelFontSize],
   );
 
   const selectedNode = nodes.find((n) => n.id === selectedId);
@@ -822,17 +1120,45 @@ function FloorplanEditor() {
     selectedNode.type === "block" &&
     selectedNode.data?.icon === "room"
   );
-  let lengthM = null;
-  let widthM = null;
 
-  if (selectedNode?.type === "building") {
-    const box = bboxOf(selectedNode.data.points);
-    lengthM = box.w / pxPerMeter;
-    widthM = box.h / pxPerMeter;
-  } else if (selectedNode) {
-    lengthM = (selectedNode.data.w || 0) / pxPerMeter;
-    widthM = (selectedNode.data.h || 0) / pxPerMeter;
-  }
+  useEffect(() => {
+    if (!selectedId) {
+      setSizeDraft({ w: "", h: "" });
+      return;
+    }
+
+    const n = nodes.find((x) => x.id === selectedId);
+    if (!n) {
+      setSizeDraft({ w: "", h: "" });
+      return;
+    }
+
+    let wM = 0;
+    let hM = 0;
+
+    if (n.type === "building" && Array.isArray(n?.data?.points)) {
+      const box = bboxOf(n.data.points);
+      wM = box.w / pxPerMeter;
+      hM = box.h / pxPerMeter;
+    } else {
+      wM = Number(n?.data?.w || 0) / pxPerMeter;
+      hM = Number(n?.data?.h || 0) / pxPerMeter;
+    }
+
+    setSizeDraft({
+      w: Number.isFinite(wM) && wM > 0 ? String(Number(wM.toFixed(2))) : "",
+      h: Number.isFinite(hM) && hM > 0 ? String(Number(hM.toFixed(2))) : "",
+    });
+  }, [selectedId, nodes, pxPerMeter]);
+
+  // if (selectedNode?.type === "building") {
+  //   const box = bboxOf(selectedNode.data.points);
+  //   lengthM = box.w / pxPerMeter;
+  //   widthM = box.h / pxPerMeter;
+  // } else if (selectedNode) {
+  //   lengthM = (selectedNode.data.w || 0) / pxPerMeter;
+  //   widthM = (selectedNode.data.h || 0) / pxPerMeter;
+  // }
 
   const updateSizeMeters = (field, m) => {
     if (!selectedNode) return;
@@ -846,8 +1172,8 @@ function FloorplanEditor() {
         nds.map((n) =>
           n.id === "building"
             ? { ...n, data: { ...n.data, points: scaled } }
-            : n
-        )
+            : n,
+        ),
       );
     } else {
       const px = Math.max(0, Number(m || 0) * pxPerMeter);
@@ -871,14 +1197,14 @@ function FloorplanEditor() {
           }
 
           return { ...n, data: nextData };
-        })
+        }),
       );
     }
   };
 
   const validateRoomNodesBeforeSave = (nodesList) => {
     const roomNodes = (nodesList || []).filter(
-      (n) => n?.type === "block" && n?.data?.icon === "room"
+      (n) => n?.type === "block" && n?.data?.icon === "room",
     );
 
     if (roomNodes.length === 0) return null;
@@ -984,13 +1310,13 @@ function FloorplanEditor() {
         layout: {
           nodes,
           edges,
-          meta: { pxPerMeter, gridGap, savedAt: Date.now() },
+          meta: { pxPerMeter, gridGap, savedAt: Date.now(), labelFontSize },
         },
       };
 
       await createFloorPlan(payload);
       alert("Đã lưu layout lên hệ thống!");
-      navigate("/floorplan/view");
+      navigate(`/floorplan/view?building=${buildingId}&floor=${floorNumber}`);
     } catch (err) {
       console.error(err);
 
@@ -1246,6 +1572,60 @@ function FloorplanEditor() {
                 }}
               />
             </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Cỡ chữ</div>
+              <input
+                value={labelFontSizeDraft}
+                inputMode="numeric"
+                onChange={(e) => {
+                  const raw = e.target.value;
+
+                  // cho phép rỗng để user xoá gõ lại, và chỉ nhận số
+                  if (raw === "") {
+                    setLabelFontSizeDraft("");
+                    return;
+                  }
+                  if (!/^\d+$/.test(raw)) return;
+
+                  setLabelFontSizeDraft(raw); // ✅ chỉ hiện đúng cái user gõ
+                }}
+                onBlur={() => {
+                  const raw = (labelFontSizeDraft || "").trim();
+                  if (raw === "") {
+                    // nếu bỏ trống thì revert về giá trị hiện tại
+                    setLabelFontSizeDraft(String(labelFontSize));
+                    return;
+                  }
+
+                  let n = Number(raw);
+                  if (!Number.isFinite(n)) {
+                    setLabelFontSizeDraft(String(labelFontSize));
+                    return;
+                  }
+
+                  // clamp chỉ khi commit
+                  n = Math.max(8, Math.min(40, n));
+
+                  setLabelFontSize(n);
+                  setLabelFontSizeDraft(String(n));
+                  applyFontSizeToAll(n);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") {
+                    setLabelFontSizeDraft(String(labelFontSize));
+                    e.currentTarget.blur();
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  marginTop: 4,
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -1277,7 +1657,7 @@ function FloorplanEditor() {
                     onChange={(e) => {
                       const onlyNumber = String(e.target.value || "").replace(
                         /\D/g,
-                        ""
+                        "",
                       );
                       setNodes((nds) =>
                         nds.map((n) =>
@@ -1290,8 +1670,8 @@ function FloorplanEditor() {
                                   label: "Phòng",
                                 },
                               }
-                            : n
-                        )
+                            : n,
+                        ),
                       );
                     }}
                     placeholder="Nhập số phòng..."
@@ -1303,10 +1683,24 @@ function FloorplanEditor() {
                 <input
                   style={inputStyle}
                   type="text"
-                  value={lengthM ?? ""}
-                  onChange={(e) =>
-                    updateSizeMeters("w", Number(e.target.value))
-                  }
+                  inputMode="decimal"
+                  value={sizeDraft.w}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    // chỉ cho nhập số (có thể có .), cho phép rỗng để xoá gõ lại
+                    if (!/^\d*([.]\d*)?$/.test(raw)) return;
+                    setSizeDraft((s) => ({ ...s, w: raw }));
+                  }}
+                  onBlur={() => {
+                    const raw = (sizeDraft.w || "").trim();
+                    if (raw === "" || raw === ".") return;
+                    const num = Number(raw);
+                    if (!Number.isFinite(num)) return;
+                    updateSizeMeters("w", num);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
                 />
               </div>
               <div>
@@ -1314,10 +1708,23 @@ function FloorplanEditor() {
                 <input
                   style={inputStyle}
                   type="text"
-                  value={widthM ?? ""}
-                  onChange={(e) =>
-                    updateSizeMeters("h", Number(e.target.value))
-                  }
+                  inputMode="decimal"
+                  value={sizeDraft.h}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (!/^\d*([.]\d*)?$/.test(raw)) return;
+                    setSizeDraft((s) => ({ ...s, h: raw }));
+                  }}
+                  onBlur={() => {
+                    const raw = (sizeDraft.h || "").trim();
+                    if (raw === "" || raw === ".") return;
+                    const num = Number(raw);
+                    if (!Number.isFinite(num)) return;
+                    updateSizeMeters("h", num); // ✅ rộng là "h"
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
                 />
               </div>
             </div>
@@ -1405,8 +1812,12 @@ function FloorplanEditor() {
           }
           fitView
           panOnDrag={[2]}
-          panOnScroll={false}
-          zoomOnScroll={false}
+          panOnScroll
+          minZoom={0.05}
+          maxZoom={8}
+          zoomOnPinch
+          zoomOnScroll
+          fitViewOptions={{ padding: 0.2 }}
           style={{ width: "100%", height: "100%" }}
           onSelectionChange={({ nodes: sel }) =>
             setSelectedId(sel?.[0]?.id || null)

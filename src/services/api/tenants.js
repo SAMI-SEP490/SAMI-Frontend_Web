@@ -107,16 +107,19 @@ export async function getTenantsByRoomId(roomId, params = {}) {
     throw error;
   }
 }
-export async function lookupTenant(identifier) {
+export async function lookupTenant(identifier, buildingId = null) { // [UPDATE] Thêm tham số buildingId
   try {
+    const params = { q: identifier };
+    if (buildingId) {
+      params.building_id = buildingId;
+    }
 
     const response = await http.get(`/tenant/lookup`, {
-      params: { q: identifier }
+      params: params
     });
 
     return un(response);
   } catch (error) {
-    // Log lỗi đúng ngữ cảnh
     console.error(
         `Lỗi khi tìm kiếm tenant với thông tin: "${identifier}"`,
         error

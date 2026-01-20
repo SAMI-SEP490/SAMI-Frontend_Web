@@ -35,7 +35,7 @@ function MaintenanceListPage() {
         ]);
         setMaintenanceRequests(maintenance);
         setUserData(users);
-      } catch (error) {
+      } catch {
         alert("❌ Lỗi khi tải dữ liệu!");
       }
     }
@@ -72,8 +72,8 @@ function MaintenanceListPage() {
       await approveMaintenanceRequest(confirmId);
       setMaintenanceRequests((prev) =>
         prev.map((r) =>
-          r.request_id === confirmId ? { ...r, status: "in_progress" } : r
-        )
+          r.request_id === confirmId ? { ...r, status: "in_progress" } : r,
+        ),
       );
     } finally {
       setLoadingIds((p) => p.filter((i) => i !== confirmId));
@@ -88,8 +88,8 @@ function MaintenanceListPage() {
       await completeMaintenanceRequest(id);
       setMaintenanceRequests((prev) =>
         prev.map((r) =>
-          r.request_id === id ? { ...r, status: "completed" } : r
-        )
+          r.request_id === id ? { ...r, status: "completed" } : r,
+        ),
       );
     } finally {
       setLoadingIds((p) => p.filter((i) => i !== id));
@@ -107,8 +107,8 @@ function MaintenanceListPage() {
       await rejectMaintenanceRequest(rejectId, rejectReason);
       setMaintenanceRequests((prev) =>
         prev.map((r) =>
-          r.request_id === rejectId ? { ...r, status: "rejected" } : r
-        )
+          r.request_id === rejectId ? { ...r, status: "rejected" } : r,
+        ),
       );
       setShowRejectModal(false);
     } finally {
@@ -127,6 +127,10 @@ function MaintenanceListPage() {
       (req.title.toLowerCase().includes(term) || name.includes(term))
     );
   });
+
+  const hasActionColumn = filteredRequests.some(
+    (req) => req.status === "pending" || req.status === "in_progress",
+  );
 
   return (
     <div className="container">
@@ -167,14 +171,14 @@ function MaintenanceListPage() {
               <th>Mô tả</th>
               <th>Trạng thái</th>
               <th>Ghi chú</th>
-              <th>Hành động</th>
+              {hasActionColumn && <th>Hành động</th>}
             </tr>
           </thead>
 
           <tbody>
             {filteredRequests.length === 0 && (
               <tr>
-                <td colSpan={8} className="no-data">
+                <td colSpan={hasActionColumn ? 8 : 7} className="no-data">
                   Không có yêu cầu phù hợp
                 </td>
               </tr>
@@ -192,56 +196,57 @@ function MaintenanceListPage() {
                   <td>{req.description || "-"}</td>
                   <td>{renderStatus(req.status)}</td>
                   <td>{req.note || "-"}</td>
+                  {hasActionColumn && (
+                    <td className="action-buttons">
+                      {req.status === "pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="btn publish"
+                            disabled={loading}
+                            onClick={() => {
+                              setConfirmId(req.request_id);
+                              setShowConfirmModal(true);
+                            }}
+                          >
+                            {loading ? (
+                              <Spinner size="sm" animation="border" />
+                            ) : (
+                              "Chấp nhận"
+                            )}
+                          </Button>
 
-                  <td className="action-buttons">
-                    {req.status === "pending" && (
-                      <>
+                          <Button
+                            size="sm"
+                            className="btn delete"
+                            disabled={loading}
+                            onClick={() => {
+                              setRejectId(req.request_id);
+                              setRejectReason("");
+                              setShowRejectModal(true);
+                            }}
+                          >
+                            Từ chối
+                          </Button>
+                        </>
+                      )}
+
+                      {req.status === "in_progress" && (
                         <Button
                           size="sm"
-                          className="btn publish"
+                          className="btn edit"
                           disabled={loading}
-                          onClick={() => {
-                            setConfirmId(req.request_id);
-                            setShowConfirmModal(true);
-                          }}
+                          onClick={() => handleResolve(req.request_id)}
                         >
                           {loading ? (
                             <Spinner size="sm" animation="border" />
                           ) : (
-                            "Chấp nhận"
+                            "Đã hoàn thành"
                           )}
                         </Button>
-
-                        <Button
-                          size="sm"
-                          className="btn delete"
-                          disabled={loading}
-                          onClick={() => {
-                            setRejectId(req.request_id);
-                            setRejectReason("");
-                            setShowRejectModal(true);
-                          }}
-                        >
-                          Từ chối
-                        </Button>
-                      </>
-                    )}
-
-                    {req.status === "in_progress" && (
-                      <Button
-                        size="sm"
-                        className="btn edit"
-                        disabled={loading}
-                        onClick={() => handleResolve(req.request_id)}
-                      >
-                        {loading ? (
-                          <Spinner size="sm" animation="border" />
-                        ) : (
-                          "Đã hoàn thành"
-                        )}
-                      </Button>
-                    )}
-                  </td>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}

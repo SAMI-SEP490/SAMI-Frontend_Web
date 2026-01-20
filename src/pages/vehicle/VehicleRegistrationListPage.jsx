@@ -269,7 +269,9 @@ text-align: center;
 td:nth-child(5),
 td:nth-child(6),
 th:nth-child(5),
-th:nth-child(6) {
+th:nth-child(6),
+td:nth-child(7),
+th:nth-child(7),{
   white-space: nowrap;
 }
 .center {
@@ -313,7 +315,7 @@ tr:hover {
    ACTION COLUMN
 ================================ */
 .action-col {
-  width: 220px;
+  width: 100px;
   text-align: center;
   white-space: nowrap;
 }
@@ -485,6 +487,7 @@ tbody tr {
                   <th>Loại xe</th>
                   <th>Ngày bắt đầu</th>
                   <th>Ngày kết thúc</th>
+                  <th >Ghi chú</th>
                   <th className="center">Trạng thái</th>
                   <th className="center action-col">Hành động</th>
                 </tr>
@@ -498,14 +501,14 @@ tbody tr {
                     <td>{VEHICLE_TYPE_LABEL[r.vehicle_type] || "—"}</td>
 
                     <td>{formatDate(r.start_date)}</td>
-<td>{formatDate(r.end_date)}</td>
-
-<td className="center">
-  <span className={`status ${r.status}`}>
-    {STATUS_LABEL[r.status] || r.status}
-  </span>
-</td>
-
+                    <td>{formatDate(r.end_date)}</td>
+                    <td>{r.note}</td>
+                    <td className="center">
+                      <span className={`status ${r.status}`}>
+                        {STATUS_LABEL[r.status] || r.status}
+                      </span>
+                    </td>
+                    
                     <td className="center action-col">
                       <div className="action-buttons">
                         {r.status === "requested" && (

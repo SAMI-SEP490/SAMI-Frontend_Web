@@ -300,7 +300,7 @@ export default function BillDetailPage() {
               <tr className="table-success">
                 <td colSpan={3} className="text-end fw-bold text-success">Đã thanh toán:</td>
                 <td className="text-end fw-bold text-success">
-                  - {Number(bill.paid_amount).toLocaleString()} đ
+                  {Number(bill.paid_amount).toLocaleString()} đ
                 </td>
               </tr>
             )}

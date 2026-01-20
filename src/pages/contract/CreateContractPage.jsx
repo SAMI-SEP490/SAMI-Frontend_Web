@@ -56,7 +56,7 @@ function CreateContractPage() {
         end_date: "",
         rent_amount: "",
         deposit_amount: "",
-        penalty_rate: 0.1,
+        penalty_rate: 0.05,
         payment_cycle_months: 1,
         status: "pending",
         note: "",
@@ -101,9 +101,9 @@ function CreateContractPage() {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            // Tạo mốc 6 tháng trước
+            // Tạo mốc 14 ngày trước
             const minDate = new Date();
-            minDate.setMonth(today.getMonth() - 6);
+            minDate.setDate(today.getDate() - 14);
             minDate.setHours(0, 0, 0, 0);
 
             const maxFutureDate = new Date();
@@ -111,7 +111,7 @@ function CreateContractPage() {
             maxFutureDate.setHours(0, 0, 0, 0);
 
             if (startDate < minDate) {
-                newErrors.start_date = "Ngày bắt đầu không được quá 6 tháng trong quá khứ.";
+                newErrors.start_date = "Ngày bắt đầu không được cũ hơn 14 ngày so với hiện tại.";
             } else if (startDate > maxFutureDate) {
                 newErrors.start_date = "Ngày bắt đầu không được vượt quá 1 tháng kể từ hôm nay.";
             }
@@ -136,12 +136,17 @@ function CreateContractPage() {
             }
         }
 
-        // 6. Validate Penalty
-        const rate = parseFloat(form.penalty_rate);
-        if (isNaN(rate) || rate < 0.01 || rate > 1) {
-            newErrors.penalty_rate = "Tỷ lệ phạt phải từ 0.01% đến 1%.";
+        const duration = parseInt(form.duration_months);
+        const cycle = parseInt(form.payment_cycle_months);
+        if (cycle > duration) {
+            newErrors.payment_cycle_months = `Chu kỳ thanh toán (${cycle} tháng) không được lớn hơn thời hạn hợp đồng (${duration} tháng).`;
         }
 
+        // [UPDATE 4] Validate Penalty (Max 0.055%)
+        const rate = parseFloat(form.penalty_rate);
+        if (isNaN(rate) || rate < 0 || rate > 0.055) {
+            newErrors.penalty_rate = "Tỷ lệ phạt không được quá 0.055%/ngày (theo quy định lãi suất).";
+        }
         return newErrors;
     };
     // --- EFFECT: Calculate End Date automatically ---
@@ -674,13 +679,19 @@ function CreateContractPage() {
                         <Row className="mb-4">
                             <Col md={6}>
                                 <label className="form-label">Chu kỳ thanh toán (Tháng) <span className="required">*</span></label>
-                                <select name="payment_cycle_months" className="form-select" value={form.payment_cycle_months} onChange={handleChange}>
+                                <select
+                                    name="payment_cycle_months"
+                                    // [SỬA LẠI DÒNG NÀY] Thêm điều kiện check lỗi để hiện class is-invalid
+                                    className={`form-select ${errors.payment_cycle_months ? 'is-invalid' : ''}`}
+                                    value={form.payment_cycle_months}
+                                    onChange={handleChange}
+                                >
                                     <option value="1">1 tháng / lần</option>
                                     <option value="2">2 tháng / lần</option>
                                     <option value="3">3 tháng / lần</option>
                                     <option value="6">6 tháng / lần</option>
-                                    <option value="12">1 năm / lần</option>
                                 </select>
+                                {errors.payment_cycle_months && <div className="invalid-feedback">{errors.payment_cycle_months}</div>}
                             </Col>
                         </Row>
 
@@ -738,7 +749,8 @@ function CreateContractPage() {
                                         className={`form-control ${errors.penalty_rate ? 'is-invalid' : ''}`}
                                         value={form.penalty_rate}
                                         onChange={handleChange}
-                                        step="0.01"
+                                        step="0.001"
+                                        max="0.055"
                                     />
                                     <span className="input-group-text">% / ngày</span>
                                     {errors.penalty_rate && <div className="invalid-feedback">{errors.penalty_rate}</div>}

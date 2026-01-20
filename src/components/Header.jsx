@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { colors } from "../constants/colors";
 import { useNavigate } from "react-router-dom";
 import { getProfile, logout as apiLogout } from "../services/api/auth";
+import { listAssignedBuildings } from "../services/api/building"; // [NEW] Import API lấy tòa nhà
 import {
   FiUser,
   FiLogOut,
@@ -9,7 +10,7 @@ import {
   FiChevronDown,
   FiAlertCircle,
 } from "react-icons/fi";
-import { useClosingAlert } from "../hooks/useClosingAlert"; // Import Hook
+import { useClosingAlert } from "../hooks/useClosingAlert";
 import { ROUTES } from "../constants/routes";
 
 // eslint-disable-next-line no-unused-vars
@@ -22,12 +23,14 @@ export default function Header({ onToggleSidebar }) {
     }
   });
   const [showDropdown, setShowDropdown] = useState(false);
+  const [managedBuilding, setManagedBuilding] = useState(""); // [NEW] State lưu tên tòa nhà
 
   const navigate = useNavigate();
 
   // Sử dụng Hook để check cảnh báo
   const { alertCount } = useClosingAlert(user);
 
+  // 1. Fetch Profile
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -36,7 +39,6 @@ export default function Header({ onToggleSidebar }) {
         const u = data?.data || data;
         if (alive) setUser(u);
         localStorage.setItem("sami:user", JSON.stringify(u));
-        // eslint-disable-next-line no-empty
       } catch {}
     })();
     return () => {
@@ -44,23 +46,39 @@ export default function Header({ onToggleSidebar }) {
     };
   }, []);
 
+  // 2. [NEW] Fetch Assigned Building if Manager
+  useEffect(() => {
+    if (user?.role === "MANAGER") {
+      listAssignedBuildings()
+        .then((res) => {
+          // API trả về mảng các tòa nhà, ta lấy tên tòa đầu tiên hoặc join lại
+          const buildings = Array.isArray(res) ? res : [];
+          if (buildings.length > 0) {
+            // Nếu quản lý nhiều tòa thì nối tên bằng dấu phẩy
+            const names = buildings.map((b) => b.name).join(", ");
+            setManagedBuilding(names);
+          }
+        })
+        .catch((err) => console.error("Failed to load assigned building:", err));
+    }
+  }, [user]);
+
   const displayName =
     user?.full_name ||
     user?.name ||
     user?.username ||
     user?.email ||
     "Người dùng";
-  const { avatar_url, full_name } = user;
+  const { avatar_url, full_name } = user || {}; // fix crash if user null
   const avatarSrc =
     avatar_url ||
     `https://ui-avatars.com/api/?background=0D8ABC&color=fff&size=256&name=${encodeURIComponent(
-      full_name || "User",
+      full_name || "User"
     )}`;
 
   const handleLogout = async () => {
     try {
       await apiLogout();
-      // eslint-disable-next-line no-empty
     } catch {
     } finally {
       [
@@ -91,13 +109,13 @@ export default function Header({ onToggleSidebar }) {
         backdropFilter: "blur(10px)",
       }}
     >
-      {/* LEFT – Toggle sidebar + Logo (Giữ nguyên) */}
+      {/* LEFT – Toggle sidebar + Logo + Welcome Text */}
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
         <button
           onClick={onToggleSidebar}
           className="header-toggle-btn"
           style={{
-            /* style cũ */ background: "rgba(255,255,255,0.1)",
+            background: "rgba(255,255,255,0.1)",
             border: "1px solid rgba(255,255,255,0.2)",
             borderRadius: "8px",
             color: "#fff",
@@ -112,6 +130,7 @@ export default function Header({ onToggleSidebar }) {
         >
           <FiMenu size={20} />
         </button>
+
         <div
           onClick={() => navigate("/")}
           style={{
@@ -131,6 +150,30 @@ export default function Header({ onToggleSidebar }) {
             }}
           />
         </div>
+
+        {/* [NEW] Lời chào mừng */}
+        {user && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              marginLeft: "8px",
+              borderLeft: "1px solid rgba(255,255,255,0.3)",
+              paddingLeft: "20px",
+              height: "40px",
+            }}
+          >
+            <span style={{ fontSize: "15px", fontWeight: "600", lineHeight: "1.2" }}>
+              Chào mừng trở lại, {user.full_name}
+            </span>
+            {user.role === "MANAGER" && managedBuilding && (
+              <span style={{ fontSize: "12px", opacity: 0.9, fontWeight: "400" }}>
+                Bạn hiện đang quản lí tòa {managedBuilding}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* RIGHT – User section */}
@@ -150,8 +193,8 @@ export default function Header({ onToggleSidebar }) {
               display: "flex",
               alignItems: "center",
               gap: 6,
-              background: "#FEE2E2", // Nền đỏ nhạt
-              color: "#DC2626", // Chữ đỏ đậm
+              background: "#FEE2E2",
+              color: "#DC2626",
               padding: "6px 12px",
               borderRadius: "20px",
               fontSize: "13px",
@@ -159,7 +202,7 @@ export default function Header({ onToggleSidebar }) {
               cursor: "pointer",
               boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
               transition: "transform 0.2s",
-              animation: "pulse 2s infinite", // Hiệu ứng nhịp đập nhẹ (tùy chọn)
+              animation: "pulse 2s infinite",
             }}
             title="Có tòa nhà cần chốt sổ điện nước!"
           >
@@ -168,7 +211,7 @@ export default function Header({ onToggleSidebar }) {
           </div>
         )}
 
-        {/* User Dropdown Trigger (Giữ nguyên logic cũ nhưng bọc lại) */}
+        {/* User Dropdown Trigger */}
         <div style={{ position: "relative" }}>
           <div
             onClick={() => setShowDropdown(!showDropdown)}
@@ -216,10 +259,9 @@ export default function Header({ onToggleSidebar }) {
             />
           </div>
 
-          {/* Dropdown Menu (Giữ nguyên) */}
+          {/* Dropdown Menu */}
           {showDropdown && (
             <>
-              {/* Overlay & Dropdown Content... (Copy y nguyên code cũ vào đây) */}
               <div
                 style={{
                   position: "absolute",

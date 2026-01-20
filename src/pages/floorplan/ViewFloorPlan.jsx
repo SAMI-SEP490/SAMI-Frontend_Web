@@ -8,7 +8,10 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import { listBuildings } from "../../services/api/building";
+import {
+  listBuildings,
+  listAssignedBuildings,
+} from "../../services/api/building";
 import {
   listFloorPlans,
   getFloorPlanDetail,
@@ -30,9 +33,6 @@ const bboxOf = (pts = []) => {
   const maxY = Math.max(...ys);
   return { minX, minY, w: maxX - minX, h: maxY - minY };
 };
-const role = getUserRole();
-const isOwner = role === "OWNER";
-console.log("isOwner", isOwner, role);
 
 function BuildingNodeView({ data }) {
   const {
@@ -124,6 +124,29 @@ function SmallNodeView({ data }) {
 function ViewerInner() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // ===== Role reactive (fix nút nhảy loạn khi đổi account) =====
+  const [role, setRole] = useState(() => getUserRole());
+  const isOwner = role === "OWNER";
+
+  useEffect(() => {
+    const syncRole = () => setRole(getUserRole());
+
+    // 1) Khi app tự bắn event (logout/login)
+    window.addEventListener("sami:auth", syncRole);
+
+    // 2) Khi localStorage thay đổi từ tab khác
+    window.addEventListener("storage", syncRole);
+
+    // 3) Sync 1 lần khi mount
+    syncRole();
+
+    return () => {
+      window.removeEventListener("sami:auth", syncRole);
+      window.removeEventListener("storage", syncRole);
+    };
+  }, []);
+
   const qsBuilding = searchParams.get("building");
   const qsFloor = searchParams.get("floor");
 
@@ -133,6 +156,8 @@ function ViewerInner() {
   const [buildingError, setBuildingError] = useState("");
 
   const [activeBuilding, setActiveBuilding] = useState("");
+  const [lockedBuildingId, setLockedBuildingId] = useState("");
+  const isManager = role === "MANAGER";
 
   // danh sách plan mới nhất cho từng tầng của tòa đang chọn
   const [plansByFloor, setPlansByFloor] = useState({}); // { '1': {plan_id,...}, ... }
@@ -206,19 +231,55 @@ function ViewerInner() {
     let canceled = false;
 
     async function fetchBuildings() {
+      setBuildings([]);
+      setActiveBuilding("");
+      setLockedBuildingId("");
+
       try {
         setLoadingBuildings(true);
         setBuildingError("");
 
-        const data = await listBuildings();
+        // ✅ MANAGER lấy tòa được assign, OWNER lấy all
+        const api = role === "MANAGER" ? listAssignedBuildings : listBuildings;
+        const data = await api();
         if (canceled) return;
 
-        const arr = Array.isArray(data) ? data : [];
+        const raw = Array.isArray(data) ? data : [];
+
+        // ✅ normalize giống các page khác (phòng/hợp đồng)
+        const arr = raw
+          .map((b) => {
+            // CASE 1: listBuildings trả { building_id, name }
+            if (b?.building_id)
+              return { building_id: b.building_id, name: b.name };
+
+            // CASE 2: listAssignedBuildings có thể trả { id, name }
+            if (b?.id && b?.name) return { building_id: b.id, name: b.name };
+
+            // CASE 3: listAssignedBuildings có thể trả { building: {...} }
+            if (b?.building?.building_id)
+              return {
+                building_id: b.building.building_id,
+                name: b.building.name,
+              };
+
+            return null;
+          })
+          .filter(Boolean);
+
         setBuildings(arr);
 
         if (arr.length > 0) {
           const firstId = String(arr[0].building_id);
 
+          // ✅ MANAGER: khóa theo building được assign (arr giờ chỉ có building manager quản lý)
+          if (role === "MANAGER") {
+            setLockedBuildingId(firstId);
+            setActiveBuilding(firstId);
+            return;
+          }
+
+          // ✅ OWNER: giữ logic cũ (ưu tiên query nếu hợp lệ)
           const desiredBuilding =
             (qsBuilding &&
             arr.some((b) => String(b.building_id) === String(qsBuilding))
@@ -241,7 +302,7 @@ function ViewerInner() {
     return () => {
       canceled = true;
     };
-  }, []);
+  }, [role]);
 
   // eslint-disable-next-line no-unused-vars
   const activeBuildingObj = useMemo(
@@ -260,6 +321,16 @@ function ViewerInner() {
 
     setSearchParams(next, { replace: true });
   }, [activeBuilding, activeFloor, setSearchParams]);
+
+  useEffect(() => {
+    if (!isManager) return;
+    if (!lockedBuildingId) return;
+
+    // nếu vì lý do nào đó activeBuilding bị đổi -> ép lại
+    if (String(activeBuilding) !== String(lockedBuildingId)) {
+      setActiveBuilding(String(lockedBuildingId));
+    }
+  }, [isManager, lockedBuildingId, activeBuilding]);
 
   // ===================== 2. Lấy danh sách floor plan theo tòa =====================
   useEffect(() => {
@@ -579,13 +650,19 @@ function ViewerInner() {
               <label style={{ fontWeight: 600 }}>Tòa nhà</label>
               <select
                 value={activeBuilding}
-                onChange={(e) => setActiveBuilding(e.target.value)}
+                disabled={isManager}
+                onChange={(e) => {
+                  if (isManager) return;
+                  setActiveBuilding(e.target.value);
+                }}
                 style={{
                   width: "100%",
                   border: "1px solid #cbd5e1",
                   borderRadius: 8,
                   padding: "8px 10px",
                   marginTop: 4,
+                  background: isManager ? "#f1f5f9" : "#fff",
+                  cursor: isManager ? "not-allowed" : "pointer",
                 }}
               >
                 {loadingBuildings && <option value="">Đang tải...</option>}

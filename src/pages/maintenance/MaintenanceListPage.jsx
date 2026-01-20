@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Table, Form, Button, Modal, Spinner } from "react-bootstrap";
 import {
   listMaintenance,
@@ -25,11 +25,9 @@ function MaintenanceListPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
 
-  /* =========================
-     LOAD DATA
-  ========================= */
+  // ===== LOAD DATA =====
   useEffect(() => {
-    const fetchData = async () => {
+    async function fetchData() {
       try {
         const [maintenance, users] = await Promise.all([
           listMaintenance(),
@@ -37,25 +35,17 @@ function MaintenanceListPage() {
         ]);
         setMaintenanceRequests(maintenance);
         setUserData(users);
-      } catch (error) {
+      } catch {
         alert("❌ Lỗi khi tải dữ liệu!");
       }
-    };
-
+    }
     fetchData();
   }, []);
 
-  /* =========================
-     UTILS
-  ========================= */
+  // ===== UTILS =====
   const getUserFullName = (id) => {
     const user = userData.find((u) => u.user_id === id);
     return user ? user.full_name : "Không rõ";
-  };
-
-  const formatDate = (date) => {
-    if (!date) return "—";
-    return new Date(date).toLocaleDateString("vi-VN");
   };
 
   const renderStatus = (status) => {
@@ -75,38 +65,34 @@ function MaintenanceListPage() {
     }
   };
 
-  /* =========================
-     HANDLERS
-  ========================= */
+  // ===== HANDLERS =====
   const handleApprove = async () => {
     try {
-      setLoadingIds((prev) => [...prev, confirmId]);
+      setLoadingIds((p) => [...p, confirmId]);
       await approveMaintenanceRequest(confirmId);
-
       setMaintenanceRequests((prev) =>
         prev.map((r) =>
           r.request_id === confirmId ? { ...r, status: "in_progress" } : r,
         ),
       );
     } finally {
-      setLoadingIds((prev) => prev.filter((id) => id !== confirmId));
+      setLoadingIds((p) => p.filter((i) => i !== confirmId));
       setShowConfirmModal(false);
     }
   };
 
   const handleResolve = async (id) => {
     try {
-      setLoadingIds((prev) => [...prev, id]);
+      setLoadingIds((p) => [...p, id]);
       await resolveMaintenanceRequest(id);
       await completeMaintenanceRequest(id);
-
       setMaintenanceRequests((prev) =>
         prev.map((r) =>
           r.request_id === id ? { ...r, status: "completed" } : r,
         ),
       );
     } finally {
-      setLoadingIds((prev) => prev.filter((i) => i !== id));
+      setLoadingIds((p) => p.filter((i) => i !== id));
     }
   };
 
@@ -117,9 +103,8 @@ function MaintenanceListPage() {
     }
 
     try {
-      setLoadingIds((prev) => [...prev, rejectId]);
+      setLoadingIds((p) => [...p, rejectId]);
       await rejectMaintenanceRequest(rejectId, rejectReason);
-
       setMaintenanceRequests((prev) =>
         prev.map((r) =>
           r.request_id === rejectId ? { ...r, status: "rejected" } : r,
@@ -127,13 +112,11 @@ function MaintenanceListPage() {
       );
       setShowRejectModal(false);
     } finally {
-      setLoadingIds((prev) => prev.filter((i) => i !== rejectId));
+      setLoadingIds((p) => p.filter((i) => i !== rejectId));
     }
   };
 
-  /* =========================
-     FILTER
-  ========================= */
+  // ===== FILTER =====
   const filteredRequests = maintenanceRequests.filter((req) => {
     const matchesStatus = statusFilter ? req.status === statusFilter : true;
     const term = searchTerm.toLowerCase();
@@ -144,6 +127,10 @@ function MaintenanceListPage() {
       (req.title.toLowerCase().includes(term) || name.includes(term))
     );
   });
+
+  const hasActionColumn = filteredRequests.some(
+    (req) => req.status === "pending" || req.status === "in_progress",
+  );
 
   return (
     <div className="container">
@@ -166,6 +153,7 @@ function MaintenanceListPage() {
           <option value="">Tất cả trạng thái</option>
           <option value="pending">Chờ xử lý</option>
           <option value="in_progress">Đang xử lý</option>
+          <option value="resolved">Đã giải quyết</option>
           <option value="completed">Đã hoàn thành</option>
           <option value="rejected">Từ chối</option>
         </select>
@@ -180,18 +168,17 @@ function MaintenanceListPage() {
               <th>Tiêu đề</th>
               <th>Người gửi</th>
               <th>Phòng</th>
-              <th>Ngày tạo</th>
               <th>Mô tả</th>
               <th>Trạng thái</th>
               <th>Ghi chú</th>
-              <th>Hành động</th>
+              {hasActionColumn && <th>Hành động</th>}
             </tr>
           </thead>
 
           <tbody>
             {filteredRequests.length === 0 && (
               <tr>
-                <td colSpan={9} className="no-data">
+                <td colSpan={hasActionColumn ? 8 : 7} className="no-data">
                   Không có yêu cầu phù hợp
                 </td>
               </tr>
@@ -205,68 +192,62 @@ function MaintenanceListPage() {
                   <td>{index + 1}</td>
                   <td>{req.title}</td>
                   <td>{getUserFullName(req.tenant_user_id)}</td>
-
-                  {/* PHÒNG */}
-                  <td>{req.room?.room_number || "—"}</td>
-
-                  {/* NGÀY TẠO */}
-                  <td>{formatDate(req.created_at)}</td>
-
+                  <td>{req.room_id}</td>
                   <td>{req.description || "-"}</td>
-                  <td style={{ textAlign: "center" }}>
-                    {renderStatus(req.status)}
-                  </td>
+                  <td>{renderStatus(req.status)}</td>
                   <td>{req.note || "-"}</td>
 
-                  <td className="action-buttons">
-                    {req.status === "pending" && (
-                      <>
+                  {hasActionColumn && (
+                    <td className="action-buttons">
+                      {req.status === "pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="btn publish"
+                            disabled={loading}
+                            onClick={() => {
+                              setConfirmId(req.request_id);
+                              setShowConfirmModal(true);
+                            }}
+                          >
+                            {loading ? (
+                              <Spinner size="sm" animation="border" />
+                            ) : (
+                              "Chấp nhận"
+                            )}
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            className="btn delete"
+                            disabled={loading}
+                            onClick={() => {
+                              setRejectId(req.request_id);
+                              setRejectReason("");
+                              setShowRejectModal(true);
+                            }}
+                          >
+                            Từ chối
+                          </Button>
+                        </>
+                      )}
+
+                      {req.status === "in_progress" && (
                         <Button
                           size="sm"
-                          className="btn publish"
+                          className="btn edit"
                           disabled={loading}
-                          onClick={() => {
-                            setConfirmId(req.request_id);
-                            setShowConfirmModal(true);
-                          }}
+                          onClick={() => handleResolve(req.request_id)}
                         >
                           {loading ? (
                             <Spinner size="sm" animation="border" />
                           ) : (
-                            "Chấp nhận"
+                            "Đã hoàn thành"
                           )}
                         </Button>
-
-                        <Button
-                          size="sm"
-                          className="btn delete"
-                          disabled={loading}
-                          onClick={() => {
-                            setRejectId(req.request_id);
-                            setRejectReason("");
-                            setShowRejectModal(true);
-                          }}
-                        >
-                          Từ chối
-                        </Button>
-                      </>
-                    )}
-
-                    {req.status === "in_progress" && (
-                      <Button
-                        size="sm"
-                        className="btn edit"
-                        disabled={loading}
-                        onClick={() => handleResolve(req.request_id)}
-                      >
-                        {loading ? (
-                          <Spinner size="sm" animation="border" />
-                        ) : (
-                          "Đã hoàn thành"
-                        )}
-                      </Button>
-                    )}
-                  </td>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}

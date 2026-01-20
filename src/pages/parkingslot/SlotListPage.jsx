@@ -14,7 +14,7 @@ export default function SlotListPage() {
 
   /* ================= AUTH ================= */
   const [role, setRole] = useState("");
-
+  const [userBuildingId, setUserBuildingId] = useState(null);
 
   /* ================= DATA ================= */
   const [slots, setSlots] = useState([]);
@@ -29,64 +29,55 @@ const [currentBuilding, setCurrentBuilding] = useState(null);
 
   /* ================= GET ROLE ================= */
   useEffect(() => {
-  try {
     const token = getAccessToken();
     if (!token) return;
 
-    const payload = token.split(".")[1];
-    if (!payload) return;
-
-    const decoded = JSON.parse(atob(payload));
+    const decoded = JSON.parse(atob(token.split(".")[1]));
     setRole(decoded.role?.toUpperCase());
-  } catch (err) {
-    console.error("Invalid token", err);
-  }
-}, []);
+    setUserBuildingId(decoded.building_id || decoded.buildingId || null);
+  }, []);
 
   /* ================= FETCH DATA ================= */
-async function fetchData() {
+  async function fetchData() {
   try {
     setLoading(true);
 
     let params = {};
+    if (role === "MANAGER" && userBuildingId) {
+      params.building_id = userBuildingId;
+    }
 
     if (role === "OWNER" && ownerBuildingId) {
-  params.building_id = Number(ownerBuildingId);
-}
-
-    if (role === "MANAGER" && currentBuilding) {
-      params.building_id = currentBuilding.building_id;
+      params.building_id = ownerBuildingId;
     }
 
     const sRes = await listParkingSlots(params);
     setSlots(sRes?.slots || sRes || []);
   } catch (err) {
     console.error(err);
-    alert("❌ Không thể tải danh sách chỗ đỗ.");
   } finally {
-    setLoading(false);
+    setLoading(false); // 🔥 QUAN TRỌNG
   }
 }
 useEffect(() => {
   if (!role) return;
-
-  // MANAGER bắt buộc có building
-  if (role === "MANAGER" && !currentBuilding) return;
-
-  // OWNER → LUÔN ĐƯỢC FETCH
   fetchData();
-}, [role, ownerBuildingId, currentBuilding]);
-useEffect(() => {
+}, [role, ownerBuildingId, userBuildingId]);
+  useEffect(() => {
   async function loadBuildings() {
     try {
       const bRes = await listBuildingsForParking();
+      console.log("BUILDINGS API:", bRes);
+
       setBuildings(bRes || []);
 
       if (role === "OWNER" && bRes?.length) {
         setOwnerBuildingId(bRes[0].building_id);
       }
 
+      // 🔥 FIX QUAN TRỌNG
       if (role === "MANAGER" && bRes?.length) {
+        console.log("MANAGER building:", bRes[0]);
         setCurrentBuilding(bRes[0]);
       }
     } catch (err) {
@@ -97,6 +88,16 @@ useEffect(() => {
   if (role) loadBuildings();
 }, [role]);
 
+useEffect(() => {
+  if (!role || !buildings.length) return;
+
+  if (role === "OWNER" && ownerBuildingId) {
+    const found = buildings.find(
+      b => b.building_id === Number(ownerBuildingId)
+    );
+    setCurrentBuilding(found || null);
+  }
+}, [role, ownerBuildingId, buildings]);
   /* ================= DELETE ================= */
   async function handleDelete(slot) {
     if (!slot.is_available) return;

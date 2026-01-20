@@ -524,7 +524,7 @@ td:nth-child(7) {
             <option value="">Tất cả trạng thái</option>
             <option value="active">Hoạt động</option>
             <option value="inactive">Ngừng</option>
-            <option value="deactivated">Đã hủy</option>
+            <option value="deactivated">Ngừng hoạt động</option>
           </select>
         </div>
 

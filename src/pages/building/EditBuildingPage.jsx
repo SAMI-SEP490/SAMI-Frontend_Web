@@ -8,7 +8,7 @@ import {
   getBuildingManagers,
 } from "../../services/api/building";
 import "./EditBuildingPage.css";
-
+import { getAccessToken } from "@/services/http.js";
 function EditBuildingPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -99,7 +99,14 @@ function EditBuildingPage() {
       navigate("/buildings");
     } catch (err) {
       console.error(err);
-      alert("❌ Cập nhật thất bại");
+
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "❌ Cập nhật thất bại";
+
+      alert(`❌ ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -143,10 +150,10 @@ function EditBuildingPage() {
           <div className="manager-list">
             {managers.length > 0
               ? managers.map((m) => (
-                  <Badge key={m.user_id} bg="secondary" className="manager-badge">
-                    {m.full_name}
-                  </Badge>
-                ))
+                <Badge key={m.user_id} bg="secondary" className="manager-badge">
+                  {m.full_name}
+                </Badge>
+              ))
               : "—"}
           </div>
         </div>
@@ -183,7 +190,7 @@ function EditBuildingPage() {
               onChange={(e) => setServiceFee(e.target.value)}
             />
           </Col>
-          
+
           {/* [UPDATE] Ngày chốt sổ: Luôn Disabled và có Label khác */}
           <Col md={3}>
             <label className="text-muted">Ngày chốt sổ (Cố định)</label>

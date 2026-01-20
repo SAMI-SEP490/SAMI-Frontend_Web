@@ -3,15 +3,21 @@ import React, { useEffect, useState } from "react";
 import { listGuestRegistrations } from "../../services/api/guest";
 import { listBuildingsForParking } from "../../services/api/parking-slots";
 import { getAccessToken } from "../../services/http";
+const STATUS_VN = {
+  approved: "Đang hoạt động",
+  cancelled: "Đã hủy",
+  expired: "Hết hiệu lực",
+};
 
 export default function ReceiveGuestRegistrationPage() {
   const [guestRegistrations, setGuestRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [userRole, setUserRole] = useState(null);
   const [buildings, setBuildings] = useState([]);
   const [filterBuilding, setFilterBuilding] = useState("");
   const [searchName, setSearchName] = useState("");
-
+  const [filterStatus, setFilterStatus] = useState("");
   useEffect(() => {
     const token = getAccessToken();
     if (!token) return;
@@ -23,7 +29,8 @@ export default function ReceiveGuestRegistrationPage() {
       if (payload.role === "OWNER") {
         listBuildingsForParking().then((res) => {
           setBuildings(res || []);
-          if (res?.length > 0) {
+
+          if (res && res.length > 0) {
             setFilterBuilding(res[0].building_id.toString());
           }
         });
@@ -32,19 +39,21 @@ export default function ReceiveGuestRegistrationPage() {
       console.error("❌ Invalid token", err);
     }
   }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      const params = {};
+      const params = {
+        status: filterStatus || undefined,
+      };
+
       if (userRole === "OWNER" && filterBuilding) {
         params.building_id = filterBuilding;
       }
 
       const res = await listGuestRegistrations(params);
+
       setGuestRegistrations(
-        Array.isArray(res?.registrations) ? res.registrations : [],
         Array.isArray(res?.registrations) ? res.registrations : [],
       );
     } catch (e) {
@@ -59,53 +68,15 @@ export default function ReceiveGuestRegistrationPage() {
     if (userRole) fetchData();
   }, [userRole, filterStatus, filterBuilding]);
 
-  // const handleApprove = async (id) => {
-  //   try {
-  //     setProcessingId(id);
-  //     await approveGuestRegistration(id);
-  //     setGuestRegistrations((prev) =>
-  //       prev.map((i) =>
-  //         i.registration_id === id ? { ...i, status: "approved" } : i
-  //       )
-  //     );
-  //   } finally {
-  //     setProcessingId(null);
-  //   }
-  // };
-
-  // const handleReject = async (id) => {
-  //   const reason = prompt("Lý do từ chối:");
-  //   if (!reason) return;
-
-  //   try {
-  //     setProcessingId(id);
-  //     await rejectGuestRegistration(id, {
-  //       cancellation_reason: reason,
-  //       cancelled_at: new Date().toISOString(),
-  //     });
-
-  //     setGuestRegistrations((prev) =>
-  //       prev.map((i) =>
-  //         i.registration_id === id
-  //           ? {
-  //             ...i,
-  //             status: "rejected",
-  //             cancellation_reason: reason,
-  //           }
-  //           : i
-  //       )
-  //     );
-  //   } finally {
-  //     setProcessingId(null);
-  //   }
-  // };
-
   const filtered = guestRegistrations.filter((item) => {
-    return (
+    const nameMatch =
       item.host?.user?.full_name
         ?.toLowerCase()
-        .includes(searchName.toLowerCase()) ?? false
-    );
+        .includes(searchName.toLowerCase()) ?? false;
+
+    const statusMatch = filterStatus ? item.status === filterStatus : true;
+
+    return nameMatch && statusMatch;
   });
 
   if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
@@ -334,7 +305,7 @@ td:nth-child(6) {
             onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option value="">Tất cả trạng thái</option>
-            <option value="approved">Chấp nhận</option>
+            <option value="approved">Đang hoạt động</option>
             <option value="cancelled">Đã hủy</option>
           </select>
           {userRole === "OWNER" && (

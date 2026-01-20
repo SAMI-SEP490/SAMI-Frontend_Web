@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Eye, Pencil, Send, Trash, XCircle } from "react-bootstrap-icons"; // Thêm XCircle
+import { Eye, Pencil, Send, Trash, XCircle, CashStack, CreditCard } from "react-bootstrap-icons"; // Thêm icon
 import {
   getBillById,
   updateDraftBill,
@@ -53,6 +53,15 @@ function getBillTitle(bill) {
   return "Hóa đơn";
 }
 
+// Helper format tiền tệ
+const fmtMoney = (v) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v || 0);
+
+// Helper format ngày giờ
+const fmtDateTime = (d) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleString('vi-VN');
+}
+
 /* ================= Page ================= */
 export default function BillDetailPage() {
   const { id } = useParams();
@@ -79,9 +88,7 @@ export default function BillDetailPage() {
 
   async function onPublish() {
     if (!bill) return;
-    const ok = window.confirm(
-      "Bạn có chắc muốn xuất bản hóa đơn này?\nSau khi xuất bản sẽ KHÔNG thể chỉnh sửa hoặc hoàn tác."
-    );
+    const ok = window.confirm("Bạn có chắc muốn xuất bản hóa đơn này?");
     if (!ok) return;
 
     try {
@@ -111,9 +118,7 @@ export default function BillDetailPage() {
   // Hủy hóa đơn (Dành cho Issued / Overdue)
   async function onCancel() {
     if (!bill) return;
-    const ok = window.confirm(
-      "Bạn có chắc chắn muốn HỦY hóa đơn này?\n\nHóa đơn sẽ chuyển sang trạng thái 'Đã hủy' và không thể thanh toán được nữa."
-    );
+    const ok = window.confirm("Bạn có chắc chắn muốn HỦY hóa đơn này?");
     if (!ok) return;
 
     try {
@@ -135,6 +140,10 @@ export default function BillDetailPage() {
   const status = getBillStatus(bill);
   const published = isPublished(status);
   const isCancellable = ["issued", "overdue", "partially_paid"].includes(status);
+
+  // Logic hiển thị lịch sử thanh toán
+  const payments = bill.payment_details?.map(d => d.payment) || [];
+  const hasPayments = payments.length > 0;
 
   return (
     <div className="container">
@@ -183,6 +192,45 @@ export default function BillDetailPage() {
         </div>
       </div>
 
+      {/* [NEW] PAYMENT HISTORY CARD */}
+      {hasPayments && (
+        <div className="card mb-4 p-3 shadow-sm border-success border-2">
+          <h5 className="text-success d-flex align-items-center gap-2">
+            <CashStack /> Lịch sử thanh toán
+          </h5>
+          <div className="table-responsive">
+            <table className="table table-sm table-borderless mb-0">
+              <thead className="text-muted small border-bottom">
+                <tr>
+                  <th>Ngày giờ</th>
+                  <th>Số tiền</th>
+                  <th>Phương thức</th>
+                  <th>Mã giao dịch</th>
+                  <th>Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p) => (
+                  <tr key={p.payment_id}>
+                    <td>{fmtDateTime(p.payment_date)}</td>
+                    <td className="fw-bold text-success">+{fmtMoney(p.amount)}</td>
+                    <td>
+                      {p.method === 'online' ? (
+                        <span className="badge bg-info text-dark"><CreditCard className="me-1" /> Online ({p.online_type})</span>
+                      ) : (
+                        <span className="badge bg-secondary"><CashStack className="me-1" /> Tiền mặt</span>
+                      )}
+                    </td>
+                    <td className="font-monospace small">{p.transaction_id || p.reference || "—"}</td>
+                    <td className="small text-muted">{p.note || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* SERVICE CHARGES TABLE */}
       <div className="card shadow-sm border-0">
         <div className="card-header bg-white py-3">
@@ -217,7 +265,7 @@ export default function BillDetailPage() {
             {(!bill.service_charges || bill.service_charges.length === 0) && (
               <tr>
                 <td colSpan={4} className="text-center py-4 text-muted">
-                  Không có chi tiết (Hóa đơn cũ hoặc chưa cập nhật)
+                  Không có chi tiết
                 </td>
               </tr>
             )}
@@ -246,7 +294,7 @@ export default function BillDetailPage() {
               <tr className="table-success">
                 <td colSpan={3} className="text-end fw-bold text-success">Đã thanh toán:</td>
                 <td className="text-end fw-bold text-success">
-                  - {Number(bill.paid_amount).toLocaleString()} đ
+                  {Number(bill.paid_amount).toLocaleString()} đ
                 </td>
               </tr>
             )}

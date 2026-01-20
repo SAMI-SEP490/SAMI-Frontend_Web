@@ -195,7 +195,7 @@ export default function EditBillPage() {
                 name="bill_type" 
                 value={form.bill_type} 
                 onChange={onFormChange}
-                disabled={isLocked} // Không cho đổi loại nếu là Utility
+                disabled={true}
             >
               <option value="other">Khác</option>
               <option value="monthly_rent">Tiền phòng</option>

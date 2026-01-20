@@ -184,7 +184,7 @@ export default function CreateBillPage() {
                 <h6 className="fw-bold text-primary">2. Cấu hình Hóa đơn</h6>
                 <div className="mb-2">
                     <label className="form-label small text-muted">Loại hóa đơn</label>
-                    <select className="form-select" value={billType} onChange={e => setBillType(e.target.value)}>
+                    <select disabled="true" className="form-select" value={billType} onChange={e => setBillType(e.target.value)}>
                         <option value="other">Khác</option>
                     </select>
                 </div>

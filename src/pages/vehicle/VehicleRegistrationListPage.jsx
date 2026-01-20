@@ -3,12 +3,12 @@ import {
   listVehicleRegistrations,
   approveVehicleRegistration,
   rejectVehicleRegistration,
-  deleteVehicleRegistration
+  deleteVehicleRegistration,
 } from "../../services/api/vehicle";
 import "../../pages/vehicle/VehicleRegistrationListPage.css";
 import {
   listAvailableParkingSlots,
-  listBuildingsForParking
+  listBuildingsForParking,
 } from "../../services/api/parking-slots";
 import { getAccessToken } from "../../services/http";
 import { createPortal } from "react-dom";
@@ -26,7 +26,7 @@ export default function VehicleRegistrationListPage() {
     requested: "Chờ duyệt",
     pending: "Chờ duyệt",
     approved: "Đã duyệt",
-    rejected: "Từ chối"
+    rejected: "Từ chối",
   };
   const [role, setRole] = useState(null);
   const [buildings, setBuildings] = useState([]);
@@ -99,7 +99,7 @@ export default function VehicleRegistrationListPage() {
 
     const loadSlots = async () => {
       const available = await listAvailableParkingSlots({
-        registration_id: approveTarget.registration_id
+        registration_id: approveTarget.registration_id,
       });
       setSlots(available || []);
     };
@@ -118,7 +118,7 @@ export default function VehicleRegistrationListPage() {
 
       await approveVehicleRegistration(
         approveTarget.registration_id,
-        Number(selectedSlot)
+        Number(selectedSlot),
       );
 
       setApproveTarget(null);
@@ -143,7 +143,7 @@ export default function VehicleRegistrationListPage() {
     }
 
     await rejectVehicleRegistration(rejectTarget.registration_id, {
-      rejection_reason: rejectionReason.trim()
+      rejection_reason: rejectionReason.trim(),
     });
 
     setRejectTarget(null);
@@ -498,6 +498,8 @@ tbody tr {
   box-sizing: border-box;
 }
 `;
+
+  const hasActionColumn = registrations.some((r) => r.status === "requested");
   return (
     <>
       <style>{pageStyle}</style>
@@ -533,9 +535,11 @@ tbody tr {
                   <th>Loại xe</th>
                   <th>Ngày bắt đầu</th>
                   <th>Ngày kết thúc</th>
-                  <th >Ghi chú</th>
+                  <th>Ghi chú</th>
                   <th className="center">Trạng thái</th>
-                  <th className="center action-col">Hành động</th>
+                  {hasActionColumn && (
+                    <th className="center action-col">Hành động</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -555,30 +559,32 @@ tbody tr {
                       </span>
                     </td>
 
-                    <td className="center action-col">
-                      <div className="action-buttons">
-                        {r.status === "requested" && (
-                          <>
-                            <button
-                              className="btn approve"
-                              onClick={() => openApprove(r)}
-                            >
-                              Duyệt
-                            </button>
+                    {hasActionColumn && (
+                      <td className="center action-col">
+                        <div className="action-buttons">
+                          {r.status === "requested" && (
+                            <>
+                              <button
+                                className="btn approve"
+                                onClick={() => openApprove(r)}
+                              >
+                                Duyệt
+                              </button>
 
-                            <button
-                              className="btn reject"
-                              onClick={() => {
-                                setRejectTarget(r);
-                                setRejectionReason("");
-                              }}
-                            >
-                              Từ chối
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+                              <button
+                                className="btn reject"
+                                onClick={() => {
+                                  setRejectTarget(r);
+                                  setRejectionReason("");
+                                }}
+                              >
+                                Từ chối
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -592,18 +598,14 @@ tbody tr {
         createPortal(
           <div className="modal">
             <div className="modal-content">
-              <h3>
-                Chọn slot cho xe {approveTarget.license_plate}
-              </h3>
+              <h3>Chọn slot cho xe {approveTarget.license_plate}</h3>
 
               <select
                 value={selectedSlot}
                 onChange={(e) => setSelectedSlot(e.target.value)}
               >
                 {approveError && (
-                  <div className="modal-error">
-                    {approveError}
-                  </div>
+                  <div className="modal-error">{approveError}</div>
                 )}
                 <option value="">-- Chọn slot --</option>
                 {slots.map((s) => (
@@ -628,15 +630,13 @@ tbody tr {
               </div>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
       {rejectTarget &&
         createPortal(
           <div className="modal">
             <div className="modal-content">
-              <h3>
-                Từ chối đăng ký xe {rejectTarget.license_plate}
-              </h3>
+              <h3>Từ chối đăng ký xe {rejectTarget.license_plate}</h3>
 
               <textarea
                 placeholder="Nhập lý do từ chối..."
@@ -646,15 +646,12 @@ tbody tr {
                 style={{
                   width: "100%",
                   marginTop: 8,
-                  resize: "none"
+                  resize: "none",
                 }}
               />
 
               <div style={{ marginTop: 12, textAlign: "right" }}>
-                <button
-                  className="btn reject"
-                  onClick={handleReject}
-                >
+                <button className="btn reject" onClick={handleReject}>
                   Xác nhận từ chối
                 </button>
 
@@ -668,9 +665,8 @@ tbody tr {
               </div>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );
 }
-

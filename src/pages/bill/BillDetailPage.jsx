@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Eye, Pencil, Send, Trash, XCircle, CashStack, CreditCard } from "react-bootstrap-icons"; // Thêm icon
+import { Eye, Pencil, Send, Trash, XCircle, CashStack, CreditCard } from "react-bootstrap-icons"; 
 import {
   getBillById,
   updateDraftBill,
@@ -19,7 +19,7 @@ function isPublished(status) {
 
 function renderPublishStatus(status) {
   if (status === "draft") return <span className="status draft">Nháp</span>;
-  if (status === "cancelled") return <span className="status cancelled">Đã hủy</span>; // Thêm style cancelled nếu cần
+  if (status === "cancelled") return <span className="status cancelled">Đã hủy</span>;
   return <span className="status published">Đã xuất bản</span>;
 }
 
@@ -27,7 +27,7 @@ function renderPaymentStatus(status) {
   if (status === "paid") return <span className="status paid">Đã thanh toán</span>;
   if (status === "partially_paid") return <span className="status partial">Thanh toán một phần</span>;
   if (status === "overdue") return <span className="status overdue">Quá hạn</span>;
-  if (status === "cancelled") return null; // Không hiện payment status nếu đã hủy
+  if (status === "cancelled") return null;
   return <span className="status unpaid">Chưa thanh toán</span>;
 }
 
@@ -88,7 +88,9 @@ export default function BillDetailPage() {
 
   async function onPublish() {
     if (!bill) return;
-    const ok = window.confirm("Bạn có chắc muốn xuất bản hóa đơn này?");
+    const ok = window.confirm(
+      "Bạn có chắc muốn xuất bản hóa đơn này?\nSau khi xuất bản sẽ KHÔNG thể chỉnh sửa hoặc hoàn tác."
+    );
     if (!ok) return;
 
     try {
@@ -118,7 +120,9 @@ export default function BillDetailPage() {
   // Hủy hóa đơn (Dành cho Issued / Overdue)
   async function onCancel() {
     if (!bill) return;
-    const ok = window.confirm("Bạn có chắc chắn muốn HỦY hóa đơn này?");
+    const ok = window.confirm(
+      "Bạn có chắc chắn muốn HỦY hóa đơn này?\n\nHóa đơn sẽ chuyển sang trạng thái 'Đã hủy' và không thể thanh toán được nữa."
+    );
     if (!ok) return;
 
     try {
@@ -141,9 +145,11 @@ export default function BillDetailPage() {
   const published = isPublished(status);
   const isCancellable = ["issued", "overdue", "partially_paid"].includes(status);
 
-  // Logic hiển thị lịch sử thanh toán
+  // [UPDATE] Chỉ hiện payments nếu có dữ liệu VÀ trạng thái là paid/partially_paid
   const payments = bill.payment_details?.map(d => d.payment) || [];
-  const hasPayments = payments.length > 0;
+  
+  // Logic hiển thị: Có payment history và trạng thái phải là đã/đang thanh toán
+  const showPaymentHistory = payments.length > 0 && (status === 'paid' || status === 'partially_paid');
 
   return (
     <div className="container">
@@ -192,8 +198,8 @@ export default function BillDetailPage() {
         </div>
       </div>
 
-      {/* [NEW] PAYMENT HISTORY CARD */}
-      {hasPayments && (
+      {/* [NEW] PAYMENT HISTORY CARD - Chỉ hiện khi đã thanh toán */}
+      {showPaymentHistory && (
         <div className="card mb-4 p-3 shadow-sm border-success border-2">
           <h5 className="text-success d-flex align-items-center gap-2">
             <CashStack /> Lịch sử thanh toán
@@ -265,7 +271,7 @@ export default function BillDetailPage() {
             {(!bill.service_charges || bill.service_charges.length === 0) && (
               <tr>
                 <td colSpan={4} className="text-center py-4 text-muted">
-                  Không có chi tiết
+                  Không có chi tiết (Hóa đơn cũ hoặc chưa cập nhật)
                 </td>
               </tr>
             )}
@@ -289,12 +295,12 @@ export default function BillDetailPage() {
               </td>
             </tr>
 
-            {/* Paid Row */}
+            {/* Paid Row - Chỉ hiện khi có tiền đã đóng */}
             {Number(bill.paid_amount) > 0 && (
               <tr className="table-success">
                 <td colSpan={3} className="text-end fw-bold text-success">Đã thanh toán:</td>
                 <td className="text-end fw-bold text-success">
-                  {Number(bill.paid_amount).toLocaleString()} đ
+                  - {Number(bill.paid_amount).toLocaleString()} đ
                 </td>
               </tr>
             )}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { use, useEffect, useState } from "react";
 import {
   listRegulations,
   deleteRegulation,
@@ -86,6 +86,11 @@ export default function RegulationListPage() {
     return matchSearch && matchStatus;
   });
 
+  useEffect(() => {
+    {
+      console.log("regulations:", regulations);
+    }
+  }, [regulations]);
   if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;
 
   return (
@@ -118,7 +123,7 @@ export default function RegulationListPage() {
             <tr>
               <th className="center">#</th>
               <th className="center">Tiêu đề</th>
-              <th className="center">Đối tượng áp dụng</th>
+              {/* <th className="center">Đối tượng áp dụng</th> */}
               <th className="center">Ngày hiệu lực</th>
               <th className="center">Người tạo</th>
               <th className="center">Ngày tạo</th>
@@ -135,7 +140,7 @@ export default function RegulationListPage() {
 
                 <td>{reg.title}</td>
 
-                <td className="center">
+                {/* <td className="center">
                   <span className="tag">
                     {reg.target === "all"
                       ? "Tất cả"
@@ -145,7 +150,7 @@ export default function RegulationListPage() {
                       ? "Khách thuê"
                       : "Không rõ"}
                   </span>
-                </td>
+                </td> */}
 
                 <td className="center">
                   {reg.effective_date
@@ -169,15 +174,15 @@ export default function RegulationListPage() {
                       reg.status === "published"
                         ? "published"
                         : reg.status === "draft"
-                        ? "draft"
-                        : "archived"
+                          ? "draft"
+                          : "archived"
                     }`}
                   >
                     {reg.status === "published"
                       ? "Đã xuất bản"
                       : reg.status === "draft"
-                      ? "Nháp"
-                      : "Lưu trữ"}
+                        ? "Nháp"
+                        : "Lưu trữ"}
                   </span>
                 </td>
 

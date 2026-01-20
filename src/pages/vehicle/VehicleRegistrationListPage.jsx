@@ -33,6 +33,8 @@ export default function VehicleRegistrationListPage() {
   const [selectedBuilding, setSelectedBuilding] = useState("");
   // approve modal
   const [approveTarget, setApproveTarget] = useState(null);
+  const [approveError, setApproveError] = useState("");
+  const [approving, setApproving] = useState(false);
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState("");
   const [rejectTarget, setRejectTarget] = useState(null);
@@ -106,19 +108,32 @@ export default function VehicleRegistrationListPage() {
   }, [approveTarget]);
   const handleApprove = async () => {
     if (!selectedSlot) {
-      alert("Vui lòng chọn slot");
+      setApproveError("Vui lòng chọn slot");
       return;
     }
 
-    await approveVehicleRegistration(
-      approveTarget.registration_id,
-      Number(selectedSlot)
-    );
+    try {
+      setApproving(true);
+      setApproveError("");
 
-    setApproveTarget(null);
-    fetchData();
+      await approveVehicleRegistration(
+        approveTarget.registration_id,
+        Number(selectedSlot)
+      );
+
+      setApproveTarget(null);
+      fetchData();
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Không thể duyệt đăng ký xe";
+
+      setApproveError(message); // 🔥 HIỂN THỊ RA MODAL
+    } finally {
+      setApproving(false);
+    }
   };
-
   /* ================= REJECT ================= */
 
   const handleReject = async () => {
@@ -397,12 +412,43 @@ tr:hover {
 
 .modal-content {
   background: #ffffff;
-  padding: 22px 26px;
+  padding: 20px 22px;
   border-radius: 14px;
-  min-width: 340px;
-  max-width: 90vw;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 420px; /* ✅ THU GỌN ĐẸP */
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.28);
   animation: pop 0.18s ease-out;
+}
+
+.modal-content h3 {
+  margin-bottom: 14px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  background: #f9fafb;
+}
+
+.modal select:focus {
+  outline: none;
+  border-color: #2563eb;
+  background: #fff;
+}
+
+.modal-error {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 8px;
+  font-size: 13px;
 }
 
 @keyframes pop {
@@ -508,7 +554,7 @@ tbody tr {
                         {STATUS_LABEL[r.status] || r.status}
                       </span>
                     </td>
-                    
+
                     <td className="center action-col">
                       <div className="action-buttons">
                         {r.status === "requested" && (
@@ -554,6 +600,11 @@ tbody tr {
                 value={selectedSlot}
                 onChange={(e) => setSelectedSlot(e.target.value)}
               >
+                {approveError && (
+                  <div className="modal-error">
+                    {approveError}
+                  </div>
+                )}
                 <option value="">-- Chọn slot --</option>
                 {slots.map((s) => (
                   <option key={s.slot_id} value={s.slot_id}>

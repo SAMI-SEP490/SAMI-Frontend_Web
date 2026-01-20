@@ -3,11 +3,6 @@ import React, { useEffect, useState } from "react";
 import { listGuestRegistrations } from "../../services/api/guest";
 import { listBuildingsForParking } from "../../services/api/parking-slots";
 import { getAccessToken } from "../../services/http";
-const STATUS_VN = {
-  approved: "Đang hoạt động",
-  cancelled: "Đã hủy",
-  expired: "Hết hiệu lực",
-};
 
 export default function ReceiveGuestRegistrationPage() {
   const [guestRegistrations, setGuestRegistrations] = useState([]);
@@ -16,7 +11,7 @@ export default function ReceiveGuestRegistrationPage() {
   const [buildings, setBuildings] = useState([]);
   const [filterBuilding, setFilterBuilding] = useState("");
   const [searchName, setSearchName] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+
   useEffect(() => {
     const token = getAccessToken();
     if (!token) return;
@@ -28,8 +23,7 @@ export default function ReceiveGuestRegistrationPage() {
       if (payload.role === "OWNER") {
         listBuildingsForParking().then((res) => {
           setBuildings(res || []);
-
-          if (res && res.length > 0) {
+          if (res?.length > 0) {
             setFilterBuilding(res[0].building_id.toString());
           }
         });
@@ -38,21 +32,19 @@ export default function ReceiveGuestRegistrationPage() {
       console.error("❌ Invalid token", err);
     }
   }, []);
+
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      const params = {
-        status: filterStatus || undefined,
-      };
-
+      const params = {};
       if (userRole === "OWNER" && filterBuilding) {
         params.building_id = filterBuilding;
       }
 
       const res = await listGuestRegistrations(params);
-
       setGuestRegistrations(
+        Array.isArray(res?.registrations) ? res.registrations : [],
         Array.isArray(res?.registrations) ? res.registrations : [],
       );
     } catch (e) {
@@ -109,14 +101,11 @@ export default function ReceiveGuestRegistrationPage() {
   // };
 
   const filtered = guestRegistrations.filter((item) => {
-    const nameMatch =
+    return (
       item.host?.user?.full_name
         ?.toLowerCase()
-        .includes(searchName.toLowerCase()) ?? false;
-
-    const statusMatch = filterStatus ? item.status === filterStatus : true;
-
-    return nameMatch && statusMatch;
+        .includes(searchName.toLowerCase()) ?? false
+    );
   });
 
   if (loading) return <p className="loading-text">Đang tải dữ liệu...</p>;

@@ -121,16 +121,25 @@ export default function BillListPage() {
 
   /* ================= Logic Actions ================= */
   async function onRefreshStatus() {
-      try {
-          setRefreshing(true);
-          const res = await refreshBillStatus();
-          //alert(`✅ Đã quét xong!\n- Quá hạn: ${res.data.bills_marked_overdue}\n- Tiền nhà mới: ${res.data.rent_bills_created}\n- Điện nước mới: ${res.data.utility_bills_created}`);
-          loadData();
-      } catch (e) {
-          alert(e.message || "Lỗi khi quét tự động");
-      } finally {
-          setRefreshing(false);
-      }
+    try {
+      setRefreshing(true);
+      const res = await refreshBillStatus();
+
+      // Lấy data an toàn: Nếu res.data có thì dùng, nếu không thì dùng chính res
+      const stats = res.data || res;
+
+      alert(`✅ Đã quét xong!
+- Quá hạn: ${stats.bills_marked_overdue ?? 0}
+- Tiền nhà mới: ${stats.rent_bills_created ?? 0}
+- Điện nước mới: ${stats.utility_bills_created ?? 0}`);
+
+      loadData(); // Reload list
+    } catch (e) {
+      console.error(e); // Log lỗi để debug nếu cần
+      alert(e.message || "Lỗi khi quét tự động");
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   // [UPDATE] Extend with Prompt for Penalty

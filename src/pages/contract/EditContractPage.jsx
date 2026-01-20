@@ -197,18 +197,21 @@ function EditContractPage() {
 
                 const currentBuildingId = data.building_id ?? data.buildingId ?? data.building?.id ?? "";
                 const currentRoomNum = data.room_number ?? data.room ?? "";
-
+                const idNumber =
+                    data.id_number
+                    ;
                 // Load Tenant Info
                 if (data.tenant_user_id) {
                     setFoundTenant({
                         user_id: data.tenant_user_id,
                         full_name: data.tenant_name,
                         phone: data.tenant_phone,
-                        id_number: data.tenant_id_number || "...",
+                        id_number: data.tenant_id_number || data.tenant_identity_card || data.identity_card || data.id_number || "",
                         avatar_url: data.tenant_avatar || null
                     });
+                    console.log(idNumber);
                     // Set tên để hiển thị đẹp, nhưng không trigger search vì foundTenant đã set
-                    setSearchQuery(data.tenant_phone || data.tenant_name || "");
+                    setSearchQuery(data.tenant_name || data.tenant_phone || "");
                 }
 
                 // Load Buildings
@@ -476,7 +479,9 @@ function EditContractPage() {
                                 <input
                                     type="text"
                                     className={`form-control ${errors.tenant_user_id ? 'is-invalid' : ''}`}
-                                    placeholder="Nhập SĐT, Tên hoặc CCCD..."
+                                    // [CẬP NHẬT 1] Placeholder hiển thị hướng dẫn nếu chưa có tòa nhà
+                                    placeholder={!form.building_id ? "Vui lòng chọn tòa nhà trước..." : "Nhập SĐT, Tên hoặc CCCD..."}
+
                                     value={searchQuery || ""}
                                     onChange={(e) => {
                                         setSearchQuery(e.target.value);
@@ -487,7 +492,9 @@ function EditContractPage() {
                                     }}
                                     onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
                                     autoComplete="off"
-                                    disabled={!!foundTenant}
+
+                                    // [CẬP NHẬT 2] Disable nếu chưa chọn tòa nhà HOẶC đã có khách thuê (giống trang Create)
+                                    disabled={!form.building_id || !!foundTenant}
                                 />
                                 {(foundTenant || searchQuery) && (
                                     <Button variant="outline-secondary" onClick={() => {
@@ -544,7 +551,7 @@ function EditContractPage() {
                                                 <div className="small text-secondary d-flex align-items-center gap-2">
                                                     <span><Telephone size={10}/> {foundTenant.phone}</span>
                                                     <span>|</span>
-                                                    <span><PersonBadge size={10}/> {foundTenant.id_number || "--"}</span>
+                                                    <span><PersonBadge size={10}/> {foundTenant.id_number }</span>
                                                 </div>
                                             </div>
                                             <div className="text-success fs-4 me-2"><CheckCircleFill /></div>

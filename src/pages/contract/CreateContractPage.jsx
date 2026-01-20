@@ -535,7 +535,7 @@ function CreateContractPage() {
                                         type="text"
                                         // [FIX LỖI REACT]: Thêm || "" để đảm bảo không bao giờ bị undefined
                                         className={`form-control ${errors.tenant_user_id ? 'is-invalid' : ''}`}
-                                        placeholder="Nhập SĐT, Tên hoặc CCCD..."
+                                        placeholder={!form.building_id ? "Vui lòng chọn tòa nhà trước..." : "Nhập SĐT, Tên hoặc CCCD..."}
                                         value={searchQuery || ""}
                                         onChange={(e) => {
                                             setSearchQuery(e.target.value);
@@ -548,7 +548,7 @@ function CreateContractPage() {
                                         onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
                                         // Tắt autocomplete mặc định của trình duyệt đè lên
                                         autoComplete="off"
-                                        disabled={!!foundTenant} // Khóa khi đã chọn (muốn tìm lại phải bấm nút X)
+                                        disabled={!form.building_id || !!foundTenant}
                                     />
                                     {/* Nút Xóa/Bỏ chọn */}
                                     {(foundTenant || searchQuery) && (

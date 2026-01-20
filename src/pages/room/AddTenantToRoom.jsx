@@ -91,12 +91,11 @@ function AddTenantToRoom() {
         const min = new Date(
           start.getFullYear(),
           start.getMonth(),
-          start.getDate() + 1,
+          start.getDate(),
         );
 
         // max: end_date - 1 month
-        const max = new Date(end);
-        max.setMonth(max.getMonth() - 1);
+        const max = new Date(end.getFullYear(), end.getMonth(), end.getDate());
 
         setContractWindow({
           start,
@@ -129,11 +128,11 @@ function AddTenantToRoom() {
 
     // ✅ Validate theo hợp đồng (nếu đã load được window)
     if (contractWindow.minMoveIn && movedInAt < contractWindow.minMoveIn) {
-      setError("Ngày đến phải sau ngày bắt đầu hợp đồng");
+      setError("Ngày đến phải từ ngày bắt đầu hợp đồng trở đi");
       return;
     }
     if (contractWindow.maxMoveIn && movedInAt > contractWindow.maxMoveIn) {
-      setError("Ngày đến phải trước ngày kết thúc hợp đồng ít nhất 1 tháng");
+      setError("Ngày đến không được sau ngày kết thúc hợp đồng");
       return;
     }
 

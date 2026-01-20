@@ -5,7 +5,7 @@ import {
   publishRegulation,
   unpublishRegulation,
 } from "../../services/api/regulation";
-import "./ViewRegulationPage.css"; // import CSS riêng
+import "./ViewRegulationPage.css";
 
 export default function ViewRegulationPage() {
   const { id } = useParams();
@@ -16,18 +16,18 @@ export default function ViewRegulationPage() {
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    async function fetchRegulation() {
+    const fetchRegulation = async () => {
       try {
         setLoading(true);
         const res = await getRegulationById(id);
         setRegulation(res.data || res);
       } catch (err) {
-        console.error("Fetch error:", err);
+        console.error(err);
         alert("❌ Không thể lấy thông tin quy định.");
       } finally {
         setLoading(false);
       }
-    }
+    };
     fetchRegulation();
   }, [id]);
 
@@ -36,9 +36,9 @@ export default function ViewRegulationPage() {
     try {
       setActionLoading(true);
       await publishRegulation(id);
-      alert("✅ Quy định đã được xuất bản.");
       const res = await getRegulationById(id);
       setRegulation(res.data || res);
+      alert("✅ Quy định đã được xuất bản.");
     } catch (err) {
       console.error(err);
       alert("❌ Xuất bản thất bại.");
@@ -52,9 +52,9 @@ export default function ViewRegulationPage() {
     try {
       setActionLoading(true);
       await unpublishRegulation(id);
-      alert("✅ Quy định đã được hủy xuất bản / lưu trữ.");
       const res = await getRegulationById(id);
       setRegulation(res.data || res);
+      alert("✅ Quy định đã được hủy xuất bản.");
     } catch (err) {
       console.error(err);
       alert("❌ Hủy xuất bản thất bại.");
@@ -76,35 +76,25 @@ export default function ViewRegulationPage() {
       <h2 className="title">Chi tiết Quy Định</h2>
 
       <div className="info-grid">
+        {/* Tiêu đề */}
         <div className="info-item">
           <p className="label">Tiêu đề:</p>
           <div className="value">{regulation.title}</div>
         </div>
 
-        <div className="info-item">
-          <p className="label">Đối tượng áp dụng:</p>
-          <div className="value">
-            {regulation.target === "all"
-              ? "Tất cả"
-              : regulation.target === "management"
-              ? "Quản lý"
-              : regulation.target === "tenants"
-              ? "Khách thuê"
-              : "Không rõ"}
-          </div>
-        </div>
-
+        {/* Trạng thái */}
         <div className="info-item">
           <p className="label">Trạng thái:</p>
           <div className="value">
             {regulation.status === "published"
               ? "Đã xuất bản"
               : regulation.status === "draft"
-              ? "Nháp"
-              : "Lưu trữ"}
+                ? "Nháp"
+                : "Lưu trữ"}
           </div>
         </div>
 
+        {/* Ngày hiệu lực */}
         <div className="info-item">
           <p className="label">Ngày hiệu lực:</p>
           <div className="value">
@@ -114,6 +104,7 @@ export default function ViewRegulationPage() {
           </div>
         </div>
 
+        {/* Ngày tạo */}
         <div className="info-item">
           <p className="label">Ngày tạo:</p>
           <div className="value">
@@ -121,23 +112,20 @@ export default function ViewRegulationPage() {
           </div>
         </div>
 
-        <div className="info-item">
-          <p className="label">Cập nhật:</p>
-          <div className="value">
-            {new Date(regulation.updated_at).toLocaleDateString("vi-VN")}
-          </div>
-        </div>
-
+        {/* Người tạo */}
         <div className="info-item full-width">
           <p className="label">Người tạo:</p>
           <div className="value">{regulation.created_by?.full_name || "—"}</div>
         </div>
 
+        {/* Nội dung */}
         <div className="info-item full-width">
           <p className="label">Nội dung:</p>
           <div className="value content">
             <div
-              dangerouslySetInnerHTML={{ __html: regulation.content || "—" }}
+              dangerouslySetInnerHTML={{
+                __html: regulation.content || "—",
+              }}
             />
           </div>
         </div>
@@ -161,6 +149,7 @@ export default function ViewRegulationPage() {
             Hủy xuất bản
           </button>
         )}
+
         <button onClick={() => navigate("/regulations")} className="btn back">
           Quay lại danh sách
         </button>

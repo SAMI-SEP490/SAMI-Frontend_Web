@@ -1,14 +1,15 @@
 // src/pages/building/EditBuildingPage.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Form, Button, Spinner, Row, Col, Badge } from "react-bootstrap";
+import { Form, Button, Spinner, Row, Col, Badge, OverlayTrigger, Tooltip } from "react-bootstrap";
 import {
   updateBuilding,
   getBuildingById,
   getBuildingManagers,
+  checkBuildingEditable,
 } from "../../services/api/building";
 import "./EditBuildingPage.css";
-import { getAccessToken } from "@/services/http.js";
+
 function EditBuildingPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -27,7 +28,11 @@ function EditBuildingPage() {
   const [electricPrice, setElectricPrice] = useState(0);
   const [waterPrice, setWaterPrice] = useState(0);
   const [serviceFee, setServiceFee] = useState(0);
-  const [billClosingDay, setBillClosingDay] = useState(""); // [UPDATE] Đổi tên state
+  const [billClosingDay, setBillClosingDay] = useState(""); 
+
+  // State kiểm soát quyền sửa ngày chốt sổ
+  const [isClosingDayEditable, setIsClosingDayEditable] = useState(false);
+  const [closingDayReason, setClosingDayReason] = useState("");
 
   // ===== PARKING =====
   const [editParking, setEditParking] = useState(false);
@@ -54,7 +59,7 @@ function EditBuildingPage() {
         setElectricPrice(b.electric_unit_price ?? 0);
         setWaterPrice(b.water_unit_price ?? 0);
         setServiceFee(b.service_fee ?? 0);
-        setBillClosingDay(b.bill_closing_day ?? ""); // [UPDATE] Load closing day
+        setBillClosingDay(b.bill_closing_day ?? ""); 
 
         // Parking
         setMax4WheelSlot(b.max_4_wheel_slot ?? 0);
@@ -62,6 +67,22 @@ function EditBuildingPage() {
 
         const mgrs = await getBuildingManagers(b.building_id);
         setManagers(mgrs);
+
+        // Check Editable Status
+        try {
+            const checkRes = await checkBuildingEditable(b.building_id);
+            // API trả về: { is_editable: boolean, reason: string }
+            // Unwrap có thể trả về object hoặc data.data tùy wrapper, kiểm tra kỹ
+            const status = checkRes.data || checkRes; 
+            
+            setIsClosingDayEditable(status.is_editable);
+            setClosingDayReason(status.reason);
+        } catch (e) {
+            console.warn("Check editable failed:", e);
+            setIsClosingDayEditable(false); // Default safe
+            setClosingDayReason("Lỗi kiểm tra trạng thái.");
+        }
+
       } catch (err) {
         console.error(err);
         alert("❌ Lỗi tải dữ liệu");
@@ -82,30 +103,33 @@ function EditBuildingPage() {
     try {
       setSaving(true);
 
-      await updateBuilding(building.building_id, {
+      const payload = {
         name,
         address,
-
         electric_unit_price: Number(electricPrice),
         water_unit_price: Number(waterPrice),
         service_fee: Number(serviceFee),
-        // [NOTE] bill_closing_day không gửi lên vì không cho sửa
-
         max_4_wheel_slot: Number(max4WheelSlot),
         max_2_wheel_slot: Number(max2WheelSlot),
-      });
+      };
+
+      // Chỉ gửi bill_closing_day nếu được phép sửa và người dùng đã nhập
+      if (isClosingDayEditable && billClosingDay) {
+          const day = parseInt(billClosingDay);
+          if (day >= 1 && day <= 28) {
+              payload.bill_closing_day = day;
+          } else {
+              return alert("Ngày chốt sổ phải từ 1-28");
+          }
+      }
+
+      await updateBuilding(building.building_id, payload);
 
       alert("✅ Cập nhật tòa nhà thành công");
       navigate("/buildings");
     } catch (err) {
       console.error(err);
-
-      const msg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "❌ Cập nhật thất bại";
-
+      const msg = err?.response?.data?.message || err?.message || "❌ Cập nhật thất bại";
       alert(`❌ ${msg}`);
     } finally {
       setSaving(false);
@@ -191,15 +215,42 @@ function EditBuildingPage() {
             />
           </Col>
 
-          {/* [UPDATE] Ngày chốt sổ: Luôn Disabled và có Label khác */}
+          {/* Logic hiển thị Bill Closing Day */}
           <Col md={3}>
-            <label className="text-muted">Ngày chốt sổ (Cố định)</label>
+            <div className="d-flex align-items-center justify-content-between">
+                <label className={isClosingDayEditable ? "" : "text-muted"}>
+                    Ngày chốt sổ
+                </label>
+                {/* Tooltip giải thích nếu bị khóa */}
+                {!isClosingDayEditable && (
+                    <OverlayTrigger
+                        placement="top"
+                        overlay={<Tooltip>{closingDayReason}</Tooltip>}
+                    >
+                        <Badge bg="warning" text="dark" style={{cursor: 'help', fontSize: '10px'}}>
+                            Đã khóa
+                        </Badge>
+                    </OverlayTrigger>
+                )}
+            </div>
+            
             <input
               type="number"
+              min="1"
+              max="28"
               value={billClosingDay}
-              disabled={true} // Luôn khóa
-              style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}
+              // Disabled nếu: Không bật editService HOẶC API báo không được sửa
+              disabled={!editService || !isClosingDayEditable} 
+              style={(!isClosingDayEditable) ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
+              onChange={(e) => setBillClosingDay(e.target.value)}
+              title={!isClosingDayEditable ? closingDayReason : "Nhập ngày từ 1-28"}
             />
+            {/* Hiển thị lý do chi tiết ở dưới nếu cần */}
+            {!isClosingDayEditable && (
+                <div className="form-text text-danger" style={{fontSize: '11px'}}>
+                    {closingDayReason}
+                </div>
+            )}
           </Col>
         </Row>
 

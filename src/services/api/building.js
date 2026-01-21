@@ -150,3 +150,10 @@ export async function getBuildingsNeedClosing(role, userId) {
     return [];
   }
 }
+
+// Check if billing settings (like closing day) are editable
+export async function checkBuildingEditable(buildingId) {
+  if (!buildingId) throw new Error("buildingId is required");
+  const { data } = await http.get(`/building/${buildingId}/check-fee-editable`);
+  return unwrap(data);
+}

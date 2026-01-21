@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { colors } from "../../constants/colors";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
-import { FaPrint, FaSave } from "react-icons/fa";
 import { listUsers } from "../../services/api/users";
 import { listRooms } from "../../services/api/rooms";
 
@@ -9,6 +8,7 @@ export default function TenantAggregatesPage() {
   const [users, setUsers] = useState([]);
   const [genderData, setGenderData] = useState([]);
   const [ageData, setAgeData] = useState([]);
+  const [tenantData, setTenantData] = useState([]);
   const [roomData, setRoomData] = useState([]);
 
   const COLORS = ["#3B82F6", "#F97316", "#10B981", "#A855F7", "#EF4444"];
@@ -26,13 +26,13 @@ export default function TenantAggregatesPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        /* ==================== LOAD USERS ==================== */
-        const res = await listUsers();
-        setUsers(res);
+        /* ==================== USERS ==================== */
+        const userRes = await listUsers();
+        setUsers(userRes);
 
-        // ===== TÍNH GIỚI TÍNH =====
+        /* ===== GIỚI TÍNH ===== */
         const genderCounts = { Nam: 0, Nữ: 0, Khác: 0 };
-        res.forEach((u) => {
+        userRes.forEach((u) => {
           const gender = (u.gender || "").toLowerCase();
           if (gender === "male" || gender === "nam") genderCounts.Nam++;
           else if (gender === "female" || gender === "nữ") genderCounts.Nữ++;
@@ -45,9 +45,9 @@ export default function TenantAggregatesPage() {
           { name: "Khác", value: genderCounts.Khác },
         ]);
 
-        // ===== TÍNH ĐỘ TUỔI =====
+        /* ===== ĐỘ TUỔI ===== */
         const ageGroups = { "<18": 0, "18-40": 0, "41-55": 0, ">55": 0 };
-        res.forEach((u) => {
+        userRes.forEach((u) => {
           const age = calculateAge(u.birthday);
           if (age == null) return;
           if (age < 18) ageGroups["<18"]++;
@@ -63,22 +63,34 @@ export default function TenantAggregatesPage() {
           { name: ">55", value: ageGroups[">55"] },
         ]);
 
-        /* ==================== LOAD ROOMS ==================== */
-        const rooms = await listRooms();
-        const counts = { occupied: 0, available: 0 };
-        rooms.forEach((r) => {
+        /* ===== NGƯỜI THUÊ ===== */
+        let tenantCount = 0;
+        let otherCount = 0;
+        userRes.forEach((u) => {
+          if (u.role === "TENANT") tenantCount++;
+          else otherCount++;
+        });
+
+        setTenantData([
+          { name: "Người thuê", value: tenantCount },
+          { name: "Khác", value: otherCount },
+        ]);
+
+        /* ==================== ROOMS ==================== */
+        const roomRes = await listRooms();
+        const roomCounts = { occupied: 0, available: 0 };
+
+        roomRes.forEach((r) => {
           const status = String(r.status || r.room_status || "")
             .trim()
             .toLowerCase();
-
-          if (status === "occupied") counts.occupied++;
-          else if (status === "available") counts.available++;
-          // ❗ Các status còn lại sẽ bỏ qua — không tính & không hiển thị
+          if (status === "occupied") roomCounts.occupied++;
+          else if (status === "available") roomCounts.available++;
         });
 
         setRoomData([
-          { name: "Đang thuê", value: counts.occupied },
-          { name: "Còn trống", value: counts.available },
+          { name: "Đang thuê", value: roomCounts.occupied },
+          { name: "Còn trống", value: roomCounts.available },
         ]);
       } catch (err) {
         console.error("❌ Lỗi tải dữ liệu:", err);
@@ -92,24 +104,12 @@ export default function TenantAggregatesPage() {
     <div
       style={{
         minHeight: "100vh",
-        padding: "24px",
+        padding: 24,
         background: colors.background,
       }}
     >
-      {/* ===== HEADER ===== */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <h2 style={{ fontWeight: 700 }}>Thống kê tổng hợp</h2>
-        <div style={{ display: "flex", gap: 10 }}></div>
-      </div>
+      <h2 style={{ fontWeight: 700, marginBottom: 16 }}>Thống kê tổng hợp</h2>
 
-      {/* ===== KHỐI CHÍNH: KHÁCH THUÊ + PHÒNG CÙNG HÀNG ===== */}
       <div
         style={{
           background: "#fff",
@@ -117,83 +117,28 @@ export default function TenantAggregatesPage() {
           boxShadow: "0 2px 8px rgba(0,0,0,.05)",
           padding: "20px 24px",
           display: "flex",
-          justifyContent: "space-between",
           gap: 40,
         }}
       >
-        {/* ================== KHÁCH THUÊ ================== */}
+        {/* ================== NGƯỜI DÙNG ================== */}
         <div style={{ flex: 1 }}>
-          <h3 style={{ fontWeight: 700, marginBottom: 12 }}>
-            Khách thuê trọ ({users.length} người)
-          </h3>
+          <h3 style={{ fontWeight: 700 }}>Người dùng ({users.length} người)</h3>
 
           {/* GIỚI TÍNH */}
-          <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
-            <div>
-              <p style={{ margin: 0, color: "#DC2626" }}>Giới tính:</p>
-              {genderData.map((g) => (
-                <p key={g.name} style={{ margin: 0 }}>
-                  {g.name}: {g.value} người
-                </p>
-              ))}
-            </div>
-
-            <PieChart width={150} height={150}>
-              <Pie
-                data={genderData}
-                cx="50%"
-                cy="50%"
-                outerRadius={60}
-                dataKey="value"
-              >
-                {genderData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </div>
+          <Section title="Giới tính" data={genderData} colors={COLORS} />
 
           {/* ĐỘ TUỔI */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 40,
-              marginTop: 20,
-            }}
-          >
-            <div>
-              <p style={{ margin: 0, color: "#DC2626" }}>Độ tuổi:</p>
-              {ageData.map((a) => (
-                <p key={a.name} style={{ margin: 0 }}>
-                  {a.name}: {a.value} người
-                </p>
-              ))}
-            </div>
+          <Section title="Độ tuổi" data={ageData} colors={COLORS} />
 
-            <PieChart width={150} height={150}>
-              <Pie
-                data={ageData}
-                cx="50%"
-                cy="50%"
-                outerRadius={60}
-                dataKey="value"
-              >
-                {ageData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </div>
+          {/* NGƯỜI THUÊ */}
+          <Section title="Người thuê" data={tenantData} colors={COLORS} />
         </div>
 
-        {/* ================== PHÒNG — đưa lên cùng hàng ================== */}
+        {/* ================== PHÒNG ================== */}
         <div
           style={{
             flex: 1,
-            padding: "16px",
+            paddingLeft: 24,
             borderLeft: "1px solid #e5e7eb",
           }}
         >
@@ -201,39 +146,47 @@ export default function TenantAggregatesPage() {
             Tình trạng phòng ({roomData.reduce((t, r) => t + r.value, 0)} phòng)
           </h3>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 30,
-              marginTop: 10,
-            }}
-          >
-            <div>
-              {roomData.map((r) => (
-                <p key={r.name} style={{ margin: 0 }}>
-                  {r.name}: {r.value} phòng
-                </p>
-              ))}
-            </div>
-
-            <PieChart width={160} height={160}>
-              <Pie
-                data={roomData}
-                cx="50%"
-                cy="50%"
-                outerRadius={65}
-                dataKey="value"
-              >
-                {roomData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </div>
+          <Section data={roomData} colors={COLORS} size={160} />
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ================== COMPONENT CON ================== */
+function Section({ title, data, colors, size = 150 }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 40,
+        marginTop: 20,
+      }}
+    >
+      <div>
+        {title && <p style={{ margin: 0, color: "#DC2626" }}>{title}:</p>}
+        {data.map((d) => (
+          <p key={d.name} style={{ margin: 0 }}>
+            {d.name}: {d.value}
+          </p>
+        ))}
+      </div>
+
+      <PieChart width={size} height={size}>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          outerRadius={size / 2 - 15}
+          dataKey="value"
+        >
+          {data.map((_, i) => (
+            <Cell key={i} fill={colors[i % colors.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+      </PieChart>
     </div>
   );
 }

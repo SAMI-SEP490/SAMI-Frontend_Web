@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Eye, Pencil, Send, Trash, XCircle, CashStack, CreditCard } from "react-bootstrap-icons"; 
+import { Eye, Pencil, Send, Trash, XCircle, CashStack, CreditCard, ClockHistory } from "react-bootstrap-icons";
 import {
   getBillById,
   updateDraftBill,
   deleteOrCancelBill,
+  extendBill,
+  getPenaltyCalculation
 } from "../../services/api/bills";
 import "./BillListPage.css";
 
@@ -134,6 +136,41 @@ export default function BillDetailPage() {
       setBill(updated);
     } catch (e) {
       alert(e.message || "Lỗi khi hủy hóa đơn");
+    }
+  }
+
+  // Logic Gia hạn với gợi ý tiền phạt
+  async function onExtend() {
+    if (!bill) return;
+
+    let suggestedPenalty = 0;
+    let promptMsg = "Gia hạn thêm 5 ngày.\nNhập số tiền phạt (VNĐ):";
+
+    // Nếu là tiền nhà, gọi API lấy số tiền phạt gợi ý
+    if (bill.bill_type === 'monthly_rent') {
+      try {
+        const calc = await getPenaltyCalculation(bill.bill_id);
+        if (calc && calc.penalty_rate_percent > 0) {
+          suggestedPenalty = calc.calculated_penalty;
+          promptMsg = `Gia hạn thêm 5 ngày.\n\nHệ thống tính phạt ${calc.penalty_rate_percent}% theo hợp đồng:\n= ${fmtMoney(calc.calculated_penalty)}\n\nNhập số tiền phạt thực tế (VNĐ):`;
+        }
+      } catch (e) {
+        console.warn("Cannot calc penalty", e);
+      }
+    }
+
+    const input = window.prompt(promptMsg, Math.round(suggestedPenalty));
+    if (input === null) return;
+
+    const penalty = Number(input);
+    if (isNaN(penalty) || penalty < 0) return alert("Số tiền không hợp lệ");
+
+    try {
+      await extendBill(bill.bill_id, penalty);
+      alert("✅ Đã gia hạn thành công!");
+      loadData();
+    } catch (e) {
+      alert(e.message || "Lỗi gia hạn");
     }
   }
 
@@ -335,6 +372,11 @@ export default function BillDetailPage() {
         {isCancellable && (
           <button className="btn btn-outline-danger" onClick={onCancel}>
             <XCircle size={14} className="me-2" /> Hủy bỏ
+          </button>
+        )}
+        {status === 'overdue' && (
+          <button className="btn btn-info text-white" onClick={onExtend}>
+            <ClockHistory size={14} className="me-2" /> Gia hạn
           </button>
         )}
       </div>

@@ -192,7 +192,7 @@ function MaintenanceListPage() {
                   <td>{index + 1}</td>
                   <td>{req.title}</td>
                   <td>{getUserFullName(req.tenant_user_id)}</td>
-                  <td>{req.room_id}</td>
+                  <td>{req.room_number}</td>
                   <td>{req.description || "-"}</td>
                   <td>{renderStatus(req.status)}</td>
                   <td>{req.note || "-"}</td>

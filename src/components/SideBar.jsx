@@ -37,7 +37,7 @@ const SideBar = () => {
       />
 
       <MenuButton
-        label="Thống kê tổng hợp người thuê"
+        label="Thống kê tổng hợp người dùng"
         active={isActive("/dashboard/tenant-aggregates")}
         onClick={() => navigate("/dashboard/tenant-aggregates")}
       />
@@ -56,11 +56,11 @@ const SideBar = () => {
           onClick={() => navigate("/tenants")}
         />
       )} */}
-        <MenuButton
-          label="Danh sách người dùng"
-          active={isActive("/users")}
-          onClick={() => navigate("/users")}
-        />
+      <MenuButton
+        label="Danh sách người dùng"
+        active={isActive("/users")}
+        onClick={() => navigate("/users")}
+      />
       <MenuButton
         label="Danh sách hóa đơn"
         active={isActive("/bills")}

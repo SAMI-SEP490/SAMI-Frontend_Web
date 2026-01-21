@@ -10,6 +10,7 @@ import {
   createCashPayment,
   refreshBillStatus,
   extendBill,
+  getPenaltyCalculation
 } from "../../services/api/bills";
 import { listBuildings } from "../../services/api/building";
 import { getAccessToken } from "../../services/http";
@@ -142,23 +143,41 @@ export default function BillListPage() {
     }
   }
 
-  // [UPDATE] Extend with Prompt for Penalty
-  async function onExtend(id) {
-      const input = window.prompt("Gia hạn thêm 5 ngày.\nNhập số tiền phạt (VNĐ) nếu có:", "0");
-      if (input === null) return; // User cancelled
+  // Extend with Prompt for Penalty
+  async function onExtend(id, billType) {
+    let suggestedPenalty = 0;
+    let promptMsg = "Gia hạn thêm 5 ngày.\nNhập số tiền phạt (VNĐ):";
 
-      const penalty = Number(input);
-      if (isNaN(penalty) || penalty < 0) {
-          return alert("Số tiền phạt không hợp lệ!");
-      }
-
+    if (billType === 'monthly_rent') {
       try {
-          await extendBill(id, penalty);
-          alert("✅ Đã gia hạn thành công!");
-          loadData();
+        // Sử dụng hàm service thay vì http.get trực tiếp
+        const calc = await getPenaltyCalculation(id);
+        // calc trả về object đã unwrap: { bill_id, total_amount, ... }
+
+        if (calc && calc.penalty_rate_percent > 0) {
+          suggestedPenalty = calc.calculated_penalty;
+          promptMsg = `Gia hạn thêm 5 ngày.\n\nHệ thống tính phạt ${calc.penalty_rate_percent}% theo hợp đồng:\n= ${fmtMoney(calc.calculated_penalty)}\n\nNhập số tiền phạt thực tế (VNĐ):`;
+        }
       } catch (e) {
-          alert(e.message || "Lỗi gia hạn");
+        console.warn("Cannot calc penalty", e);
       }
+    }
+
+    const input = window.prompt(promptMsg, Math.round(suggestedPenalty));
+    if (input === null) return;
+
+    const penalty = Number(input);
+    if (isNaN(penalty) || penalty < 0) {
+      return alert("Số tiền phạt không hợp lệ!");
+    }
+
+    try {
+      await extendBill(id, penalty);
+      alert("✅ Đã gia hạn thành công!");
+      loadData();
+    } catch (e) {
+      alert(e.message || "Lỗi gia hạn");
+    }
   }
 
   // [UPDATE] Publish Draft
@@ -363,7 +382,7 @@ export default function BillListPage() {
 
                         {/* Overdue: Extend */}
                         {b.status === 'overdue' && (
-                            <button className="btn btn-info btn-sm text-white" title="Gia hạn" onClick={() => onExtend(getBillId(b))}>
+                            <button className="btn btn-info btn-sm text-white" title="Gia hạn" onClick={() => onExtend(getBillId(b), b.bill_type)}>
                                 <ClockHistory/>
                             </button>
                         )}

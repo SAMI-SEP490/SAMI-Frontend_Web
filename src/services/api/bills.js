@@ -163,6 +163,13 @@ export async function getUnbilledRooms(periodStart) {
   return un(res);
 }
 
+// Get Penalty Calculation Preview
+export async function getPenaltyCalculation(id) {
+  const res = await http.get(`/bill/penalty-calc/${id}`, { validateStatus: () => true });
+  if (res.status >= 400) throw new Error(extractServerError(res));
+  return un(res);
+}
+
 export async function precheckDuplicateBill(roomId, periodStart) {
   // This function is purely logic on top of getUnbilledRooms, no HTTP call itself
   // But we need to handle potential errors from getUnbilledRooms

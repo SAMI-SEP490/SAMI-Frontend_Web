@@ -402,26 +402,48 @@ function ContractListPage() {
           <Modal.Header closeButton className="border-bottom-0 pb-0">
             <Modal.Title className="h5 fw-bold">Thông tin Hợp đồng</Modal.Title>
           </Modal.Header>
+          {/* --- Thay thế toàn bộ phần Modal.Body hiện tại bằng đoạn dưới đây --- */}
           <Modal.Body className="pt-2">
             {selectedContract && (
                 <div className="d-flex flex-column gap-4">
-                  {/* Header Info */}
+                  {/* 1. Header Info & Trạng thái */}
                   <div className="d-flex justify-content-between align-items-center bg-light p-3 rounded">
                     <div>
                       <span className="text-muted small text-uppercase">Mã hợp đồng</span>
-                      <div className="fw-bold fs-5">#{selectedContract.contract_number || selectedContract.contract_id}</div>
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="fw-bold fs-5">#{selectedContract.contract_number || selectedContract.contract_id}</div>
+                        <span className="text-muted small fst-italic">
+               (Tạo ngày: {formatDate(selectedContract.created_at)})
+             </span>
+                      </div>
                     </div>
                     {renderStatus(selectedContract.status)}
                   </div>
 
                   <div className="detail-grid">
-                    {/* Cột trái: Thông tin thuê */}
+                    {/* 2. Cột trái: Thông tin Bên thuê (Bổ sung CCCD) */}
                     <div className="d-flex flex-column gap-3">
-                      <h6 className="border-bottom pb-2 mb-0 text-primary"><Person className="me-2"/>Bên thuê</h6>
+                      <h6 className="border-bottom pb-2 mb-0 text-primary fw-bold">
+                        <Person className="me-2"/>Bên thuê
+                      </h6>
+
                       <div className="detail-item">
-                        <div className="detail-label">Khách thuê</div>
-                        <div className="detail-value">{selectedContract.tenant_name}</div>
+                        <div className="detail-label">Họ và tên</div>
+                        <div className="detail-value fw-bold">{selectedContract.tenant_name}</div>
                       </div>
+
+                      <div className="detail-item">
+                        <div className="detail-label">Thông tin định danh</div>
+                        {/* Hiển thị CCCD/CMND nếu có */}
+                        <div className="detail-value">
+                          {selectedContract.id_number || selectedContract.tenant_id_number ? (
+                              <span>CCCD/CMND: {selectedContract.id_number || selectedContract.tenant_id_number}</span>
+                          ) : (
+                              <span className="text-muted fst-italic">Chưa cập nhật CCCD</span>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="detail-item">
                         <div className="detail-label">Liên hệ</div>
                         <div className="detail-value">{selectedContract.tenant_phone || "N/A"}</div>
@@ -429,43 +451,79 @@ function ContractListPage() {
                       </div>
                     </div>
 
-                    {/* Cột phải: Thông tin phòng & Giá */}
+                    {/* 3. Cột phải: Tài chính & Phòng (Bổ sung Chu kỳ thanh toán & Phạt) */}
                     <div className="d-flex flex-column gap-3">
-                      <h6 className="border-bottom pb-2 mb-0 text-primary"><Building className="me-2"/>Phòng & Chi phí</h6>
+                      <h6 className="border-bottom pb-2 mb-0 text-primary fw-bold">
+                        <Building className="me-2"/>Phòng & Tài chính
+                      </h6>
+
                       <div className="detail-item">
-                        <div className="detail-label">Vị trí</div>
+                        <div className="detail-label">Vị trí thuê</div>
                         <div className="detail-value">
-                          {userRole === "OWNER" && <span>{selectedContract.building_name} - </span>}
+                          {userRole === "OWNER" && <strong>{selectedContract.building_name} - </strong>}
                           Phòng {selectedContract.room_number}
                         </div>
                       </div>
-                      <div className="d-flex gap-2">
-                        <div className="detail-item w-50">
-                          <div className="detail-label">Tiền thuê</div>
-                          <div className="detail-value text-success">{selectedContract.rent_amount?.toLocaleString()} ₫</div>
+
+                      <div className="row g-2">
+                        <div className="col-6">
+                          <div className="detail-item">
+                            <div className="detail-label">Tiền thuê / tháng</div>
+                            <div className="detail-value text-success fw-bold">
+                              {selectedContract.rent_amount?.toLocaleString()} ₫
+                            </div>
+                          </div>
                         </div>
-                        <div className="detail-item w-50">
-                          <div className="detail-label">Đặt cọc</div>
-                          <div className="detail-value">{selectedContract.deposit_amount?.toLocaleString()} ₫</div>
+                        <div className="col-6">
+                          <div className="detail-item">
+                            <div className="detail-label">Tiền đặt cọc</div>
+                            <div className="detail-value fw-bold">
+                              {selectedContract.deposit_amount?.toLocaleString()} ₫
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* BỔ SUNG: Chu kỳ thanh toán và Lãi phạt */}
+                      <div className="row g-2">
+                        <div className="col-6">
+                          <div className="detail-item">
+                            <div className="detail-label">Chu kỳ thanh toán</div>
+                            <div className="detail-value">
+                              {selectedContract.payment_cycle_months} tháng/lần
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-6">
+                          <div className="detail-item">
+                            <div className="detail-label">Phạt chậm trả</div>
+                            <div className="detail-value text-danger">
+                              {selectedContract.penalty_rate ? `${selectedContract.penalty_rate}% / ngày` : "Không áp dụng"}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Hàng dưới: Thời hạn & Ghi chú */}
+                  {/* 4. Hàng dưới: Thời hạn & Ghi chú */}
                   <div className="d-flex flex-column gap-3">
-                    <h6 className="border-bottom pb-2 mb-0 text-primary"><Calendar3 className="me-2"/>Thời hạn & Ghi chú</h6>
+                    <h6 className="border-bottom pb-2 mb-0 text-primary fw-bold">
+                      <Calendar3 className="me-2"/>Thời hạn & Khác
+                    </h6>
                     <div className="detail-grid">
                       <div className="detail-item">
-                        <div className="detail-label">Ngày bắt đầu - Kết thúc</div>
+                        <div className="detail-label">Hiệu lực hợp đồng</div>
                         <div className="detail-value">
-                          {formatDate(selectedContract.start_date)} - {formatDate(selectedContract.end_date)}
+                          {formatDate(selectedContract.start_date)} <span className="mx-2">➔</span> {formatDate(selectedContract.end_date)}
                         </div>
-                        <div className="small text-muted mt-1">({selectedContract.duration_months} tháng)</div>
+                        <div className="small text-muted mt-1 fw-bold">
+                          (Tổng thời hạn: {selectedContract.duration_months} tháng)
+                        </div>
                       </div>
                       <div className="detail-item">
-                        <div className="detail-label">Ghi chú</div>
-                        <div className="detail-value text-break" style={{fontSize:'14px'}}>
+                        <div className="detail-label">Ghi chú / Điều khoản bổ sung</div>
+                        <div className="detail-value bg-light p-2 rounded text-break" style={{ fontSize: '14px', minHeight: '60px' }}>
                           {selectedContract.note || "Không có ghi chú"}
                         </div>
                       </div>

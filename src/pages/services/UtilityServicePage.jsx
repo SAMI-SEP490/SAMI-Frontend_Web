@@ -261,6 +261,7 @@ export default function UtilityServicePage() {
           className={`btn-secondary ${editModeOld ? 'active' : ''}`}
           onClick={() => setEditModeOld(!editModeOld)}
           title="Cho phép sửa chỉ số cũ khi thay công tơ"
+          hidden
         >
           <FiRotateCcw /> {editModeOld ? "Đang sửa số cũ" : "Báo thay công tơ"}
         </button>

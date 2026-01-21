@@ -45,7 +45,7 @@ function renderTypeBadge(type) {
     switch(type) {
         case 'monthly_rent': return <span className="badge bg-primary">Tiền nhà</span>;
         case 'utilities': return <span className="badge bg-warning text-dark">Điện nước & Dịch vụ</span>;
-        default: return <span className="badge bg-secondary">Khác</span>;
+        default: return <span className="badge bg-secondary text-light">Khác</span>;
     }
 }
 

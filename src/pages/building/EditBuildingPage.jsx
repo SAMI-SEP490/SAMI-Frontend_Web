@@ -8,7 +8,6 @@ import {
   getBuildingManagers,
 } from "../../services/api/building";
 import "./EditBuildingPage.css";
-import { getAccessToken } from "@/services/http.js";
 function EditBuildingPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -28,6 +27,7 @@ function EditBuildingPage() {
   const [waterPrice, setWaterPrice] = useState(0);
   const [serviceFee, setServiceFee] = useState(0);
   const [billClosingDay, setBillClosingDay] = useState(""); // [UPDATE] Đổi tên state
+  const [canEditClosingDay, setCanEditClosingDay] = useState(true);
 
   // ===== PARKING =====
   const [editParking, setEditParking] = useState(false);
@@ -55,6 +55,7 @@ function EditBuildingPage() {
         setWaterPrice(b.water_unit_price ?? 0);
         setServiceFee(b.service_fee ?? 0);
         setBillClosingDay(b.bill_closing_day ?? ""); // [UPDATE] Load closing day
+        setCanEditClosingDay(b.can_edit_bill_closing_day ?? true);
 
         // Parking
         setMax4WheelSlot(b.max_4_wheel_slot ?? 0);
@@ -79,6 +80,14 @@ function EditBuildingPage() {
       return alert("Vui lòng nhập tên và địa chỉ");
     }
 
+    // Validate ngày chốt sổ nếu được phép sửa
+    if (canEditClosingDay) {
+      const day = Number.parseInt(billClosingDay, 10);
+      if (!Number.isInteger(day) || day < 1 || day > 28) {
+        return alert("❌ Ngày chốt sổ phải từ 1 đến 28");
+      }
+    }
+
     try {
       setSaving(true);
 
@@ -89,7 +98,7 @@ function EditBuildingPage() {
         electric_unit_price: Number(electricPrice),
         water_unit_price: Number(waterPrice),
         service_fee: Number(serviceFee),
-        // [NOTE] bill_closing_day không gửi lên vì không cho sửa
+        ...(canEditClosingDay ? { bill_closing_day: Number(billClosingDay) } : {}),
 
         max_4_wheel_slot: Number(max4WheelSlot),
         max_2_wheel_slot: Number(max2WheelSlot),
@@ -191,15 +200,27 @@ function EditBuildingPage() {
             />
           </Col>
 
-          {/* [UPDATE] Ngày chốt sổ: Luôn Disabled và có Label khác */}
+          {/* [UPDATE] Ngày chốt sổ: chỉ cho sửa khi chưa có hợp đồng active */}
           <Col md={3}>
-            <label className="text-muted">Ngày chốt sổ (Cố định)</label>
+            <label className={!canEditClosingDay ? "text-muted" : undefined}>
+              {canEditClosingDay ? "Ngày chốt sổ (1-28)" : "Ngày chốt sổ (Đã khóa)"}
+            </label>
             <input
               type="number"
               value={billClosingDay}
-              disabled={true} // Luôn khóa
-              style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}
+              disabled={!editService || !canEditClosingDay}
+              onChange={(e) => setBillClosingDay(e.target.value)}
+              style={
+                !editService || !canEditClosingDay
+                  ? { backgroundColor: "#e9ecef", cursor: "not-allowed" }
+                  : undefined
+              }
             />
+            {!canEditClosingDay && (
+              <small className="text-muted">
+                Tòa nhà đã có hợp đồng active nên không thể sửa ngày chốt sổ.
+              </small>
+            )}
           </Col>
         </Row>
 

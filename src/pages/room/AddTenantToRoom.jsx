@@ -46,7 +46,18 @@ function AddTenantToRoom() {
         setError("");
 
         // lookupTenant() -> backend sẽ tự loại tenant đã là secondary ở phòng khác
-        const res = await lookupTenant(term);
+        const buildingId =
+          roomInfo?.building_id ||
+          roomInfo?.building?.building_id ||
+          roomInfo?.buildingId;
+
+        // Chưa load được roomInfo/buildingId thì chưa search
+        if (!buildingId) {
+          setSearchResults([]);
+          return;
+        }
+
+        const res = await lookupTenant(term, buildingId);
 
         // normalize result: object | array | null
         const arr = Array.isArray(res) ? res : res ? [res] : [];
@@ -61,7 +72,7 @@ function AddTenantToRoom() {
     }, 350);
 
     return () => clearTimeout(t);
-  }, [searchTerm, selectedUser]);
+  }, [searchTerm, selectedUser, roomInfo]);
 
   useEffect(() => {
     async function fetchContractWindow() {

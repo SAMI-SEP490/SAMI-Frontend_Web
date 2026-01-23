@@ -10,7 +10,7 @@ import {
 import { FiAlertTriangle, FiClock, FiSave, FiRotateCcw } from "react-icons/fi";
 import "./UtilityServicePage.css";
 
-// Helper format datetime
+// ===== Helper format datetime =====
 const fmtDate = (d) => {
   if (!d) return "—";
   return new Date(d).toLocaleString("vi-VN", {
@@ -29,7 +29,7 @@ export default function UtilityServicePage() {
   const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
 
-  // --- STATE ---
+  // ================= STATE =================
   const [buildings, setBuildings] = useState([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState(null);
 
@@ -44,24 +44,28 @@ export default function UtilityServicePage() {
   const [saving, setSaving] = useState(false);
 
   const [editModeOld, setEditModeOld] = useState(false);
+  const [autoJumped, setAutoJumped] = useState(false);
 
-  // --- LOAD BUILDINGS ---
+  // ================= RESET AUTO-JUMP WHEN BUILDING CHANGE =================
   useEffect(() => {
-    async function load() {
+    setAutoJumped(false);
+  }, [selectedBuildingId]);
+
+  // ================= LOAD BUILDINGS =================
+  useEffect(() => {
+    async function loadBuildings() {
       try {
-        const all = await listBuildings();
+        const allBuildings = await listBuildings();
         let allowed = [];
 
         if (role === "OWNER") {
-          allowed = all;
+          allowed = allBuildings;
         } else {
-          for (const b of all) {
-            try {
-              const mgrs = await getBuildingManagers(b.building_id);
-              if (mgrs.some((m) => Number(m.user_id) === Number(userId))) {
-                allowed.push(b);
-              }
-            } catch {}
+          for (const b of allBuildings) {
+            const managers = await getBuildingManagers(b.building_id);
+            if (managers.some((m) => Number(m.user_id) === Number(userId))) {
+              allowed.push(b);
+            }
           }
         }
 
@@ -69,14 +73,52 @@ export default function UtilityServicePage() {
         if (allowed.length > 0) {
           setSelectedBuildingId(allowed[0].building_id);
         }
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error(err);
       }
     }
-    load();
+
+    loadBuildings();
   }, [role, userId]);
 
-  // --- LOAD READINGS ---
+  // ================= RULE 3 – AUTO JUMP MONTH =================
+  useEffect(() => {
+    if (autoJumped) return;
+
+    const building = buildings.find(
+      (b) => b.building_id === Number(selectedBuildingId),
+    );
+    if (!building?.bill_closing_day) return;
+
+    if (
+      month === currentMonth &&
+      year === currentYear &&
+      today.getDate() > building.bill_closing_day
+    ) {
+      let nextMonth = currentMonth + 1;
+      let nextYear = currentYear;
+
+      if (nextMonth === 13) {
+        nextMonth = 1;
+        nextYear += 1;
+      }
+
+      setMonth(nextMonth);
+      setYear(nextYear);
+      setAutoJumped(true); // ⭐ QUAN TRỌNG
+    }
+  }, [
+    buildings,
+    selectedBuildingId,
+    currentMonth,
+    currentYear,
+    month,
+    year,
+    today,
+    autoJumped,
+  ]);
+
+  // ================= LOAD READINGS =================
   useEffect(() => {
     if (!selectedBuildingId) return;
 
@@ -99,8 +141,8 @@ export default function UtilityServicePage() {
 
         setRooms(mapped);
         setOriginalRooms(JSON.parse(JSON.stringify(mapped)));
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -111,67 +153,44 @@ export default function UtilityServicePage() {
 
   // ================= LOGIC =================
 
-  // 1. Tháng tương lai
-  const isFuture = useMemo(() => {
-    if (year > currentYear) return true;
-    if (year === currentYear && month > currentMonth) return true;
-    return false;
-  }, [month, year, currentMonth, currentYear]);
-
-  // 2. Tháng quá khứ
-  const isPastMonth = useMemo(() => {
-    if (year < currentYear) return true;
-    if (year === currentYear && month < currentMonth) return true;
-    return false;
-  }, [month, year, currentMonth, currentYear]);
-
-  // 3. Sau ngày chốt sổ
-  const isAfterClosingDay = useMemo(() => {
+  // Kỳ duy nhất được phép sửa theo RULE 3
+  const editableTarget = useMemo(() => {
     const building = buildings.find(
       (b) => b.building_id === Number(selectedBuildingId),
     );
-    if (!building || !building.bill_closing_day) return false;
 
-    if (month !== currentMonth || year !== currentYear) return false;
-
-    return today.getDate() > building.bill_closing_day;
-  }, [buildings, selectedBuildingId, month, year, currentMonth, currentYear]);
-
-  // 4. Có được sửa không
-  const isEditable = !isFuture && !isPastMonth && !isAfterClosingDay;
-
-  // 5. Auto jump sang tháng sau sau closing day
-  useEffect(() => {
-    const building = buildings.find(
-      (b) => b.building_id === Number(selectedBuildingId),
-    );
-    if (!building || !building.bill_closing_day) return;
-
-    if (
-      month === currentMonth &&
-      year === currentYear &&
-      today.getDate() > building.bill_closing_day
-    ) {
-      let nextMonth = currentMonth + 1;
-      let nextYear = currentYear;
-
-      if (nextMonth === 13) {
-        nextMonth = 1;
-        nextYear += 1;
-      }
-
-      setMonth(nextMonth);
-      setYear(nextYear);
+    if (!building?.bill_closing_day) {
+      return { month: currentMonth, year: currentYear };
     }
-  }, [buildings, selectedBuildingId]);
 
-  // 6. Deadline badge
+    // Quá ngày chốt → chỉ được sửa tháng kế tiếp
+    if (today.getDate() > building.bill_closing_day) {
+      let m = currentMonth + 1;
+      let y = currentYear;
+      if (m === 13) {
+        m = 1;
+        y += 1;
+      }
+      return { month: m, year: y };
+    }
+
+    // Chưa quá ngày chốt → sửa tháng hiện tại
+    return { month: currentMonth, year: currentYear };
+  }, [buildings, selectedBuildingId, currentMonth, currentYear, today]);
+
+  const isEditable =
+    month === editableTarget.month && year === editableTarget.year;
+
+  const isFuture =
+    year > editableTarget.year ||
+    (year === editableTarget.year && month > editableTarget.month);
+
+  // ================= DEADLINE BADGE =================
   const deadlineInfo = useMemo(() => {
     const building = buildings.find(
       (b) => b.building_id === Number(selectedBuildingId),
     );
-    if (!building || !building.bill_closing_day) return null;
-
+    if (!building?.bill_closing_day) return null;
     if (month !== currentMonth || year !== currentYear) return null;
 
     const closingDay = building.bill_closing_day;
@@ -190,15 +209,24 @@ export default function UtilityServicePage() {
     if (diffDays <= 3) {
       return {
         status: "warning",
-        text: `Sắp đến hạn chốt sổ! Còn ${diffDays > 1 ? diffDays + " ngày" : diffHours + " giờ"}`,
+        text: `Sắp đến hạn chốt sổ! Còn ${
+          diffDays > 1 ? diffDays + " ngày" : diffHours + " giờ"
+        }`,
       };
     }
 
     return null;
-  }, [buildings, selectedBuildingId, month, year, currentMonth, currentYear]);
+  }, [
+    buildings,
+    selectedBuildingId,
+    month,
+    year,
+    currentMonth,
+    currentYear,
+    today,
+  ]);
 
   // ================= HANDLERS =================
-
   const handleChange = (roomId, field, value) => {
     setRooms((prev) =>
       prev.map((r) =>
@@ -211,42 +239,30 @@ export default function UtilityServicePage() {
     const invalid = rooms.some(
       (r) => r.new_electric < r.old_electric || r.new_water < r.old_water,
     );
-    if (invalid) return alert("Chỉ số mới không được nhỏ hơn chỉ số cũ!");
+    if (invalid) {
+      alert("Chỉ số mới không được nhỏ hơn chỉ số cũ!");
+      return;
+    }
 
     setSaving(true);
     try {
-      const payload = {
+      await submitUtilityReadings({
         building_id: selectedBuildingId,
         billing_month: month,
         billing_year: year,
-        readings: rooms.map((r) => {
-          const item = {
-            room_id: r.room_id,
-            new_electric: r.new_electric,
-            new_water: r.new_water,
-          };
+        readings: rooms.map((r) => ({
+          room_id: r.room_id,
+          new_electric: r.new_electric,
+          new_water: r.new_water,
+        })),
+      });
 
-          if (r.old_electric !== r.old_electric_original) {
-            item.old_electric_override = r.old_electric;
-            item.is_electric_reset = true;
-          }
-
-          if (r.old_water !== r.old_water_original) {
-            item.old_water_override = r.old_water;
-            item.is_water_reset = true;
-          }
-
-          return item;
-        }),
-      };
-
-      await submitUtilityReadings(payload);
       alert("✅ Lưu thành công!");
       setOriginalRooms(JSON.parse(JSON.stringify(rooms)));
       setEditModeOld(false);
-    } catch (e) {
+    } catch (err) {
       alert("❌ Lỗi lưu dữ liệu");
-      console.error(e);
+      console.error(err);
     } finally {
       setSaving(false);
     }
@@ -255,10 +271,10 @@ export default function UtilityServicePage() {
   const filteredRooms = rooms.filter((r) =>
     r.room_number.toLowerCase().includes(search.toLowerCase()),
   );
+
   const hasChanged = JSON.stringify(rooms) !== JSON.stringify(originalRooms);
 
   // ================= RENDER =================
-
   return (
     <div className="container utility-page">
       <div className="header-row">
@@ -329,14 +345,6 @@ export default function UtilityServicePage() {
       {/* ACTIONS */}
       <div className="actions-row">
         <button
-          className={`btn-secondary ${editModeOld ? "active" : ""}`}
-          onClick={() => setEditModeOld(!editModeOld)}
-          hidden={!isEditable}
-        >
-          <FiRotateCcw /> {editModeOld ? "Đang sửa số cũ" : "Báo thay công tơ"}
-        </button>
-
-        <button
           className="btn-primary"
           onClick={handleSave}
           disabled={!hasChanged || saving || !isEditable}
@@ -353,7 +361,7 @@ export default function UtilityServicePage() {
 
       {/* TABLE */}
       {isFuture ? (
-        <div className="no-data">⏳ Không thể nhập liệu cho tương lai.</div>
+        <div className="no-data">⛔ Chỉ được nhập đến kỳ chốt hợp lệ.</div>
       ) : loading ? (
         <div className="loading-text">Đang tải dữ liệu...</div>
       ) : (

@@ -265,19 +265,65 @@ function ContractListPage() {
   // --- RENDER HELPERS ---
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
 
+
   const renderStatus = (status) => {
     const map = {
-      active: { label: "Hiệu lực", css: "status-active" },
-      pending: { label: "Chờ duyệt", css: "status-pending" },
-      expired: { label: "Hết hạn", css: "status-expired" },
-      terminated: { label: "Đã hủy", css: "status-terminated" },
-      rejected: { label: "Từ chối", css: "status-expired" } // Thêm style cho rejected nếu cần
+      // 1. Trạng thái Hiệu lực (Xanh lá)
+      active: {
+        label: "Đang hiệu lực",
+        bg: "bg-success",
+        text: "text-white",
+        icon: "🟢"
+      },
+
+      // 2. Trạng thái Chờ (Xanh dương / Vàng)
+      pending: {
+        label: "Chờ ký kết",
+        bg: "bg-primary",
+        text: "text-white",
+        icon: "🔵"
+      },
+      pending_transaction: {
+        label: "Chờ thanh toán",
+        bg: "bg-warning",
+        text: "text-dark",
+        icon: "⏳"
+      },
+      requested_termination: {
+        label: "Yêu cầu hủy",
+        bg: "bg-info",
+        text: "text-dark",
+        icon: "⚠️"
+      },
+
+      // 3. Trạng thái Kết thúc (Xám / Đỏ / Đen)
+      expired: {
+        label: "Đã hết hạn",
+        bg: "bg-secondary",
+        text: "text-white",
+        icon: "📅"
+      },
+      terminated: {
+        label: "Đã thanh lý",
+        bg: "bg-dark",
+        text: "text-white",
+        icon: "🏁"
+      },
+      rejected: {
+        label: "Đã từ chối",
+        bg: "bg-danger",
+        text: "text-white",
+        icon: "⛔"
+      }
     };
-    const item = map[status] || { label: status, css: "status-expired" };
+
+    const item = map[status] || { label: status, bg: "bg-light", text: "text-dark", icon: "❓" };
+
     return (
-        <span className={`status-badge ${item.css}`}>
-        <span className="status-dot"></span> {item.label}
-      </span>
+        <span className={`badge rounded-pill ${item.bg} ${item.text} border px-3 py-2 fw-normal d-inline-flex align-items-center gap-2 shadow-sm`}>
+      <span style={{ fontSize: '0.8rem' }}>{item.icon}</span>
+          {item.label}
+    </span>
     );
   };
 
@@ -330,15 +376,23 @@ function ContractListPage() {
                 </div>
             )}
 
+
             <div className="filter-group">
-              <label>Trạng thái</label>
-              <select name="status" className="form-select form-select-sm" value={filters.status} onChange={handleFilterChange}>
-                <option value="">-- Tất cả --</option>
-                <option value="active">Đang hiệu lực</option>
-                <option value="pending">Chờ duyệt</option>
-                <option value="expired">Hết hạn</option>
-                <option value="terminated">Đã hủy</option>
-                <option value="rejected">Bị từ chối</option>
+              <label className="fw-bold small mb-1">Trạng thái</label>
+              <select
+                  name="status"
+                  className="form-select form-select-sm shadow-none border-secondary-subtle"
+                  value={filters.status}
+                  onChange={handleFilterChange}
+              >
+                <option value="">-- Tất cả trạng thái --</option>
+                <option value="active"> Đang hiệu lực</option>
+                <option value="pending"> Chờ ký kết</option>
+                <option value="pending_transaction"> Chờ thanh toán (Công nợ)</option>
+                <option value="requested_termination">️ Yêu cầu hủy</option>
+                <option value="expired"> Đã hết hạn</option>
+                <option value="terminated">Đã thanh lý</option>
+                <option value="rejected"> Đã từ chối</option>
               </select>
             </div>
 

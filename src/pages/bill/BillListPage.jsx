@@ -257,14 +257,19 @@ export default function BillListPage() {
     <div className="container">
       <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="title m-0">Quản lý Hóa đơn</h2>
-          <button 
-            className="btn btn-success d-flex align-items-center gap-2 px-3 py-2" 
-            onClick={onRefreshStatus}
-            disabled={refreshing}
-          >
-            {refreshing ? <div className="spinner-border spinner-border-sm"/> : <LightningCharge size={18}/>}
-            {refreshing ? "Đang xử lý..." : "Tạo tiền nhà & điện nước ngay"}
-          </button>
+          <div className="d-flex flex-column align-items-end">
+            <button 
+              className="btn btn-success d-flex align-items-center gap-2 px-3 py-2" 
+              onClick={onRefreshStatus}
+              disabled={refreshing}
+            >
+              {refreshing ? <div className="spinner-border spinner-border-sm"/> : <LightningCharge size={18}/>}
+              {refreshing ? "Đang xử lý..." : "Tạo tiền nhà & điện nước ngay"}
+            </button>
+            <small className="text-muted fst-italic mt-1" style={{fontSize: '0.8rem'}}>
+              Thao tác này sẽ tự động chạy vào 11:30 PM
+            </small>
+          </div>
       </div>
 
       <div className="filter-bar">

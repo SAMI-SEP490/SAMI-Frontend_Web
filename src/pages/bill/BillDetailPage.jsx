@@ -218,7 +218,7 @@ export default function BillDetailPage() {
           </div>
 
           <div className="col-md-6">
-            <label className="text-muted small">Kỳ thanh toán</label>
+            <label className="text-muted small">Khoảng thời gian</label>
             <div>
               {new Date(bill.billing_period_start).toLocaleDateString('vi-VN')}
               <span className="mx-2">➔</span>

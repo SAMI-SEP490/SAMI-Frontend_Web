@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { colors } from "../../constants/colors";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
-import { listUsers } from "../../services/api/users";
+import { listActiveTenants } from "../../services/api/users";
+
 import { listRooms } from "../../services/api/rooms";
 import { listBuildings } from "../../services/api/building";
 
@@ -12,7 +13,6 @@ export default function TenantAggregatesPage() {
   const [users, setUsers] = useState([]);
   const [genderData, setGenderData] = useState([]);
   const [ageData, setAgeData] = useState([]);
-  const [tenantData, setTenantData] = useState([]);
   const [roomData, setRoomData] = useState([]);
 
   const COLORS = ["#3B82F6", "#F97316", "#10B981", "#A855F7", "#EF4444"];
@@ -34,25 +34,19 @@ export default function TenantAggregatesPage() {
         const buildingRes = await listBuildings();
         setBuildings(buildingRes);
 
-        const buildingIds = buildingRes.map((b) => b.building_id);
+        /* ==================== USERS (CHỈ NGƯỜI THUÊ) ==================== */
+        const tenantUsers = await listActiveTenants(
+  selectedBuilding === "ALL"
+    ? {}
+    : { building_id: Number(selectedBuilding) }
+);
 
-        /* ==================== USERS ==================== */
-        const userRes = await listUsers();
-
-        const buildingId =
-          selectedBuilding === "ALL" ? null : Number(selectedBuilding);
-
-        const filteredUsers =
-          buildingId === null
-            ? userRes
-            : userRes.filter((u) => Number(u.building_id) === buildingId);
-
-        setUsers(filteredUsers);
+        setUsers(tenantUsers);
 
         /* ==================== GIỚI TÍNH ==================== */
         const genderCounts = { Nam: 0, Nữ: 0, Khác: 0 };
 
-        filteredUsers.forEach((u) => {
+        tenantUsers.forEach((u) => {
           const gender = (u.gender || "").toLowerCase();
           if (gender === "male" || gender === "nam") genderCounts.Nam++;
           else if (gender === "female" || gender === "nữ") genderCounts.Nữ++;
@@ -68,7 +62,7 @@ export default function TenantAggregatesPage() {
         /* ==================== ĐỘ TUỔI ==================== */
         const ageGroups = { "<18": 0, "18-40": 0, "41-55": 0, ">55": 0 };
 
-        filteredUsers.forEach((u) => {
+        tenantUsers.forEach((u) => {
           const age = calculateAge(u.birthday);
           if (age == null) return;
           if (age < 18) ageGroups["<18"]++;
@@ -84,28 +78,8 @@ export default function TenantAggregatesPage() {
           { name: ">55", value: ageGroups[">55"] },
         ]);
 
-        /* ==================== NGƯỜI THUÊ (CHUẨN NGHIỆP VỤ) ==================== */
-        let tenantCount = 0;
-        let otherCount = 0;
-
-        filteredUsers.forEach((u) => {
-          const isValidTenant =
-            u.role === "TENANT" &&
-            u.building_id &&
-            buildingIds.includes(Number(u.building_id));
-
-          if (isValidTenant) tenantCount++;
-          else otherCount++;
-        });
-
-        setTenantData([
-          { name: "Người thuê", value: tenantCount },
-          { name: "Khác", value: otherCount },
-        ]);
-
         /* ==================== ROOMS ==================== */
         const roomRes = await listRooms();
-
         const filteredRooms =
           buildingId === null
             ? roomRes
@@ -114,9 +88,7 @@ export default function TenantAggregatesPage() {
         const roomCounts = { occupied: 0, available: 0 };
 
         filteredRooms.forEach((r) => {
-          const status = String(r.status || "")
-            .trim()
-            .toLowerCase();
+          const status = String(r.status || "").toLowerCase();
           if (status === "occupied") roomCounts.occupied++;
           else if (status === "available") roomCounts.available++;
         });
@@ -141,11 +113,15 @@ export default function TenantAggregatesPage() {
         background: colors.background,
       }}
     >
-      <h2 style={{ fontWeight: 700, marginBottom: 12 }}>Thống kê tổng hợp</h2>
+      <h2 style={{ fontWeight: 700, marginBottom: 12 }}>
+        Thống kê tổng hợp người thuê
+      </h2>
 
       {/* ===== FILTER BUILDING ===== */}
       <div style={{ marginBottom: 16 }}>
-        <label style={{ fontWeight: 600, marginRight: 8 }}>Lọc theo tòa:</label>
+        <label style={{ fontWeight: 600, marginRight: 8 }}>
+          Lọc theo tòa:
+        </label>
         <select
           value={selectedBuilding}
           onChange={(e) => setSelectedBuilding(e.target.value)}
@@ -174,13 +150,14 @@ export default function TenantAggregatesPage() {
           gap: 40,
         }}
       >
-        {/* ================== NGƯỜI DÙNG ================== */}
+        {/* ================== NGƯỜI THUÊ ================== */}
         <div style={{ flex: 1 }}>
-          <h3 style={{ fontWeight: 700 }}>Người dùng ({users.length} người)</h3>
+          <h3 style={{ fontWeight: 700 }}>
+            Người thuê ({users.length} người)
+          </h3>
 
           <Section title="Giới tính" data={genderData} colors={COLORS} />
           <Section title="Độ tuổi" data={ageData} colors={COLORS} />
-          <Section title="Người thuê" data={tenantData} colors={COLORS} />
         </div>
 
         {/* ================== PHÒNG ================== */}
@@ -192,7 +169,8 @@ export default function TenantAggregatesPage() {
           }}
         >
           <h3 style={{ fontWeight: 700 }}>
-            Tình trạng phòng ({roomData.reduce((t, r) => t + r.value, 0)} phòng)
+            Tình trạng phòng (
+            {roomData.reduce((t, r) => t + r.value, 0)} phòng)
           </h3>
 
           <Section data={roomData} colors={COLORS} size={160} />

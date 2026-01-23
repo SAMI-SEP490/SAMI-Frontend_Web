@@ -144,17 +144,6 @@ export async function approveContract(id) {
 // TERMINATION FLOW (NEW)
    ========================================================================== */
 
-/** Owner/Manager yêu cầu chấm dứt hợp đồng */
-export async function requestTermination(id, data) {
-  // data: { termination_date, note }
-  try {
-    const response = await http.post(`/contract/${id}/request-termination`, data);
-    return unwrap(response);
-  } catch (error) {
-    console.error(`Lỗi khi yêu cầu chấm dứt hợp đồng ${id}:`, error);
-    throw error;
-  }
-}
 
 /** Owner xác nhận hoàn tất giao dịch thanh lý (đã trả cọc/thanh toán xong) */
 export async function completePendingTransaction(id) {
@@ -219,7 +208,37 @@ export async function fetchContractFileBlob(id) {
     throw error;
   }
 }
+export async function forceTerminateContract(id, data) {
+  try {
+    const formData = new FormData();
+    formData.append('reason', data.reason);
 
+    // Key 'evidence' phải khớp với upload.array('evidence') trong routes
+    if (data.evidence && data.evidence.length > 0) {
+      Array.from(data.evidence).forEach((file) => {
+        formData.append('evidence', file);
+      });
+    }
+
+    // Header Content-Type sẽ được browser tự động set là multipart/form-data
+    const response = await http.post(`/contract/${id}/force-terminate`, formData);
+    return unwrap(response);
+  } catch (error) {
+    console.error(`Lỗi khi cưỡng chế hủy hợp đồng ${id}:`, error);
+    throw error;
+  }
+}
+
+export async function requestTermination(id, reason) {
+
+  try {
+    const response = await http.post(`/contract/${id}/request-termination`, { reason });
+    return unwrap(response);
+  } catch (error) {
+    console.error(`Lỗi khi yêu cầu chấm dứt hợp đồng ${id}:`, error);
+    throw error;
+  }
+}
 /* ==========================================================================
 // AI FEATURES
    ========================================================================== */

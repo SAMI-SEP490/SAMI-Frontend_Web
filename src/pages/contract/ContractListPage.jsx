@@ -1,19 +1,22 @@
 // src/pages/contract/ContractListPage.jsx
 import React, { useState, useEffect, useMemo } from "react";
-import { Table, Button, Modal, Spinner, OverlayTrigger, Tooltip } from "react-bootstrap";
+import { Table, Button, Modal, Spinner, OverlayTrigger, Tooltip, Form , Alert} from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
+import { http } from "../../services/http";
 import {
   listContracts,
   deleteContract,
   downloadContractDirect,
-  fetchContractFileBlob
+  fetchContractFileBlob, forceTerminateContract,
+  requestTermination
 } from "../../services/api/contracts";
 import { listBuildings } from "@/services/api/building.js";
 import { getAccessToken } from "../../services/http";
 import {
   PlusLg, Download, Eye, Trash,
   ArrowClockwise, FileEarmarkPdf, Building, Person, Calendar3,
-  JournalText, PencilSquare // <--- Đã thêm PencilSquare
+  JournalText, PencilSquare, ShieldExclamation,
+  ExclamationTriangle, SlashCircle
 } from "react-bootstrap-icons";
 import "./ContractListPage.css";
 
@@ -41,7 +44,11 @@ function ContractListPage() {
     building: "",
     q: ""
   });
-
+// --- STATE: REQUEST TERMINATION (Mới) ---
+  const [showTermModal, setShowTermModal] = useState(false);
+  const [termContractId, setTermContractId] = useState(null);
+  const [termReason, setTermReason] = useState("");
+  const [termLoading, setTermLoading] = useState(false);
   // --- MODALS ---
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedContract, setSelectedContract] = useState(null);
@@ -86,6 +93,63 @@ function ContractListPage() {
     } catch (err) { console.error(err); }
   };
 
+  const [showForceModal, setShowForceModal] = useState(false);
+  const [forceContractId, setForceContractId] = useState(null);
+  const [forceReason, setForceReason] = useState("");
+  const [forceFiles, setForceFiles] = useState(null);
+  const [forceSubmitting, setForceSubmitting] = useState(false);
+
+  // --- HANDLER ---
+  const openForceModal = (contractId) => {
+    setForceContractId(contractId);
+    setForceReason("");
+    setForceFiles(null);
+    setShowForceModal(true);
+  };
+
+  const handleForceSubmit = async () => {
+    if (!forceReason.trim()) return alert("Vui lòng nhập lý do.");
+    if (!forceFiles || forceFiles.length === 0) return alert("Bắt buộc phải upload bằng chứng.");
+
+    try {
+      setForceSubmitting(true);
+      await forceTerminateContract(forceContractId, {
+        reason: forceReason,
+        evidence: forceFiles
+      });
+
+      alert("Cưỡng chế hủy thành công!");
+      setShowForceModal(false);
+      fetchContracts(); // Reload lại danh sách
+    } catch (error) {
+      alert("Lỗi: " + (error.message || "Không thể thực hiện"));
+    } finally {
+      setForceSubmitting(false);
+    }
+  };
+
+  const openTerminationModal = (contractId) => {
+    setTermContractId(contractId);
+    setTermReason("");
+    setShowTermModal(true);
+  };
+
+  const handleTerminationSubmit = async () => {
+    if (!termReason.trim()) return alert("Vui lòng nhập lý do chấm dứt hợp đồng.");
+
+    try {
+      setTermLoading(true);
+      await requestTermination(termContractId, termReason);
+
+      alert("Đã gửi yêu cầu chấm dứt thành công! Đang chờ Tenant xác nhận.");
+      setShowTermModal(false);
+      fetchContracts(); // Reload lại danh sách để cập nhật trạng thái
+    } catch (error) {
+      alert("Lỗi: " + (error.message || "Không thể gửi yêu cầu"));
+    } finally {
+      setTermLoading(false);
+    }
+  };
   // --- MEMOS ---
   const uniqueBuildings = useMemo(() => {
     if (listBuildingsData?.length > 0) {
@@ -158,7 +222,46 @@ function ContractListPage() {
       setShowDeleteModal(false);
     } catch (e) { alert("Lỗi xóa: " + e.message); }
   };
+  const evidenceKey = useMemo(() => {
+    if (!selectedContract?.note) return null;
+    const match = selectedContract.note.match(/\[EVIDENCE_S3_KEY::(.*?)\]/);
+    return match ? match[1] : null;
+  }, [selectedContract]);
 
+
+
+  const handleViewEvidence = async () => {
+    console.log("--- [DEBUG] CLIENT: View Evidence Clicked ---");
+    console.log("Full Note:", selectedContract?.note);
+    console.log("Extracted Key:", evidenceKey);
+
+    // 1. Kiểm tra key
+    if (!evidenceKey) {
+      alert("Không tìm thấy file bằng chứng trong ghi chú hợp đồng.");
+      return;
+    }
+
+    try {
+      // 2. Gọi API
+      console.log("Requesting URL for key:", evidenceKey);
+      const response = await http.get(`/contract/evidence/download`, {
+        params: { key: evidenceKey }
+      });
+
+      console.log("API Response:", response);
+      const { url } = response.data || response;
+
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        alert("Lỗi: Server trả về thành công nhưng không có URL.");
+      }
+
+    } catch (error) {
+      console.error("View Evidence Error:", error);
+      alert("Không thể tải bằng chứng. Lỗi: " + (error.message || "Unknown"));
+    }
+  };
   // --- RENDER HELPERS ---
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
 
@@ -355,7 +458,26 @@ function ContractListPage() {
                                   </button>
                                 </WithTooltip>
                             )}
-
+                            {c.status === 'active' && (
+                                <WithTooltip text="Yêu cầu chấm dứt">
+                                  <button
+                                      className="btn-icon text-warning" // Màu vàng cảnh báo
+                                      onClick={() => openTerminationModal(c.contract_id)}
+                                  >
+                                    <SlashCircle />
+                                  </button>
+                                </WithTooltip>
+                            )}
+                            {userRole === "OWNER" && c.status === 'requested_termination' && (
+                                <WithTooltip text="Cưỡng chế hủy (Owner)">
+                                  <button
+                                      className="btn-icon text-danger"
+                                      onClick={() => openForceModal(c.contract_id)}
+                                  >
+                                    <ExclamationTriangle />
+                                  </button>
+                                </WithTooltip>
+                            )}
                             {/* 5. Xóa (Cập nhật điều kiện) */}
                             {/* Chỉ xóa khi: Owner AND (Terminated OR Expired OR Rejected) */}
                             {userRole === "OWNER" && ['terminated', 'expired', 'rejected'].includes(c.status) && (
@@ -527,6 +649,28 @@ function ContractListPage() {
                           {selectedContract.note || "Không có ghi chú"}
                         </div>
                       </div>
+                      {/* [NEW] KHU VỰC BẰNG CHỨNG (CHỈ DÀNH CHO OWNER) */}
+                      {userRole === "OWNER" && evidenceKey && (
+                          <Alert variant="danger" className="mt-2 mb-0 border-danger">
+                            <div className="d-flex align-items-start gap-3">
+                              <ShieldExclamation size={24} className="text-danger mt-1" />
+                              <div className="flex-grow-1">
+                                <h6 className="alert-heading fw-bold mb-1 text-danger">Bằng chứng Cưỡng chế Hủy</h6>
+                                <p className="mb-2 small text-muted">
+                                  Hợp đồng này đã bị cưỡng chế hủy. Dưới đây là biên bản/hình ảnh bằng chứng được lưu trữ an toàn.
+                                </p>
+                                <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={handleViewEvidence}
+                                    className="d-flex align-items-center gap-2"
+                                >
+                                  <Eye /> Xem File Bằng Chứng
+                                </Button>
+                              </div>
+                            </div>
+                          </Alert>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -560,16 +704,111 @@ function ContractListPage() {
 
         <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
           <Modal.Body className="text-center p-4">
-            <div className="text-danger mb-3"><Trash size={40}/></div>
-            <h5>Xác nhận xóa hợp đồng?</h5>
-            <p className="text-muted">Dữ liệu sẽ bị xóa vĩnh viễn và không thể khôi phục.</p>
+            <div className="text-danger mb-3">
+              <Trash size={40} />
+            </div>
+            <h5 className="fw-bold text-danger">Xóa vĩnh viễn Hợp đồng?</h5>
+
+            <div className="alert alert-warning text-start mt-3" style={{ fontSize: '14px' }}>
+              <p className="mb-2 fw-bold">⚠️ Cảnh báo quan trọng:</p>
+              <ul className="mb-0 ps-3">
+                <li>Hợp đồng này sẽ bị xóa hoàn toàn khỏi hệ thống.</li>
+                <li>
+                  <strong>TOÀN BỘ HÓA ĐƠN & LỊCH SỬ THANH TOÁN</strong> gắn liền với hợp đồng này cũng sẽ bị xóa sạch.
+                </li>
+                <li>Hành động này <strong>không thể hoàn tác</strong>.</li>
+              </ul>
+            </div>
+
+            <p className="text-muted small">
+              Nếu bạn chỉ muốn kết thúc hợp đồng, hãy dùng chức năng "Thanh lý" thay vì xóa.
+            </p>
+
             <div className="d-flex justify-content-center gap-2 mt-4">
-              <Button variant="light" onClick={() => setShowDeleteModal(false)}>Hủy bỏ</Button>
-              <Button variant="danger" onClick={handleDelete}>Xóa vĩnh viễn</Button>
+              <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+                Hủy bỏ
+              </Button>
+              <Button variant="danger" onClick={handleDelete}>
+                Xác nhận Xóa
+              </Button>
             </div>
           </Modal.Body>
         </Modal>
 
+        <Modal show={showForceModal} onHide={() => setShowForceModal(false)} backdrop="static" centered>
+          <Modal.Header closeButton className="bg-danger text-white">
+            <Modal.Title className="h5">⚠️ Cưỡng chế Hủy Hợp đồng</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Alert variant="warning" className="small">
+              Hành động này sẽ giải phóng phòng ngay lập tức và ghi log kiểm toán.
+              Nếu còn công nợ, hợp đồng sẽ chuyển sang trạng thái <b>Pending Transaction</b>.
+            </Alert>
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label>Lý do hủy <span className="text-danger">*</span></Form.Label>
+                <Form.Control
+                    as="textarea" rows={3}
+                    value={forceReason}
+                    onChange={(e) => setForceReason(e.target.value)}
+                    placeholder="VD: Khách bỏ trốn, vi phạm nghiêm trọng..."
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Bằng chứng (Ảnh/Biên bản) <span className="text-danger">*</span></Form.Label>
+                <Form.Control
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setForceFiles(e.target.files)}
+                />
+              </Form.Group>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowForceModal(false)}>Hủy</Button>
+            <Button
+                variant="danger"
+                onClick={handleForceSubmit}
+                disabled={forceSubmitting}
+            >
+              {forceSubmitting ? <Spinner size="sm" /> : "Xác nhận Cưỡng chế"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* --- MODAL: REQUEST TERMINATION (STANDARD) --- */}
+        <Modal show={showTermModal} onHide={() => setShowTermModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title className="h5">Yêu cầu Chấm dứt Hợp đồng</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Alert variant="info" className="small mb-3">
+              Hành động này sẽ chuyển trạng thái hợp đồng sang <b>Requested Termination</b>.
+              Khách thuê (Tenant) sẽ nhận được email thông báo và cần xác nhận trên ứng dụng của họ.
+            </Alert>
+            <Form.Group>
+              <Form.Label>Lý do chấm dứt <span className="text-danger">*</span></Form.Label>
+              <Form.Control
+                  as="textarea"
+                  rows={3}
+                  value={termReason}
+                  onChange={(e) => setTermReason(e.target.value)}
+                  placeholder="VD: Kết thúc hợp đồng trước hạn theo thỏa thuận..."
+              />
+            </Form.Group>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowTermModal(false)}>Đóng</Button>
+            <Button
+                variant="warning"
+                onClick={handleTerminationSubmit}
+                disabled={termLoading}
+            >
+              {termLoading ? <Spinner size="sm" /> : "Gửi yêu cầu"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
       </div>
   );
 }

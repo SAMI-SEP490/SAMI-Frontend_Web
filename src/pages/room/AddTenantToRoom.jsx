@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Form, Button, Card, Spinner, Alert } from "react-bootstrap";
 import { addTenantToRoom, getRoomById } from "../../services/api/rooms";
-import { lookupTenant } from "../../services/api/tenants";
+import { listTenants } from "../../services/api/users";
 
 function AddTenantToRoom() {
   const { id: roomId } = useParams();
@@ -18,78 +18,32 @@ function AddTenantToRoom() {
   const [movedInAt, setMovedInAt] = useState("");
   const [note, setNote] = useState("");
 
-  const [loading, setLoading] = useState(false); // loading khi submit
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [roomInfo, setRoomInfo] = useState(null);
+
   const [contractWindow, setContractWindow] = useState({
     start: null,
     end: null,
-    minMoveIn: "", // yyyy-mm-dd
-    maxMoveIn: "", // yyyy-mm-dd
+    minMoveIn: "",
+    maxMoveIn: "",
   });
-  // ===== SEARCH (DEBOUNCE) =====
-  useEffect(() => {
-    const term = searchTerm.trim();
 
-    // Nếu đã chọn user rồi hoặc input rỗng -> clear dropdown
-    if (!term || selectedUser) {
-      setSearchResults([]);
-      setSearchLoading(false);
-      return;
-    }
+  // ===== CACHE ALL TENANTS =====
+  const [allTenants, setAllTenants] = useState([]);
 
-    setSearchTouched(true);
-
-    const t = setTimeout(async () => {
-      try {
-        setSearchLoading(true);
-        setError("");
-
-        // lookupTenant() -> backend sẽ tự loại tenant đã là secondary ở phòng khác
-        const buildingId =
-          roomInfo?.building_id ||
-          roomInfo?.building?.building_id ||
-          roomInfo?.buildingId;
-
-        // Chưa load được roomInfo/buildingId thì chưa search
-        if (!buildingId) {
-          setSearchResults([]);
-          return;
-        }
-
-        const res = await lookupTenant(term, buildingId);
-
-        // normalize result: object | array | null
-        const arr = Array.isArray(res) ? res : res ? [res] : [];
-
-        setSearchResults(arr);
-      } catch {
-        // 404 hoặc lỗi -> coi như không có kết quả
-        setSearchResults([]);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 350);
-
-    return () => clearTimeout(t);
-  }, [searchTerm, selectedUser, roomInfo]);
-
+  // ===== LOAD ROOM + CONTRACT WINDOW =====
   useEffect(() => {
     async function fetchContractWindow() {
       try {
         const room = await getRoomById(roomId);
         setRoomInfo(room);
-
-        // lấy active contract: ưu tiên contracts_history[0], fallback current_contract
         const active =
           (Array.isArray(room?.contracts_history) &&
             room.contracts_history[0]) ||
           room?.current_contract;
 
-        if (!active?.start_date || !active?.end_date) {
-          // không chặn UI ở đây, vì backend đã chặn; chỉ để trống window
-          return;
-        }
+        if (!active?.start_date || !active?.end_date) return;
 
         const start = new Date(active.start_date);
         const end = new Date(active.end_date);
@@ -98,29 +52,64 @@ function AddTenantToRoom() {
         const toYMD = (d) =>
           `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-        // min: SAU start_date => +1 day
-        const min = new Date(
-          start.getFullYear(),
-          start.getMonth(),
-          start.getDate(),
-        );
-
-        // max: end_date - 1 month
-        const max = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-
         setContractWindow({
           start,
           end,
-          minMoveIn: toYMD(min),
-          maxMoveIn: toYMD(max),
+          minMoveIn: toYMD(start),
+          maxMoveIn: toYMD(end),
         });
       } catch {
-        // ignore: BE vẫn chặn ở submit
+        // backend đã chặn
       }
     }
 
     if (roomId) fetchContractWindow();
   }, [roomId]);
+
+  // ===== LOAD ALL USERS ONCE =====
+  useEffect(() => {
+    async function fetchTenants() {
+      try {
+        const buildingId = roomInfo?.building_id;
+        if (!buildingId) return;
+
+        setSearchLoading(true);
+
+        const res = await listTenants();
+        const users = Array.isArray(res) ? res : [];
+        const validTenants = users.filter(
+          (u) => u.role === "TENANT" && u.building_id == buildingId,
+        );
+        setAllTenants(validTenants);
+      } catch {
+        setAllTenants([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }
+
+    fetchTenants();
+  }, [roomInfo?.building_id]);
+
+  // ===== SEARCH TENANT (FILTER FROM CACHE) =====
+  useEffect(() => {
+    const term = searchTerm.trim().toLowerCase();
+
+    if (!term || selectedUser) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchTouched(true);
+
+    const filtered = allTenants.filter((u) => {
+      const phone = u.phone?.toLowerCase() || "";
+      const email = u.email?.toLowerCase() || "";
+      return phone.includes(term) || email.includes(term);
+    });
+
+    setSearchResults(filtered);
+  }, [searchTerm, selectedUser, allTenants]);
 
   // ===== SUBMIT =====
   const handleSubmit = async (e) => {
@@ -137,11 +126,11 @@ function AddTenantToRoom() {
       return;
     }
 
-    // ✅ Validate theo hợp đồng (nếu đã load được window)
     if (contractWindow.minMoveIn && movedInAt < contractWindow.minMoveIn) {
       setError("Ngày đến phải từ ngày bắt đầu hợp đồng trở đi");
       return;
     }
+
     if (contractWindow.maxMoveIn && movedInAt > contractWindow.maxMoveIn) {
       setError("Ngày đến không được sau ngày kết thúc hợp đồng");
       return;
@@ -183,9 +172,9 @@ function AddTenantToRoom() {
           {error && <Alert variant="danger">{error}</Alert>}
 
           <Form onSubmit={handleSubmit}>
-            {/* ===== USER SEARCH ===== */}
+            {/* ===== SEARCH USER ===== */}
             <Form.Group className="mb-3">
-              <Form.Label>Người thuê (nhập SĐT hoặc Email)</Form.Label>
+              <Form.Label>Người thuê (SĐT hoặc Email)</Form.Label>
               <Form.Control
                 type="text"
                 placeholder="VD: 0123456789 hoặc email@example.com"
@@ -196,14 +185,12 @@ function AddTenantToRoom() {
                 }}
               />
 
-              {/* Loading tìm kiếm (giữ đúng cảm giác cũ) */}
               {searchLoading && !selectedUser && (
                 <div style={{ marginTop: 6, fontSize: 13, color: "#6b7280" }}>
-                  <Spinner size="sm" animation="border" /> Đang tìm kiếm...
+                  <Spinner size="sm" animation="border" /> Đang tải danh sách...
                 </div>
               )}
 
-              {/* DROPDOWN RESULT */}
               {searchResults.length > 0 && !selectedUser && (
                 <div
                   style={{
@@ -218,10 +205,7 @@ function AddTenantToRoom() {
                   {searchResults.map((u) => (
                     <div
                       key={u.user_id}
-                      style={{
-                        padding: "8px 12px",
-                        cursor: "pointer",
-                      }}
+                      style={{ padding: "8px 12px", cursor: "pointer" }}
                       onClick={() => {
                         setSelectedUser(u);
                         setSearchResults([]);
@@ -243,7 +227,6 @@ function AddTenantToRoom() {
                 </div>
               )}
 
-              {/* No result */}
               {!searchLoading &&
                 !selectedUser &&
                 searchTouched &&
@@ -275,11 +258,10 @@ function AddTenantToRoom() {
 
             {/* ===== NOTE ===== */}
             <Form.Group className="mb-3">
-              <Form.Label>Ghi chú (không bắt buộc)</Form.Label>
+              <Form.Label>Ghi chú</Form.Label>
               <Form.Control
                 as="textarea"
                 rows={3}
-                placeholder="VD: Người ở ghép, bạn bè..."
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
               />

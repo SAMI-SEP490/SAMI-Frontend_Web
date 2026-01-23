@@ -483,12 +483,12 @@ function CreateContractPage() {
                     <h2>Tạo hợp đồng mới</h2>
                     <p>Thiết lập thông tin hợp đồng thuê phòng cho khách hàng.</p>
                 </div>
-                <div>
-                    <input ref={fileInputRef} type="file" hidden accept=".pdf" onChange={handleAiImportFile} />
-                    <Button className="ai-import-btn d-flex align-items-center gap-2" onClick={() => fileInputRef.current.click()} disabled={aiProcessing}>
-                        {aiProcessing ? <Spinner size="sm"/> : <Magic />} Auto-fill từ PDF
-                    </Button>
-                </div>
+                {/*<div>*/}
+                {/*    <input ref={fileInputRef} type="file" hidden accept=".pdf" onChange={handleAiImportFile} />*/}
+                {/*    <Button className="ai-import-btn d-flex align-items-center gap-2" onClick={() => fileInputRef.current.click()} disabled={aiProcessing}>*/}
+                {/*        {aiProcessing ? <Spinner size="sm"/> : <Magic />} Auto-fill từ PDF*/}
+                {/*    </Button>*/}
+                {/*</div>*/}
             </div>
 
             {aiMessage && !showScanner && (

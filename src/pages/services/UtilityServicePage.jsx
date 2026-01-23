@@ -7,13 +7,13 @@ import {
   getUtilityReadingsForm,
   submitUtilityReadings,
 } from "../../services/api/utility";
-import { FiAlertTriangle, FiClock, FiSave } from "react-icons/fi";
+import { FiAlertTriangle, FiClock, FiSave, FiRotateCcw } from "react-icons/fi";
 import "./UtilityServicePage.css";
 
 // ===== Helper format datetime =====
 const fmtDate = (d) => {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("vi-VN", {
+  return new Date(d).toLocaleString("vi-VN", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -43,6 +43,7 @@ export default function UtilityServicePage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [editModeOld, setEditModeOld] = useState(false);
   const [autoJumped, setAutoJumped] = useState(false);
 
   // ================= RESET AUTO-JUMP WHEN BUILDING CHANGE =================
@@ -80,7 +81,7 @@ export default function UtilityServicePage() {
     loadBuildings();
   }, [role, userId]);
 
-  // ================= RULE 3 – AUTO JUMP MONTH (GIỮ NGUYÊN) =================
+  // ================= RULE 3 – AUTO JUMP MONTH =================
   useEffect(() => {
     if (autoJumped) return;
 
@@ -104,7 +105,7 @@ export default function UtilityServicePage() {
 
       setMonth(nextMonth);
       setYear(nextYear);
-      setAutoJumped(true);
+      setAutoJumped(true); // ⭐ QUAN TRỌNG
     }
   }, [
     buildings,
@@ -134,6 +135,8 @@ export default function UtilityServicePage() {
           ...r,
           new_electric: r.new_electric ?? r.old_electric,
           new_water: r.new_water ?? r.old_water,
+          old_electric_original: r.old_electric,
+          old_water_original: r.old_water,
         }));
 
         setRooms(mapped);
@@ -148,14 +151,41 @@ export default function UtilityServicePage() {
     fetchReadings();
   }, [selectedBuildingId, month, year]);
 
-  // ================= EDIT RULE (CHO SỬA QUÁ KHỨ) =================
+  // ================= LOGIC =================
+
+  // Kỳ duy nhất được phép sửa theo RULE 3
+  const editableTarget = useMemo(() => {
+    const building = buildings.find(
+      (b) => b.building_id === Number(selectedBuildingId),
+    );
+
+    if (!building?.bill_closing_day) {
+      return { month: currentMonth, year: currentYear };
+    }
+
+    // Quá ngày chốt → chỉ được sửa tháng kế tiếp
+    if (today.getDate() > building.bill_closing_day) {
+      let m = currentMonth + 1;
+      let y = currentYear;
+      if (m === 13) {
+        m = 1;
+        y += 1;
+      }
+      return { month: m, year: y };
+    }
+
+    // Chưa quá ngày chốt → sửa tháng hiện tại
+    return { month: currentMonth, year: currentYear };
+  }, [buildings, selectedBuildingId, currentMonth, currentYear, today]);
+
   const isEditable =
-    year < currentYear || (year === currentYear && month <= currentMonth);
+    month === editableTarget.month && year === editableTarget.year;
 
   const isFuture =
-    year > currentYear || (year === currentYear && month > currentMonth);
+    year > editableTarget.year ||
+    (year === editableTarget.year && month > editableTarget.month);
 
-  // ================= DEADLINE BADGE (GIỮ NGUYÊN) =================
+  // ================= DEADLINE BADGE =================
   const deadlineInfo = useMemo(() => {
     const building = buildings.find(
       (b) => b.building_id === Number(selectedBuildingId),
@@ -229,6 +259,7 @@ export default function UtilityServicePage() {
 
       alert("✅ Lưu thành công!");
       setOriginalRooms(JSON.parse(JSON.stringify(rooms)));
+      setEditModeOld(false);
     } catch (err) {
       alert("❌ Lỗi lưu dữ liệu");
       console.error(err);
@@ -330,7 +361,7 @@ export default function UtilityServicePage() {
 
       {/* TABLE */}
       {isFuture ? (
-        <div className="no-data">⛔ Không được nhập kỳ tương lai.</div>
+        <div className="no-data">⛔ Chỉ được nhập đến kỳ chốt hợp lệ.</div>
       ) : loading ? (
         <div className="loading-text">Đang tải dữ liệu...</div>
       ) : (
@@ -353,6 +384,7 @@ export default function UtilityServicePage() {
 
                   <td>
                     <input
+                      type="number"
                       className="table-input text-end"
                       value={r.old_electric}
                       disabled
@@ -361,6 +393,7 @@ export default function UtilityServicePage() {
 
                   <td>
                     <input
+                      type="number"
                       className="table-input text-end fw-bold"
                       value={r.new_electric}
                       disabled={!isEditable}
@@ -375,6 +408,7 @@ export default function UtilityServicePage() {
 
                   <td>
                     <input
+                      type="number"
                       className="table-input text-end"
                       value={r.old_water}
                       disabled
@@ -383,6 +417,7 @@ export default function UtilityServicePage() {
 
                   <td>
                     <input
+                      type="number"
                       className="table-input text-end fw-bold"
                       value={r.new_water}
                       disabled={!isEditable}

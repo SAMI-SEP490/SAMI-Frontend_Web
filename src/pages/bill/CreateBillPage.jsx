@@ -5,7 +5,7 @@ import { listAssignedBuildings, listBuildings } from "@/services/api/building";
 import { getRoomsByBuildingId, getRoomById } from "@/services/api/rooms";
 import { getUserById } from "@/services/api/users";
 import { getAccessToken } from "@/services/http";
-import { Trash, Plus, Save } from "react-bootstrap-icons";
+import { Trash, Plus, Save, InfoCircle } from "react-bootstrap-icons";
 
 // --- HELPERS ---
 const getRole = () => {
@@ -15,12 +15,7 @@ const getRole = () => {
   } catch { return ""; }
 };
 
-const isValidDate = (dateString) => {
-  if (!dateString) return false;
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return false;
-  return d.toISOString().slice(0, 10) === dateString;
-};
+const getTodayISO = () => new Date().toISOString().slice(0, 10);
 
 const fmtMoney = (amount) => new Intl.NumberFormat('vi-VN').format(amount || 0);
 
@@ -38,10 +33,14 @@ export default function CreateBillPage() {
   const [tenantUserId, setTenantUserId] = useState("");
   const [tenantName, setTenantName] = useState("");
 
-  // Bill Info (Mặc định là 'other' vì không làm điện nước ở đây nữa)
-  const [billType, setBillType] = useState("other");
+  // Bill Info
+  const billType = "other"; // Fixed type
+  
+  // Period State (Optional Toggle)
+  const [showPeriod, setShowPeriod] = useState(false);
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
+  
   const [dueDate, setDueDate] = useState("");
   const [description, setDescription] = useState("");
 
@@ -113,11 +112,20 @@ export default function CreateBillPage() {
 
   const onSubmit = async () => {
     if (!activeContract) return alert("Phòng này chưa có hợp đồng!");
-    if (!isValidDate(periodStart) || !isValidDate(periodEnd) || !isValidDate(dueDate)) {
-        return alert("Ngày tháng không hợp lệ (dd/mm/yyyy).");
+    
+    // Validate dueDate bắt buộc
+    if (!dueDate) {
+        return alert("Vui lòng chọn Hạn đóng tiền (Due Date)!");
     }
-    if (new Date(periodStart) > new Date(periodEnd)) {
-        return alert("Ngày bắt đầu không thể lớn hơn ngày kết thúc!");
+
+    // Validate Period nếu bật Toggle
+    if (showPeriod) {
+        if (!periodStart || !periodEnd) {
+            return alert("Vui lòng điền đầy đủ ngày bắt đầu và kết thúc.");
+        }
+        if (new Date(periodStart) > new Date(periodEnd)) {
+            return alert("Ngày bắt đầu không thể lớn hơn ngày kết thúc!");
+        }
     }
 
     if (charges.length === 0 || totalAmount <= 0) {
@@ -129,9 +137,10 @@ export default function CreateBillPage() {
       const payload = {
         contract_id: activeContract.contract_id,
         tenant_user_id: tenantUserId,
-        bill_type: billType, // 'other' or 'monthly_rent'
-        billing_period_start: periodStart,
-        billing_period_end: periodEnd,
+        bill_type: billType,
+        // Send dates only if manually set
+        billing_period_start: showPeriod ? periodStart : undefined,
+        billing_period_end: showPeriod ? periodEnd : undefined,
         due_date: dueDate,
         description: description || "Hóa đơn dịch vụ",
         total_amount: totalAmount,
@@ -184,22 +193,49 @@ export default function CreateBillPage() {
                 <h6 className="fw-bold text-primary">2. Cấu hình Hóa đơn</h6>
                 <div className="mb-2">
                     <label className="form-label small text-muted">Loại hóa đơn</label>
-                    <select disabled="true" className="form-select" value={billType} onChange={e => setBillType(e.target.value)}>
+                    <select className="form-select" value="other" disabled>
                         <option value="other">Khác</option>
                     </select>
                 </div>
+
+                {/* Optional Period Section */}
                 <div className="mb-2">
-                    <label className="form-label small text-muted">Kỳ thanh toán</label>
-                    <div className="d-flex gap-1">
-                        <input type="date" className="form-control form-control-sm" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
-                        <span className="align-self-center">-</span>
-                        <input type="date" className="form-control form-control-sm" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                        <label className="form-label small text-muted m-0">Khoảng thời gian</label>
+                        <div className="form-check form-switch">
+                            <input 
+                                className="form-check-input" 
+                                type="checkbox" 
+                                id="togglePeriod" 
+                                checked={showPeriod}
+                                onChange={e => setShowPeriod(e.target.checked)}
+                            />
+                            <label className="form-check-label small text-muted" htmlFor="togglePeriod">
+                                {showPeriod ? "Tùy chỉnh" : "Mặc định (Hôm nay)"}
+                            </label>
+                        </div>
                     </div>
+                    
+                    {showPeriod && (
+                        <div className="d-flex gap-1 bg-light p-2 rounded border">
+                            <input type="date" className="form-control form-control-sm" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
+                            <span className="align-self-center">-</span>
+                            <input type="date" className="form-control form-control-sm" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
+                        </div>
+                    )}
                 </div>
+
                 <div className="mb-2">
-                    <label className="form-label small text-muted">Hạn đóng tiền</label>
-                    <input type="date" className="form-control" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                    <label className="form-label small text-muted">Hạn đóng tiền (Bắt buộc)</label>
+                    <input 
+                        type="date" 
+                        className={`form-control ${!dueDate ? 'is-invalid' : ''}`} 
+                        value={dueDate} 
+                        onChange={e => setDueDate(e.target.value)} 
+                    />
+                    {!dueDate && <div className="invalid-feedback">Vui lòng chọn ngày</div>}
                 </div>
+                
                 <div className="mb-2">
                     <label className="form-label small text-muted">Ghi chú</label>
                     <textarea className="form-control" rows="2" value={description} onChange={e => setDescription(e.target.value)}></textarea>

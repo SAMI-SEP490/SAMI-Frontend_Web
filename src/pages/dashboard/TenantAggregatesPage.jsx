@@ -36,10 +36,10 @@ export default function TenantAggregatesPage() {
 
         /* ==================== USERS (CHỈ NGƯỜI THUÊ) ==================== */
         const tenantUsers = await listActiveTenants(
-  selectedBuilding === "ALL"
-    ? {}
-    : { building_id: Number(selectedBuilding) }
-);
+          selectedBuilding === "ALL"
+            ? {}
+            : { building_id: Number(selectedBuilding) },
+        );
 
         setUsers(tenantUsers);
 
@@ -80,10 +80,13 @@ export default function TenantAggregatesPage() {
 
         /* ==================== ROOMS ==================== */
         const roomRes = await listRooms();
+        console.log("🚀 roomRes:", roomRes);
         const filteredRooms =
-          buildingId === null
+          selectedBuilding === "ALL"
             ? roomRes
-            : roomRes.filter((r) => Number(r.building_id) === buildingId);
+            : roomRes.filter(
+                (r) => Number(r.building_id) === Number(selectedBuilding),
+              );
 
         const roomCounts = { occupied: 0, available: 0 };
 
@@ -92,6 +95,7 @@ export default function TenantAggregatesPage() {
           if (status === "occupied") roomCounts.occupied++;
           else if (status === "available") roomCounts.available++;
         });
+        console.log("🚀 roomCounts:", roomCounts);
 
         setRoomData([
           { name: "Đang thuê", value: roomCounts.occupied },
@@ -119,9 +123,7 @@ export default function TenantAggregatesPage() {
 
       {/* ===== FILTER BUILDING ===== */}
       <div style={{ marginBottom: 16 }}>
-        <label style={{ fontWeight: 600, marginRight: 8 }}>
-          Lọc theo tòa:
-        </label>
+        <label style={{ fontWeight: 600, marginRight: 8 }}>Lọc theo tòa:</label>
         <select
           value={selectedBuilding}
           onChange={(e) => setSelectedBuilding(e.target.value)}
@@ -152,9 +154,7 @@ export default function TenantAggregatesPage() {
       >
         {/* ================== NGƯỜI THUÊ ================== */}
         <div style={{ flex: 1 }}>
-          <h3 style={{ fontWeight: 700 }}>
-            Người thuê ({users.length} người)
-          </h3>
+          <h3 style={{ fontWeight: 700 }}>Người thuê ({users.length} người)</h3>
 
           <Section title="Giới tính" data={genderData} colors={COLORS} />
           <Section title="Độ tuổi" data={ageData} colors={COLORS} />
@@ -169,8 +169,7 @@ export default function TenantAggregatesPage() {
           }}
         >
           <h3 style={{ fontWeight: 700 }}>
-            Tình trạng phòng (
-            {roomData.reduce((t, r) => t + r.value, 0)} phòng)
+            Tình trạng phòng ({roomData.reduce((t, r) => t + r.value, 0)} phòng)
           </h3>
 
           <Section data={roomData} colors={COLORS} size={160} />

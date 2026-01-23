@@ -35,7 +35,25 @@ export async function listTenants(params = {}) {
 
   return arr.filter((u) => u.role === "TENANT");
 }
+/** =========================
+ *  ACTIVE TENANTS (GET)
+ *  Backend: GET /user/active-tenants
+ *  Chỉ primary + secondary + contract active
+ * ========================= */
+export async function listActiveTenants(params = {}) {
+  const res = await http.get("/user/active-tenants", {
+    params, // có thể truyền building_id nếu cần
+  });
 
+  const data = unwrap(res);
+
+  // Chuẩn hóa output
+  return Array.isArray(data?.data)
+    ? data.data
+    : Array.isArray(data)
+    ? data
+    : [];
+}
 /** =========================
  *  Helpers chuẩn hóa dữ liệu
  * ========================= */

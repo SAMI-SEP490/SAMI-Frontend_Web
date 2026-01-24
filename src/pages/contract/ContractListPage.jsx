@@ -16,7 +16,8 @@ import {
   PlusLg, Download, Eye, Trash,
   ArrowClockwise, FileEarmarkPdf, Building, Person, Calendar3,
   JournalText, PencilSquare, ShieldExclamation,
-  ExclamationTriangle, SlashCircle
+  ExclamationTriangle, SlashCircle,CheckCircle, HourglassSplit, Wallet2, ExclamationCircle,
+   XCircle, FileEarmarkX
 } from "react-bootstrap-icons";
 import "./ContractListPage.css";
 
@@ -267,63 +268,57 @@ function ContractListPage() {
 
 
   const renderStatus = (status) => {
-    const map = {
-      // 1. Trạng thái Hiệu lực (Xanh lá)
+    // Cấu hình hiển thị cho từng trạng thái Backend
+    const config = {
       active: {
         label: "Đang hiệu lực",
-        bg: "bg-success",
-        text: "text-white",
-        icon: "🟢"
+        className: "status-active",
+        icon: <CheckCircle size={14} />
       },
-
-      // 2. Trạng thái Chờ (Xanh dương / Vàng)
       pending: {
         label: "Chờ ký kết",
-        bg: "bg-primary",
-        text: "text-white",
-        icon: "🔵"
+        className: "status-pending",
+        icon: <HourglassSplit size={14} />
       },
       pending_transaction: {
         label: "Chờ thanh toán",
-        bg: "bg-warning",
-        text: "text-dark",
-        icon: "⏳"
+        className: "status-pending-transaction",
+        icon: <Wallet2 size={14} />
       },
       requested_termination: {
         label: "Yêu cầu hủy",
-        bg: "bg-info",
-        text: "text-dark",
-        icon: "⚠️"
+        className: "status-requested-termination",
+        icon: <ExclamationCircle size={14} />
       },
-
-      // 3. Trạng thái Kết thúc (Xám / Đỏ / Đen)
       expired: {
         label: "Đã hết hạn",
-        bg: "bg-secondary",
-        text: "text-white",
-        icon: "📅"
+        className: "status-expired",
+        icon: <FileEarmarkX size={14} />
       },
       terminated: {
         label: "Đã thanh lý",
-        bg: "bg-dark",
-        text: "text-white",
-        icon: "🏁"
+        className: "status-terminated",
+        icon: <SlashCircle size={14} />
       },
       rejected: {
         label: "Đã từ chối",
-        bg: "bg-danger",
-        text: "text-white",
-        icon: "⛔"
+        className: "status-rejected",
+        icon: <XCircle size={14} />
       }
     };
 
-    const item = map[status] || { label: status, bg: "bg-light", text: "text-dark", icon: "❓" };
+    // Fallback nếu status không tồn tại trong config
+    const item = config[status] || {
+      label: status,
+      className: "status-expired",
+      icon: null
+    };
 
     return (
-        <span className={`badge rounded-pill ${item.bg} ${item.text} border px-3 py-2 fw-normal d-inline-flex align-items-center gap-2 shadow-sm`}>
-      <span style={{ fontSize: '0.8rem' }}>{item.icon}</span>
+        <span className={`status-badge ${item.className}`}>
+        {item.icon && <span className="me-2 d-flex align-items-center">{item.icon}</span>}
           {item.label}
-    </span>
+      </span>
     );
   };
 

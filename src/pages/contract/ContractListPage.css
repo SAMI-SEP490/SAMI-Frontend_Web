@@ -248,3 +248,72 @@
 .custom-table tbody td:last-child {
     white-space: nowrap;
 }
+/* --- NEW STATUS BADGES (Soft UI Style) --- */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border-radius: 6px; /* Bo góc nhẹ, trông hiện đại hơn pill tròn hoàn toàn */
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    border: 1px solid transparent; /* Tạo khung viền mỏng */
+    transition: all 0.2s ease-in-out;
+}
+
+/* 1. Active - Xanh lá (Tươi, tích cực) */
+.status-active {
+    background-color: #d1fae5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+
+/* 2. Pending - Vàng cam (Cảnh báo nhẹ) */
+.status-pending {
+    background-color: #fef3c7;
+    color: #b45309;
+    border-color: #fcd34d;
+}
+
+/* 3. Pending Transaction - Tím (Tài chính/Công nợ - Màu khác biệt để chú ý) */
+.status-pending-transaction {
+    background-color: #ede9fe;
+    color: #6d28d9;
+    border-color: #ddd6fe;
+}
+
+/* 4. Requested Termination - Cam đỏ (Cảnh báo quan trọng) */
+.status-requested-termination {
+    background-color: #ffedd5;
+    color: #c2410c;
+    border-color: #fdba74;
+}
+
+/* 5. Expired - Xám (Trung tính, đã qua) */
+.status-expired {
+    background-color: #f3f4f6;
+    color: #4b5563;
+    border-color: #e5e7eb;
+}
+
+/* 6. Terminated - Đen/Xám đậm (Kết thúc hẳn) */
+.status-terminated {
+    background-color: #1f2937;
+    color: #f9fafb;
+    border-color: #374151;
+}
+
+/* 7. Rejected - Đỏ (Lỗi/Từ chối) */
+.status-rejected {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+/* Hiệu ứng hover nhẹ để giao diện sống động hơn */
+.status-badge:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+}

@@ -16,7 +16,8 @@ import {
   PlusLg, Download, Eye, Trash,
   ArrowClockwise, FileEarmarkPdf, Building, Person, Calendar3,
   JournalText, PencilSquare, ShieldExclamation,
-  ExclamationTriangle, SlashCircle
+  ExclamationTriangle, SlashCircle,CheckCircle, HourglassSplit, Wallet2, ExclamationCircle,
+   XCircle, FileEarmarkX
 } from "react-bootstrap-icons";
 import "./ContractListPage.css";
 
@@ -265,18 +266,58 @@ function ContractListPage() {
   // --- RENDER HELPERS ---
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
 
+
   const renderStatus = (status) => {
-    const map = {
-      active: { label: "Hiệu lực", css: "status-active" },
-      pending: { label: "Chờ duyệt", css: "status-pending" },
-      expired: { label: "Hết hạn", css: "status-expired" },
-      terminated: { label: "Đã hủy", css: "status-terminated" },
-      rejected: { label: "Từ chối", css: "status-expired" } // Thêm style cho rejected nếu cần
+    // Cấu hình hiển thị cho từng trạng thái Backend
+    const config = {
+      active: {
+        label: "Đang hiệu lực",
+        className: "status-active",
+        icon: <CheckCircle size={14} />
+      },
+      pending: {
+        label: "Chờ ký kết",
+        className: "status-pending",
+        icon: <HourglassSplit size={14} />
+      },
+      pending_transaction: {
+        label: "Chờ thanh toán",
+        className: "status-pending-transaction",
+        icon: <Wallet2 size={14} />
+      },
+      requested_termination: {
+        label: "Yêu cầu hủy",
+        className: "status-requested-termination",
+        icon: <ExclamationCircle size={14} />
+      },
+      expired: {
+        label: "Đã hết hạn",
+        className: "status-expired",
+        icon: <FileEarmarkX size={14} />
+      },
+      terminated: {
+        label: "Đã thanh lý",
+        className: "status-terminated",
+        icon: <SlashCircle size={14} />
+      },
+      rejected: {
+        label: "Đã từ chối",
+        className: "status-rejected",
+        icon: <XCircle size={14} />
+      }
     };
-    const item = map[status] || { label: status, css: "status-expired" };
+
+    // Fallback nếu status không tồn tại trong config
+    const item = config[status] || {
+      label: status,
+      className: "status-expired",
+      icon: null
+    };
+
     return (
-        <span className={`status-badge ${item.css}`}>
-        <span className="status-dot"></span> {item.label}
+        <span className={`status-badge ${item.className}`}>
+        {item.icon && <span className="me-2 d-flex align-items-center">{item.icon}</span>}
+          {item.label}
       </span>
     );
   };
@@ -330,15 +371,23 @@ function ContractListPage() {
                 </div>
             )}
 
+
             <div className="filter-group">
-              <label>Trạng thái</label>
-              <select name="status" className="form-select form-select-sm" value={filters.status} onChange={handleFilterChange}>
-                <option value="">-- Tất cả --</option>
-                <option value="active">Đang hiệu lực</option>
-                <option value="pending">Chờ duyệt</option>
-                <option value="expired">Hết hạn</option>
-                <option value="terminated">Đã hủy</option>
-                <option value="rejected">Bị từ chối</option>
+              <label className="fw-bold small mb-1">Trạng thái</label>
+              <select
+                  name="status"
+                  className="form-select form-select-sm shadow-none border-secondary-subtle"
+                  value={filters.status}
+                  onChange={handleFilterChange}
+              >
+                <option value="">-- Tất cả trạng thái --</option>
+                <option value="active"> Đang hiệu lực</option>
+                <option value="pending"> Chờ ký kết</option>
+                <option value="pending_transaction"> Chờ thanh toán (Công nợ)</option>
+                <option value="requested_termination">️ Yêu cầu hủy</option>
+                <option value="expired"> Đã hết hạn</option>
+                <option value="terminated">Đã thanh lý</option>
+                <option value="rejected"> Đã từ chối</option>
               </select>
             </div>
 
